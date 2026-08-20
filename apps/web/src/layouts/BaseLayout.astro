@@ -4,6 +4,7 @@ import SeoHead from "../components/SeoHead.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
 import { THEME_STORAGE_KEY } from "../lib/theme.js";
+import type { LocalizedRoute } from "../lib/locale.js";
 import "../styles/global.css";
 
 interface Alternate {
@@ -17,9 +18,19 @@ interface Props {
   description: string;
   canonicalPath: string;
   alternates: readonly Alternate[];
+  localizedRoute?: LocalizedRoute;
+  noindex?: boolean;
 }
 
-const { locale, title, description, canonicalPath, alternates } = Astro.props;
+const {
+  locale,
+  title,
+  description,
+  canonicalPath,
+  alternates,
+  localizedRoute = "home",
+  noindex = false,
+} = Astro.props;
 const { skip } = SITE_CONTENT[locale];
 const themeBootstrap = `(() => {
   const root = document.documentElement;
@@ -68,13 +79,14 @@ const themeBootstrap = `(() => {
       description={description}
       canonicalPath={canonicalPath}
       alternates={alternates}
+      noindex={noindex}
     />
   </head>
   <body>
     <a class="skip-link" href="#main-content">{skip}</a>
-    <SiteHeader locale={locale} />
+    <SiteHeader locale={locale} route={localizedRoute} />
     <main id="main-content"><slot /></main>
-    <SiteFooter locale={locale} />
+    <SiteFooter locale={locale} route={localizedRoute} />
     <script>
       import { initializeThemeControls } from "../scripts/theme";
 

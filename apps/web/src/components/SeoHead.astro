@@ -12,10 +12,11 @@ interface Props {
   description: string;
   canonicalPath: string;
   alternates: readonly Alternate[];
+  noindex?: boolean;
 }
 
 const productionOrigin = "https://v-b.tech";
-const { locale, title, description, canonicalPath, alternates } = Astro.props;
+const { locale, title, description, canonicalPath, alternates, noindex = false } = Astro.props;
 const absoluteUrl = (path: string) => new URL(path, productionOrigin).toString();
 const canonicalUrl = absoluteUrl(canonicalPath);
 const person = {
@@ -33,6 +34,7 @@ const alternateOgLocale = locale === "ru" ? "en_US" : "ru_RU";
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width" />
 <meta name="description" content={description} />
+{noindex && <meta name="robots" content="noindex,nofollow" />}
 <link rel="canonical" href={canonicalUrl} />
 {alternates.map((alternate) => (
   <link rel="alternate" hreflang={alternate.locale} href={absoluteUrl(alternate.path)} />

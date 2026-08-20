@@ -1,17 +1,18 @@
 ---
 import type { Locale } from "@vbtech/content";
-import { localizedPath } from "../lib/locale.js";
+import { localizedPath, type LocalizedRoute } from "../lib/locale.js";
 
 interface Props {
   locale: Locale;
   label: string;
+  route?: LocalizedRoute;
 }
 
-const { locale, label } = Astro.props;
+const { locale, label, route = "home" } = Astro.props;
 ---
 
 <nav class="locale-links" aria-label={label}>
-  <a href={localizedPath("ru", "home")} aria-current={locale === "ru" ? "page" : undefined}>RU</a>
+  <a href={localizedPath("ru", route)} aria-current={locale === "ru" ? "page" : undefined}>RU</a>
   <span aria-hidden="true"> / </span>
-  <a href={localizedPath("en", "home")} aria-current={locale === "en" ? "page" : undefined}>EN</a>
+  <a href={localizedPath("en", route)} aria-current={locale === "en" ? "page" : undefined}>EN</a>
 </nav>

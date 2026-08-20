@@ -1,0 +1,55 @@
+---
+import type { LegalDocumentView } from "@vbtech/legal-documents";
+import type { Locale } from "@vbtech/content";
+import { localizedPath } from "../lib/locale.js";
+
+interface Props {
+  locale: Locale;
+  document: LegalDocumentView;
+}
+
+const { locale, document } = Astro.props;
+const labels =
+  locale === "ru"
+    ? { code: "Код", identity: "Идентификатор", status: "Статус", draft: "проект", back: "К реестру документов" }
+    : { code: "Code", identity: "Identity", status: "Status", draft: "draft", back: "Back to legal register" };
+---
+
+<article class="legal-document">
+  <header class="legal-document-header">
+    <p class="legal-kicker">{document.code}</p>
+    <h1>{document.content.title}</h1>
+    <p class="legal-summary">{document.content.summary}</p>
+    <dl class="legal-metadata">
+      <div><dt>{labels.code}</dt><dd>{document.code}</dd></div>
+      <div><dt>{labels.identity}</dt><dd>{document.identity}</dd></div>
+      <div><dt>{labels.status}</dt><dd>{labels.draft}</dd></div>
+    </dl>
+  </header>
+
+  <div class="legal-sections">
+    {document.content.sections.map((section) => (
+      <section id={section.id}>
+        <h2>{section.heading}</h2>
+        {section.blocks.map((block) => {
+          if (block.kind === "paragraph") return <p>{block.text}</p>;
+          if (block.kind === "ordered-list") {
+            return <ol>{block.items.map((item) => <li>{item}</li>)}</ol>;
+          }
+          if (block.kind === "unordered-list") {
+            return <ul>{block.items.map((item) => <li>{item}</li>)}</ul>;
+          }
+          return (
+            <dl class="legal-definitions">
+              {(block.items as readonly { readonly term: string; readonly detail: string }[]).map(
+                ({ term, detail }) => <div><dt>{term}</dt><dd>{detail}</dd></div>,
+              )}
+            </dl>
+          );
+        })}
+      </section>
+    ))}
+  </div>
+
+  <p class="legal-back"><a href={localizedPath(locale, "legal-register")}>{labels.back}</a></p>
+</article>

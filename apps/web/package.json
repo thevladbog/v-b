@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@vbtech/content": "workspace:*",
+    "@vbtech/legal-documents": "workspace:*",
     "astro": "7.1.6"
   },
   "devDependencies": {

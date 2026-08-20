@@ -1,0 +1,40 @@
+---
+import type { Locale } from "@vbtech/content";
+import BaseLayout from "./BaseLayout.astro";
+import { localizedPath, type LocalizedRoute } from "../lib/locale.js";
+import "../styles/legal.css";
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  route: LocalizedRoute;
+}
+
+const { locale, title, description, route } = Astro.props;
+const banner =
+  locale === "ru"
+    ? "Проект. Документ не вступил в силу. Дата вступления в силу отсутствует. Отправка формы отключена."
+    : "Draft. This document is not in force. No effective date. Submission is disabled.";
+---
+
+<BaseLayout
+  locale={locale}
+  title={title}
+  description={description}
+  canonicalPath={localizedPath(locale, route)}
+  alternates={[
+    { locale: "ru", path: localizedPath("ru", route) },
+    { locale: "en", path: localizedPath("en", route) },
+    { locale: "x-default", path: localizedPath("ru", route) },
+  ]}
+  localizedRoute={route}
+  noindex={true}
+>
+  <div class="legal-shell">
+    <aside class="legal-draft-banner" aria-label={locale === "ru" ? "Статус документа" : "Document status"}>
+      {banner}
+    </aside>
+    <slot />
+  </div>
+</BaseLayout>

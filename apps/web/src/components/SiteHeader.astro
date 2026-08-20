@@ -3,27 +3,31 @@ import { SITE_CONTENT, type Locale } from "@vbtech/content";
 import LocaleLinks from "./LocaleLinks.astro";
 import ThemeControl from "./ThemeControl.astro";
 import Wordmark from "./Wordmark.astro";
+import { localizedPath, type LocalizedRoute } from "../lib/locale.js";
 
 interface Props {
   locale: Locale;
+  route?: LocalizedRoute;
 }
 
-const { locale } = Astro.props;
+const { locale, route = "home" } = Astro.props;
 const page = SITE_CONTENT[locale];
+const sectionHref = (fragment: string) =>
+  route === "home" ? `#${fragment}` : `${localizedPath(locale, "home")}#${fragment}`;
 ---
 
 <header class="site-header">
   <div class="shell header-inner">
     <Wordmark locale={locale} label={page.navigation.homeLabel} />
     <nav class="site-navigation" aria-label={page.navigation.primaryLabel}>
-      <a href="#work">{page.navigation.work}</a>
-      <a href="#expertise">{page.navigation.expertise}</a>
-      <a href="#approach">{page.navigation.approach}</a>
-      <a href="#about">{page.navigation.about}</a>
-      <a class="header-contact" href="#contact">{page.navigation.contact}</a>
+      <a href={sectionHref("work")}>{page.navigation.work}</a>
+      <a href={sectionHref("expertise")}>{page.navigation.expertise}</a>
+      <a href={sectionHref("approach")}>{page.navigation.approach}</a>
+      <a href={sectionHref("about")}>{page.navigation.about}</a>
+      <a class="header-contact" href={sectionHref("contact")}>{page.navigation.contact}</a>
     </nav>
     <div class="header-preferences">
-      <LocaleLinks locale={locale} label={page.navigation.languageLabel} />
+      <LocaleLinks locale={locale} label={page.navigation.languageLabel} route={route} />
       <ThemeControl locale={locale} />
     </div>
   </div>

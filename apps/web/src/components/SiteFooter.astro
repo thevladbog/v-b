@@ -1,15 +1,16 @@
 ---
 import { SITE_CONTENT, type Locale } from "@vbtech/content";
-import { localizedPath } from "../lib/locale.js";
+import { localizedPath, type LocalizedRoute } from "../lib/locale.js";
 import LocaleLinks from "./LocaleLinks.astro";
 import ThemeControl from "./ThemeControl.astro";
 import Wordmark from "./Wordmark.astro";
 
 interface Props {
   locale: Locale;
+  route?: LocalizedRoute;
 }
 
-const { locale } = Astro.props;
+const { locale, route = "home" } = Astro.props;
 const page = SITE_CONTENT[locale];
 const legalLabels =
   locale === "ru"
@@ -37,7 +38,7 @@ const legalLabels =
       <a href={localizedPath(locale, "personal-data-consent")}>{legalLabels.consent}</a>
     </nav>
     <div class="footer-actions">
-      <LocaleLinks locale={locale} label={page.navigation.languageLabel} />
+      <LocaleLinks locale={locale} label={page.navigation.languageLabel} route={route} />
       <ThemeControl locale={locale} />
       <p><a href="https://github.com/thevladbog">GitHub</a><a href="mailto:hello@v-b.tech">Email</a></p>
     </div>
