@@ -17,6 +17,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@vbtech/content':
+        specifier: workspace:*
+        version: link:../../packages/content
       astro:
         specifier: 7.1.6
         version: 7.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(yaml@2.9.0)
@@ -24,6 +27,15 @@ importers:
       '@astrojs/check':
         specifier: 0.9.4
         version: 0.9.4(prettier@3.9.6)(typescript@6.0.3)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(vite@8.2.0(esbuild@0.28.1)(yaml@2.9.0))
+
+  packages/content:
+    devDependencies:
       typescript:
         specifier: 6.0.3
         version: 6.0.3

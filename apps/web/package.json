@@ -9,6 +9,7 @@
     "lint": "astro check"
   },
   "dependencies": {
+    "@vbtech/content": "workspace:*",
     "astro": "7.1.6"
   },
   "devDependencies": {
