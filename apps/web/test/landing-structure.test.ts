@@ -14,6 +14,7 @@ interface HtmlNode {
   namespaceURI?: string;
   attrs?: HtmlAttribute[];
   childNodes?: HtmlNode[];
+  parentNode?: HtmlNode;
 }
 
 const pages = [
@@ -107,6 +108,32 @@ const accessibleText = (node: HtmlNode): string =>
       ? (node as HtmlNode & { value?: string }).value ?? ""
       : (node.childNodes ?? []).map(accessibleText).join(" ").replace(/\s+/g, " ").trim();
 
+const normalizedText = (value: string) => value.replace(/\s+/g, " ").trim();
+
+const effectiveAccessibleName = (document: HtmlNode, node: HtmlNode) => {
+  const labelledBy = attr(node, "aria-labelledby")?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const referenced = labelledBy.flatMap((id) =>
+    elements(document, (candidate) => attr(candidate, "id") === id)
+  );
+  if (referenced.length > 0) return normalizedText(referenced.map(text).join(" "));
+
+  const ariaLabel = attr(node, "aria-label");
+  if (ariaLabel?.trim()) return normalizedText(ariaLabel);
+  return normalizedText(accessibleText(node));
+};
+
+const isEffectivelyHidden = (node: HtmlNode) => {
+  for (let current: HtmlNode | undefined = node; current; current = current.parentNode) {
+    if (attr(current, "aria-hidden")?.trim().toLowerCase() === "true") return true;
+    if (attr(current, "hidden") !== undefined || attr(current, "inert") !== undefined) return true;
+    const style = attr(current, "style") ?? "";
+    if (/(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\b/i.test(style)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const elementById = (document: HtmlNode, id: string) =>
   elements(document, (node) => attr(node, "id") === id)[0];
 
@@ -158,18 +185,57 @@ const rootTokenSets = (css: string) => {
   return sets;
 };
 
+const quotedCssValue = (css: string, quoteIndex: number) => {
+  const quote = css[quoteIndex];
+  let value = "";
+  for (let index = quoteIndex + 1; index < css.length; index += 1) {
+    if (css[index] === "\\" && index + 1 < css.length) {
+      value += css[index] + css[index + 1];
+      index += 1;
+      continue;
+    }
+    if (css[index] === quote) return { end: index + 1, value };
+    value += css[index];
+  }
+  return undefined;
+};
+
 const cssAssetUrls = (css: string) => {
-  const urls = [...css.matchAll(/url\(\s*["']?([^"')\s]+)["']?\s*\)/gi)]
-    .map((match) => match[1]);
-  urls.push(
-    ...[...css.matchAll(/@import\s+(["'])([^"']+)\1/gi)]
-      .map((match) => match[2]),
-  );
+  const urls: string[] = [];
+  for (const match of css.matchAll(/url\s*\(/gi)) {
+    let index = (match.index ?? 0) + match[0].length;
+    while (/\s/.test(css[index] ?? "")) index += 1;
+    if (css[index] === '"' || css[index] === "'") {
+      const quoted = quotedCssValue(css, index);
+      if (!quoted) continue;
+      index = quoted.end;
+      while (/\s/.test(css[index] ?? "")) index += 1;
+      if (css[index] === ")" && quoted.value.trim()) urls.push(quoted.value.trim());
+      continue;
+    }
+    const close = css.indexOf(")", index);
+    if (close < 0) continue;
+    const value = css.slice(index, close).trim();
+    if (value) urls.push(value);
+  }
+
+  for (const match of css.matchAll(/@import\s+/gi)) {
+    let index = (match.index ?? 0) + match[0].length;
+    while (/\s/.test(css[index] ?? "")) index += 1;
+    if (css.slice(index).match(/^url\s*\(/i)) continue;
+    if (css[index] !== '"' && css[index] !== "'") continue;
+    const quoted = quotedCssValue(css, index);
+    if (quoted?.value.trim()) urls.push(quoted.value.trim());
+  }
   return urls;
 };
 
 const assetUrls = (document: HtmlNode) => {
   const urls: string[] = [];
+  const pushUrl = (value: string | undefined) => {
+    const normalized = value?.trim();
+    if (normalized) urls.push(normalized);
+  };
   const srcElements = new Set([
     "audio", "embed", "iframe", "img", "input", "script", "source", "track", "video",
   ]);
@@ -181,33 +247,35 @@ const assetUrls = (document: HtmlNode) => {
   for (const node of elements(document)) {
     const tagName = node.tagName?.toLowerCase() ?? "";
     if (srcElements.has(tagName)) {
-      const source = attr(node, "src");
-      if (source) urls.push(source);
+      pushUrl(attr(node, "src"));
     }
     for (const responsiveSource of [attr(node, "srcset"), attr(node, "imagesrcset")]) {
       if (responsiveSource) {
-        urls.push(...responsiveSource.split(",").map((item) => item.trim().split(/\s+/)[0]));
+        for (const item of responsiveSource.split(",")) pushUrl(item.trim().split(/\s+/)[0]);
       }
     }
     if (tagName === "video") {
-      const poster = attr(node, "poster");
-      if (poster) urls.push(poster);
+      pushUrl(attr(node, "poster"));
     }
     if (tagName === "object") {
-      const data = attr(node, "data");
-      if (data) urls.push(data);
+      pushUrl(attr(node, "data"));
     }
     if (tagName === "link") {
       const relations = new Set((attr(node, "rel") ?? "").toLowerCase().split(/\s+/));
       const href = attr(node, "href");
-      if (href && [...relations].some((relation) => assetLinkRels.has(relation))) urls.push(href);
+      if ([...relations].some((relation) => assetLinkRels.has(relation))) pushUrl(href);
     }
     if (node.namespaceURI === "http://www.w3.org/2000/svg" && tagName !== "a") {
       const href = attr(node, "href") ?? attr(node, "xlink:href");
-      if (href) urls.push(href);
+      pushUrl(href);
     }
     const style = attr(node, "style");
     if (style) urls.push(...cssAssetUrls(style));
+    for (const attribute of node.attrs ?? []) {
+      if (attribute.name !== "style" && /url\s*\(/i.test(attribute.value)) {
+        urls.push(...cssAssetUrls(attribute.value));
+      }
+    }
   }
 
   for (const style of elements(document, (node) => node.tagName === "style")) {
@@ -300,18 +368,27 @@ const figureContractProblems = (document: HtmlNode, locale: PageLocale) => {
     const expected = figureContracts[locale][caseId];
     if (!expected) continue;
     const figure = descendants(article, "figure")[0];
-    if (!figure || attr(figure, "aria-label") !== expected.label) {
+    const roles = new Set(
+      (figure && attr(figure, "role")?.trim().toLowerCase().split(/\s+/)) || [],
+    );
+    if (
+      !figure ||
+      isEffectivelyHidden(figure) ||
+      roles.has("none") ||
+      roles.has("presentation")
+    ) {
+      problems.push(`${caseId}: figure is effectively hidden or presentational`);
+    }
+    if (!figure || effectiveAccessibleName(document, figure) !== expected.label) {
       problems.push(`${caseId}: accessible figure label is not exact`);
     }
     const caption = figure && descendants(figure, "figcaption")[0];
-    const captionSpans = caption ? descendants(caption, "span") : [];
-    const disclosureNode = captionSpans.at(-1) ?? caption;
-    if (
-      !disclosureNode ||
-      attr(disclosureNode, "aria-hidden") === "true" ||
-      attr(disclosureNode, "hidden") !== undefined ||
-      text(disclosureNode) !== expected.disclosure
-    ) {
+    const disclosureNodes = caption
+      ? [caption, ...descendants(caption)].filter((node) =>
+          !isEffectivelyHidden(node) && normalizedText(text(node)) === expected.disclosure
+        )
+      : [];
+    if (!caption || isEffectivelyHidden(caption) || disclosureNodes.length === 0) {
       problems.push(`${caseId}: visible disclosure is not exact`);
     }
   }
@@ -321,22 +398,33 @@ const figureContractProblems = (document: HtmlNode, locale: PageLocale) => {
 const browsingContextProblems = (document: HtmlNode, locale: PageLocale) => {
   const disclosure = pages.find((page) => page.locale === locale)?.newTabDisclosure ?? "";
   const problems: string[] = [];
-  for (const link of elements(document, (node) => node.tagName === "a" && attr(node, "target") !== undefined)) {
-    const target = attr(link, "target") ?? "";
+  const targetElements = new Set(["a", "area", "base", "form"]);
+  for (const link of elements(document, (node) =>
+    targetElements.has(node.tagName ?? "") && attr(node, "target") !== undefined
+  )) {
+    const tagName = link.tagName ?? "";
+    const target = (attr(link, "target") ?? "").trim();
     const targetKeyword = target.toLowerCase();
-    const visiblePurpose = accessibleText(link);
-    const identifier = visiblePurpose || attr(link, "href") || "unnamed link";
+    const visiblePurpose = normalizedText(accessibleText(link));
+    const destination = (tagName === "form" ? attr(link, "action") : attr(link, "href"))?.trim();
+    const identifier = tagName === "a"
+      ? visiblePurpose || destination || "unnamed link"
+      : `${tagName} ${destination || "(no destination)"}`;
     if (targetKeyword === "_self") continue;
-    if (targetKeyword !== "_blank") {
+    if (tagName !== "a" || targetKeyword !== "_blank") {
       problems.push(`${identifier}: target ${target || "(empty)"} opens an unsupported browsing context`);
       continue;
     }
 
-    const relTokens = (attr(link, "rel") ?? "").split(/\s+/).filter(Boolean).sort();
+    const relTokens = (attr(link, "rel") ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((token) => token.toLowerCase())
+      .sort();
     if (relTokens.join(" ") !== "noopener noreferrer") {
       problems.push(`${identifier}: new-tab rel must be exactly noopener noreferrer`);
     }
-    const label = (attr(link, "aria-label") || visiblePurpose).trim();
+    const label = effectiveAccessibleName(document, link);
     if (!label.toLocaleLowerCase(locale).includes(disclosure.toLocaleLowerCase(locale))) {
       problems.push(`${identifier}: new-tab label lacks localized disclosure`);
       continue;
@@ -353,6 +441,55 @@ const browsingContextProblems = (document: HtmlNode, locale: PageLocale) => {
       problems.push(`${identifier}: new-tab label does not include its purpose`);
     }
   }
+  return problems;
+};
+
+const productionOrigin = "https://v-b.tech";
+
+const remoteAssetProblems = (document: HtmlNode, css: string, pathname: string) => {
+  const canonicalBase = new URL(pathname, productionOrigin);
+  const problems: string[] = [];
+  let effectiveBase = canonicalBase;
+  const bases = elements(document, (node) =>
+    node.tagName === "base" && Boolean(attr(node, "href")?.trim())
+  );
+  bases.forEach((base, index) => {
+    const href = attr(base, "href")?.trim() ?? "";
+    let resolved: URL;
+    try {
+      resolved = new URL(href, canonicalBase);
+    } catch {
+      problems.push(`base href ${href}: is invalid`);
+      return;
+    }
+    if (index === 0) effectiveBase = resolved;
+    if (resolved.origin !== canonicalBase.origin) {
+      problems.push(`base href ${resolved.href}: resolves outside ${canonicalBase.origin}`);
+    }
+  });
+
+  const inspect = (rawValue: string, base: URL) => {
+    const value = rawValue.trim();
+    if (!value) return;
+    let resolved: URL;
+    try {
+      resolved = new URL(value, base);
+    } catch {
+      problems.push(`${value}: is not a valid asset URL`);
+      return;
+    }
+    const hostname = resolved.hostname.replace(/\.$/, "");
+    if (["fonts.googleapis.com", "fonts.gstatic.com"].includes(hostname)) {
+      problems.push(`${value}: Google Fonts fetch host is forbidden`);
+      return;
+    }
+    if (["http:", "https:"].includes(resolved.protocol) && resolved.origin !== canonicalBase.origin) {
+      problems.push(`${value}: resolves to remote asset ${resolved.href}`);
+    }
+  };
+
+  for (const url of assetUrls(document)) inspect(url, effectiveBase);
+  for (const url of cssAssetUrls(css)) inspect(url, canonicalBase);
   return problems;
 };
 
@@ -385,6 +522,49 @@ describe("negative structural guard fixtures", () => {
     ]);
   });
 
+  it("uses aria-labelledby before aria-label for the effective figure name", () => {
+    const document = documentFor(`
+      <article data-case="markiro">
+        <span id="wrong-figure-name">Wrong figure name</span>
+        <figure aria-labelledby="wrong-figure-name" aria-label="Markiro — product interface concept illustration">
+          <figcaption><span>illustration / concept, not a product capture</span></figcaption>
+        </figure>
+      </article>
+    `);
+
+    expect(figureContractProblems(document, "en")).toEqual([
+      "markiro: accessible figure label is not exact",
+    ]);
+  });
+
+  it("rejects a presentational figure even when its label and caption match", () => {
+    const document = documentFor(`
+      <article data-case="markiro">
+        <figure role="presentation" aria-label="Markiro — product interface concept illustration">
+          <figcaption><span>illustration / concept, not a product capture</span></figcaption>
+        </figure>
+      </article>
+    `);
+
+    expect(figureContractProblems(document, "en")).toEqual([
+      "markiro: figure is effectively hidden or presentational",
+    ]);
+  });
+
+  it("rejects a matching disclosure under a hidden ancestor", () => {
+    const document = documentFor(`
+      <article data-case="markiro">
+        <figure aria-label="Markiro — product interface concept illustration">
+          <div inert><figcaption><span>illustration / concept, not a product capture</span></figcaption></div>
+        </figure>
+      </article>
+    `);
+
+    expect(figureContractProblems(document, "en")).toEqual([
+      "markiro: visible disclosure is not exact",
+    ]);
+  });
+
   it("catches named targets and disclosure-only blank-link labels", () => {
     const document = documentFor(`
       <a href="/report" target="report-window">Download report</a>
@@ -393,6 +573,32 @@ describe("negative structural guard fixtures", () => {
 
     expect(browsingContextProblems(document, "en")).toEqual([
       "Download report: target report-window opens an unsupported browsing context",
+      "Contact team: new-tab label does not include its purpose",
+    ]);
+  });
+
+  it("rejects non-self targets on area, form, and base", () => {
+    const document = documentFor(`
+      <map><area href="/map" alt="Map area" target="map-window"></map>
+      <form action="/search" target="_parent"></form>
+      <base href="/" target="_blank">
+    `);
+
+    expect(browsingContextProblems(document, "en")).toEqual([
+      "area /map: target map-window opens an unsupported browsing context",
+      "form /search: target _parent opens an unsupported browsing context",
+      "base /: target _blank opens an unsupported browsing context",
+    ]);
+  });
+
+  it("uses aria-labelledby before aria-label for new-tab purpose", () => {
+    const document = documentFor(`
+      <span id="disclosure-only">opens in a new tab</span>
+      <a href="https://example.com/contact" target="_blank" rel="noopener noreferrer"
+        aria-labelledby="disclosure-only" aria-label="Contact team (opens in a new tab)">Contact team</a>
+    `);
+
+    expect(browsingContextProblems(document, "en")).toEqual([
       "Contact team: new-tab label does not include its purpose",
     ]);
   });
@@ -426,6 +632,49 @@ describe("negative structural guard fixtures", () => {
     `)).toEqual([
       "https://cdn.example.com/background.png",
       "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans",
+    ]);
+  });
+
+  it("normalizes a remote base and SVG presentation URLs without flagging navigation", () => {
+    const document = documentFor(`
+      <base href="  https://cdn.example.com/assets/  ">
+      <link rel="canonical" href="https://remote.example/canonical">
+      <link rel="alternate" hreflang="en" href="https://remote.example/en/">
+      <a href="https://fonts.googleapis.com/help">Font documentation</a>
+      <p>fonts.gstatic.com is ordinary text here.</p>
+      <img src="  local.png  ">
+      <svg filter="url( https://media.example/filter.svg#active )"></svg>
+    `);
+
+    expect(remoteAssetProblems(document, "", "/")).toEqual([
+      "base href https://cdn.example.com/assets/: resolves outside https://v-b.tech",
+      "local.png: resolves to remote asset https://cdn.example.com/assets/local.png",
+      "https://media.example/filter.svg#active: resolves to remote asset https://media.example/filter.svg#active",
+    ]);
+  });
+
+  it("collects quoted CSS fetch URLs containing whitespace", () => {
+    expect(cssAssetUrls(`
+      @import "https://fonts.googleapis.com/css family.css";
+      .hero { background-image: url("https://cdn.example.com/hero image.png"); }
+    `)).toEqual([
+      "https://cdn.example.com/hero image.png",
+      "https://fonts.googleapis.com/css family.css",
+    ]);
+  });
+
+  it("classifies a browser-equivalent Google Fonts fetch host without scanning navigation", () => {
+    const document = documentFor(`
+      <link rel="canonical" href="https://fonts.googleapis.com/canonical">
+      <a href="https://fonts.gstatic.com/help">Font help</a>
+    `);
+
+    expect(remoteAssetProblems(
+      document,
+      '@import "https://fonts.googleapis.com./css?family=IBM+Plex+Sans";',
+      "/",
+    )).toEqual([
+      "https://fonts.googleapis.com./css?family=IBM+Plex+Sans: Google Fonts fetch host is forbidden",
     ]);
   });
 });
@@ -478,14 +727,13 @@ describe("production landing structure", () => {
     expect(positions).toEqual([...positions].sort((left, right) => left - right));
   });
 
-  it.each(pages)("rejects remote URL-bearing assets without confusing metadata or navigation in $locale", async ({ file }) => {
+  it.each(pages)("rejects browser-normalized remote asset loads without confusing metadata or navigation in $locale", async ({ file, pathname }) => {
     const html = await readBuilt(file);
     const document = documentFor(html);
     const css = await readBuiltCss();
     const urls = [...assetUrls(document), ...cssAssetUrls(css)];
 
-    expect(urls.filter((url) => /^(?:https?:)?\/\//i.test(url))).toEqual([]);
-    expect(`${html}\n${css}`).not.toMatch(/fonts\.(?:googleapis|gstatic)\.com/i);
+    expect(remoteAssetProblems(document, css, pathname)).toEqual([]);
     for (const asset of urls.filter((url) => url.startsWith("/assets/") && url.endsWith(".svg"))) {
       await expect(access(new URL(`../dist${asset}`, import.meta.url))).resolves.toBeUndefined();
     }
