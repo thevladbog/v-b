@@ -20,3 +20,18 @@ describe("Astro build contract", () => {
     });
   });
 });
+
+describe("root acceptance gate contract", () => {
+  it("runs the unit graph before the browser gate without a concurrent dist race", async () => {
+    const rootPackage = JSON.parse(
+      await readFile(new URL("../../../package.json", import.meta.url), "utf8"),
+    ) as { scripts?: Record<string, string> };
+
+    expect(rootPackage.scripts?.["test:unit"]).toBe(
+      "turbo run test --filter='!@vbtech/browser'",
+    );
+    expect(rootPackage.scripts?.test).toBe(
+      "corepack pnpm run test:unit && corepack pnpm --dir tools/browser test",
+    );
+  });
+});

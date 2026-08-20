@@ -19,6 +19,7 @@ interface Props {
   canonicalPath: string;
   alternates: readonly Alternate[];
   localizedRoute?: LocalizedRoute;
+  routeKind?: "home" | "secondary";
   noindex?: boolean;
 }
 
@@ -29,6 +30,7 @@ const {
   canonicalPath,
   alternates,
   localizedRoute = "home",
+  routeKind = localizedRoute === "home" ? "home" : "secondary",
   noindex = false,
 } = Astro.props;
 const { skip } = SITE_CONTENT[locale];
@@ -84,7 +86,7 @@ const themeBootstrap = `(() => {
   </head>
   <body>
     <a class="skip-link" href="#main-content">{skip}</a>
-    <SiteHeader locale={locale} route={localizedRoute} />
+    <SiteHeader locale={locale} localizedRoute={localizedRoute} routeKind={routeKind} />
     <main id="main-content" tabindex="-1"><slot /></main>
     <SiteFooter locale={locale} route={localizedRoute} />
     <script>

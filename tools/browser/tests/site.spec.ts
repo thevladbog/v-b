@@ -205,7 +205,7 @@ test("central route inventory and discovery artifacts are reachable", async ({ r
   expect((await request.get("/llms.txt")).headers()["content-type"]).toContain("text/plain");
 });
 
-test("landing, legal drafts, and 404 expose their intended index policy", async ({ page }) => {
+test("landing, legal drafts, and 404 expose their intended index policy", async ({ page }, testInfo) => {
   for (const path of PUBLIC_ROUTES) {
     await page.goto(path);
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
@@ -221,6 +221,16 @@ test("landing, legal drafts, and 404 expose their intended index policy", async 
   await expect(page.getByRole("link", { name: "English home" })).toHaveAttribute("href", "/en/");
   await expect(page.getByRole("link", { name: "Связаться" })).toHaveAttribute("href", "/#contact");
   await expect(page.getByRole("link", { name: "Contact", exact: true })).toHaveAttribute("href", "/en/#contact");
+
+  if (testInfo.project.name === "Pixel 7") {
+    await page.getByRole("button", { name: "Открыть меню" }).click();
+  }
+  const primaryNavigation = page.getByRole("navigation", { name: "Основная навигация" });
+  await expect(primaryNavigation.getByRole("link", { name: "кейсы" })).toHaveAttribute("href", "/#work");
+  await expect(primaryNavigation.getByRole("link", { name: "экспертиза" })).toHaveAttribute("href", "/#expertise");
+  await expect(primaryNavigation.getByRole("link", { name: "подход" })).toHaveAttribute("href", "/#approach");
+  await expect(primaryNavigation.getByRole("link", { name: "обо мне" })).toHaveAttribute("href", "/#about");
+  await expect(primaryNavigation.getByRole("link", { name: "обсудить проект" })).toHaveAttribute("href", "/#contact");
 });
 
 test("generated runtime has no remote scripts or enabled contact and captcha clients", async ({ page, request }) => {

@@ -7,13 +7,18 @@ import { localizedPath, type LocalizedRoute } from "../lib/locale.js";
 
 interface Props {
   locale: Locale;
-  route?: LocalizedRoute;
+  localizedRoute?: LocalizedRoute;
+  routeKind?: "home" | "secondary";
 }
 
-const { locale, route = "home" } = Astro.props;
+const {
+  locale,
+  localizedRoute = "home",
+  routeKind = localizedRoute === "home" ? "home" : "secondary",
+} = Astro.props;
 const page = SITE_CONTENT[locale];
 const sectionHref = (fragment: string) =>
-  route === "home" ? `#${fragment}` : `${localizedPath(locale, "home")}#${fragment}`;
+  routeKind === "home" ? `#${fragment}` : `${localizedPath(locale, "home")}#${fragment}`;
 ---
 
 <header class="site-header" data-site-header>
@@ -41,7 +46,7 @@ const sectionHref = (fragment: string) =>
       <a class="header-contact" href={sectionHref("contact")}>{page.navigation.contact}</a>
     </nav>
     <div class="header-preferences">
-      <LocaleLinks locale={locale} label={page.navigation.languageLabel} route={route} />
+      <LocaleLinks locale={locale} label={page.navigation.languageLabel} route={localizedRoute} />
       <ThemeControl locale={locale} />
     </div>
   </div>

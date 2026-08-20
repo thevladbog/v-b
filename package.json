@@ -7,7 +7,8 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test --filter='!@vbtech/browser'",
+    "test": "corepack pnpm run test:unit && corepack pnpm --dir tools/browser test",
+    "test:unit": "turbo run test --filter='!@vbtech/browser'",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint"
   },

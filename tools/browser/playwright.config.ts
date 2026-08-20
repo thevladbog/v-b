@@ -10,6 +10,7 @@ export default defineConfig({
   testMatch: "**/*.spec.ts",
   outputDir: join(tmpdir(), "vbtech-task-8-playwright"),
   fullyParallel: true,
+  workers: 2,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: "list",
