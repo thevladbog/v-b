@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "astro build",
-    "test": "vitest run",
+    "test": "astro build && vitest run",
     "typecheck": "astro check",
     "lint": "astro check"
   },

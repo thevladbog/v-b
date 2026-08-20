@@ -2,34 +2,59 @@ import { THEME_STORAGE_KEY, parseTheme, resolveTheme, type ThemeMode } from "../
 
 const colorSchemeQuery = "(prefers-color-scheme: dark)";
 
-const readStoredMode = (): ThemeMode => {
+interface ThemeRoot {
+  dataset: { theme?: string };
+  style: { colorScheme: string };
+}
+
+interface ThemeButton {
+  dataset: { themeMode?: string };
+  setAttribute: (name: string, value: string) => void;
+  addEventListener: (event: "click", listener: () => void) => void;
+}
+
+interface ThemeStorage {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+}
+
+interface ThemeMediaQuery {
+  matches: boolean;
+  addEventListener?: (event: "change", listener: () => void) => void;
+  addListener?: (listener: () => void) => void;
+}
+
+interface ThemeRuntimeOptions {
+  root: ThemeRoot;
+  buttons: Iterable<ThemeButton>;
+  storage?: ThemeStorage;
+  mediaQuery?: ThemeMediaQuery;
+}
+
+const readStoredMode = (storage?: ThemeStorage): ThemeMode => {
   try {
-    return parseTheme(window.localStorage.getItem(THEME_STORAGE_KEY));
+    return parseTheme(storage?.getItem(THEME_STORAGE_KEY));
   } catch {
     return "system";
   }
 };
 
-const persistMode = (mode: ThemeMode): void => {
+const persistMode = (storage: ThemeStorage | undefined, mode: ThemeMode): void => {
   try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, mode);
+    storage?.setItem(THEME_STORAGE_KEY, mode);
   } catch {
     // Storage can be unavailable in private or hardened browsing contexts.
   }
 };
 
-export const initializeThemeControls = (): void => {
-  const root = document.documentElement;
-  const buttons = document.querySelectorAll<HTMLButtonElement>("[data-theme-control] button[data-theme-mode]");
-  let mediaQuery: MediaQueryList | undefined;
-
-  try {
-    mediaQuery = window.matchMedia(colorSchemeQuery);
-  } catch {
-    mediaQuery = undefined;
-  }
-
-  let mode = readStoredMode();
+export const bindThemeControls = ({
+  root,
+  buttons: buttonIterable,
+  storage,
+  mediaQuery,
+}: ThemeRuntimeOptions): void => {
+  const buttons = Array.from(buttonIterable);
+  let mode = readStoredMode(storage);
 
   const render = (): void => {
     const theme = resolveTheme(mode, mediaQuery?.matches ?? false);
@@ -43,7 +68,7 @@ export const initializeThemeControls = (): void => {
 
   const selectMode = (nextMode: ThemeMode): void => {
     mode = nextMode;
-    persistMode(mode);
+    persistMode(storage, mode);
     render();
   };
 
@@ -51,11 +76,42 @@ export const initializeThemeControls = (): void => {
     button.addEventListener("click", () => selectMode(parseTheme(button.dataset.themeMode)));
   });
 
-  mediaQuery?.addEventListener("change", () => {
+  const handleSystemChange = (): void => {
     if (mode === "system") {
       render();
     }
-  });
+  };
+
+  if (typeof mediaQuery?.addEventListener === "function") {
+    mediaQuery.addEventListener("change", handleSystemChange);
+  } else if (typeof mediaQuery?.addListener === "function") {
+    mediaQuery.addListener(handleSystemChange);
+  }
 
   render();
+};
+
+const getStorage = (): ThemeStorage | undefined => {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+};
+
+const getMediaQuery = (): ThemeMediaQuery | undefined => {
+  try {
+    return window.matchMedia(colorSchemeQuery);
+  } catch {
+    return undefined;
+  }
+};
+
+export const initializeThemeControls = (): void => {
+  bindThemeControls({
+    root: document.documentElement,
+    buttons: document.querySelectorAll<HTMLButtonElement>("[data-theme-control] button[data-theme-mode]"),
+    storage: getStorage(),
+    mediaQuery: getMediaQuery(),
+  });
 };
