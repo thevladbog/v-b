@@ -1,6 +1,11 @@
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { parse } from "parse5";
 import { describe, expect, it } from "vitest";
+import {
+  listGeneratedLegalRoutes,
+  validateLegalPageContract,
+  type LegalPageContract,
+} from "./helpers/legal-page-contract.js";
 
 interface HtmlAttribute { name: string; value: string; }
 interface HtmlNode {
@@ -95,25 +100,58 @@ const text = (node: HtmlNode): string =>
     ? (node as HtmlNode & { value?: string }).value ?? ""
     : (node.childNodes ?? []).map(text).join(" ").replace(/\s+/g, " ").trim();
 
+const fixtureContract: LegalPageContract = {
+  locale: "ru",
+  route: "/legal/",
+  pairedRoute: "/en/legal/",
+  title: "Правовые документы v-b.tech — проекты",
+  description: "Описание проекта реестра.",
+  draftBanner:
+    "Проект. Документ не вступил в силу. Дата вступления в силу отсутствует. Отправка формы отключена.",
+};
+
+const validLegalFixture = `<!doctype html>
+<html lang="ru">
+  <head>
+    <title>${fixtureContract.title}</title>
+    <meta name="description" content="${fixtureContract.description}">
+    <meta name="robots" content="noindex,nofollow">
+    <link rel="canonical" href="https://v-b.tech/legal/">
+    <link rel="alternate" hreflang="ru" href="https://v-b.tech/legal/">
+    <link rel="alternate" hreflang="en" href="https://v-b.tech/en/legal/">
+    <link rel="alternate" hreflang="x-default" href="https://v-b.tech/legal/">
+  </head>
+  <body>
+    <nav class="locale-links" aria-label="Язык">
+      <a href="/legal/" aria-current="page">RU</a>
+      <a href="/en/legal/">EN</a>
+    </nav>
+    <main><aside class="legal-draft-banner">${fixtureContract.draftBanner}</aside><h1>Правовые документы</h1><p>Безопасный текст</p></main>
+  </body>
+</html>`;
+
 describe("draft legal pages", () => {
   it("builds exactly the six canonical legal route files", async () => {
-    await Promise.all(pages.map(({ file }) => access(new URL(`../${file}`, import.meta.url))));
-    expect(new Set(pages.map(({ route }) => route)).size).toBe(6);
-    expect(new Set(pages.map(({ file }) => file).filter((file) => !file.includes("/legal/"))).size).toBe(4);
+    const generatedRoutes = await listGeneratedLegalRoutes(new URL("../dist/", import.meta.url));
+    expect(generatedRoutes).toEqual(pages.map(({ route }) => route).sort());
+    expect(generatedRoutes).not.toContain("/");
+    expect(generatedRoutes).not.toContain("/en/");
   });
 
   it.each(pages)("renders metadata and draft boundary for $route", async (page) => {
     const html = await readBuilt(page.file);
     const document = parse(html) as unknown as HtmlNode;
-    expect(html).toContain(`<title>${page.title}</title>`);
-    expect(html).toContain(`<meta name="description" content="${page.description}">`);
-    expect(html).toContain(`<link rel="canonical" href="https://v-b.tech${page.route}">`);
-    expect(html).toContain(`<link rel="alternate" hreflang="ru" href="https://v-b.tech${page.locale === "ru" ? page.route : page.pair}">`);
-    expect(html).toContain(`<link rel="alternate" hreflang="en" href="https://v-b.tech${page.locale === "en" ? page.route : page.pair}">`);
-    expect(html).toContain(`<link rel="alternate" hreflang="x-default" href="https://v-b.tech${page.locale === "ru" ? page.route : page.pair}">`);
-    expect(html).toContain('<meta name="robots" content="noindex,nofollow">');
-    expect(elements(document, "main")).toHaveLength(1);
-    expect(elements(document, "h1")).toHaveLength(1);
+    expect(validateLegalPageContract(html, {
+      locale: page.locale,
+      route: page.route,
+      pairedRoute: page.pair,
+      title: page.title,
+      description: page.description,
+      draftBanner:
+        page.locale === "ru"
+          ? "Проект. Документ не вступил в силу. Дата вступления в силу отсутствует. Отправка формы отключена."
+          : "Draft. This document is not in force. No effective date. Submission is disabled.",
+    })).toEqual([]);
     expect(text(document)).toContain(page.identity);
     expect(text(document)).toMatch(
       page.locale === "ru"
@@ -122,6 +160,32 @@ describe("draft legal pages", () => {
     );
     expect(html).toMatch(new RegExp(`<a[^>]+href="${page.pair.replaceAll("/", "\\/")}"[^>]*>\\s*(?:RU|EN)\\s*<\\/a>`));
     expect(await readBuilt(page.pairFile)).toBeTruthy();
+  });
+
+  it("accepts a complete reusable legal-page fixture", () => {
+    expect(validateLegalPageContract(validLegalFixture, fixtureContract)).toEqual([]);
+  });
+
+  it.each([
+    ["wrong canonical", validLegalFixture.replace("https://v-b.tech/legal/\">", "https://v-b.tech/wrong/\">"), /canonical/i],
+    ["missing canonical", validLegalFixture.replace(/\s*<link rel="canonical"[^>]+>/, ""), /canonical/i],
+    ["missing reciprocal alternate", validLegalFixture.replace(/\s*<link rel="alternate" hreflang="en"[^>]+>/, ""), /alternate.*en/i],
+    ["wrong x-default", validLegalFixture.replace('hreflang="x-default" href="https://v-b.tech/legal/"', 'hreflang="x-default" href="https://v-b.tech/en/legal/"'), /x-default/i],
+    ["missing noindex", validLegalFixture.replace(/\s*<meta name="robots"[^>]+>/, ""), /noindex/i],
+    ["indexable robots", validLegalFixture.replace("noindex,nofollow", "index,follow"), /noindex/i],
+    ["missing main", validLegalFixture.replace(/<main>[\s\S]*?<\/main>/, "<div><h1>Правовые документы</h1></div>"), /exactly one main/i],
+    ["duplicate main", validLegalFixture.replace("</main>", "</main><main><p>duplicate</p></main>"), /exactly one main/i],
+    ["missing h1", validLegalFixture.replace("<h1>Правовые документы</h1>", "<h2>Правовые документы</h2>"), /exactly one h1/i],
+    ["duplicate h1", validLegalFixture.replace("</h1>", "</h1><h1>duplicate</h1>"), /exactly one h1/i],
+    ["wrong paired locale href", validLegalFixture.replace('href="/en/legal/">EN', 'href="/en/">EN'), /paired locale/i],
+    ["missing draft banner", validLegalFixture.replace(/<aside class="legal-draft-banner">[\s\S]*?<\/aside>/, ""), /draft banner/i],
+    ["hidden draft banner", validLegalFixture.replace('class="legal-draft-banner"', 'class="legal-draft-banner" hidden'), /visible draft banner/i],
+    ["unsafe script in legal main", validLegalFixture.replace("<p>Безопасный текст</p>", "<script>alert(1)</script>"), /unsafe legal markup/i],
+    ["unsafe event handler", validLegalFixture.replace("<p>Безопасный текст</p>", '<p onclick="alert(1)">Безопасный текст</p>'), /unsafe legal markup/i],
+  ])("rejects malformed fixture: %s", (_label, html, expected) => {
+    expect(validateLegalPageContract(html, fixtureContract)).toEqual(
+      expect.arrayContaining([expect.stringMatching(expected)]),
+    );
   });
 
   it.each(pages.filter(({ back }) => back !== null))(

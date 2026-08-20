@@ -16,6 +16,7 @@ export {
 } from "./registry.js";
 export type {
   LegalBlock,
+  LegalContentRequirement,
   LegalDocumentCode,
   LegalDocumentIdentity,
   LegalDocumentLocaleContent,

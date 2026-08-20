@@ -6,6 +6,7 @@ import type {
   LegalDocumentRelease,
   LegalDocumentSource,
   LegalDocumentView,
+  LegalDocumentLocaleContent,
   LegalLocale,
 } from "./types.js";
 
@@ -81,6 +82,7 @@ const CURRENT_RELEASES: readonly LegalDocumentRelease[] = LEGAL_RELEASES;
 const CODES = ["VBT-PD-01", "VBT-PD-02"] as const;
 const STATUSES = ["draft", "active", "superseded", "withdrawn"] as const;
 const ROUTE_PATTERN = /^\/(?:en\/)?[a-z0-9-]+(?:\/[a-z0-9-]+)*\/$/;
+const SECTION_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 function assertLocaleRoutes(release: LegalDocumentRelease): void {
   const routes = release.routes as Partial<Record<LegalLocale, string>>;
@@ -105,6 +107,88 @@ function expectedIdentity(release: LegalDocumentRelease): string {
   return release.status === "draft"
     ? `${release.code}/DRAFT`
     : `${release.code}/${String(release.revision)}`;
+}
+
+function assertNonBlank(value: unknown, path: string): asserts value is string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Blank legal content at ${path}`);
+  }
+}
+
+function validateLocalizedContent(
+  release: LegalDocumentRelease,
+  content: LegalDocumentLocaleContent,
+  locale: LegalLocale,
+): void {
+  if (content.documentCode !== release.code) {
+    throw new Error(
+      `Content document code ${content.documentCode} does not match release ${release.code}`,
+    );
+  }
+  if (content.releaseIdentity !== release.identity) {
+    throw new Error(
+      `Localized content identity ${content.releaseIdentity} does not match ${release.identity}`,
+    );
+  }
+  if (content.locale !== locale) {
+    throw new Error(`Legal content locale mismatch: expected ${locale}, received ${content.locale}`);
+  }
+
+  assertNonBlank(content.title, `${release.identity}.${locale}.title`);
+  assertNonBlank(content.description, `${release.identity}.${locale}.description`);
+  assertNonBlank(content.summary, `${release.identity}.${locale}.summary`);
+  if (content.sections.length === 0) {
+    throw new Error(`Legal content ${release.identity}.${locale} must have at least one section`);
+  }
+
+  const sectionIds = new Set<string>();
+  for (const [sectionIndex, section] of content.sections.entries()) {
+    const path = `${release.identity}.${locale}.sections[${sectionIndex}]`;
+    assertNonBlank(section.id, `${path}.id`);
+    if (!SECTION_ID_PATTERN.test(section.id)) {
+      throw new Error(`Unsafe section id: ${section.id}`);
+    }
+    if (sectionIds.has(section.id)) {
+      throw new Error(`Duplicate section id: ${section.id}`);
+    }
+    sectionIds.add(section.id);
+    assertNonBlank(section.heading, `${path}.heading`);
+    if (section.requirements.length === 0) {
+      throw new Error(`Section ${section.id} must have at least one requirement marker`);
+    }
+    const requirements = new Set<string>();
+    for (const [requirementIndex, requirement] of section.requirements.entries()) {
+      assertNonBlank(requirement, `${path}.requirements[${requirementIndex}]`);
+      if (requirements.has(requirement)) {
+        throw new Error(`Duplicate requirement marker ${requirement} in section ${section.id}`);
+      }
+      requirements.add(requirement);
+    }
+    if (section.blocks.length === 0) {
+      throw new Error(`Section ${section.id} must have at least one block`);
+    }
+
+    for (const [blockIndex, block] of section.blocks.entries()) {
+      const blockPath = `${path}.blocks[${blockIndex}]`;
+      if (block.kind === "paragraph") {
+        assertNonBlank(block.text, `${blockPath}.text`);
+        continue;
+      }
+      if (block.items.length === 0) {
+        throw new Error(`Legal ${block.kind} list must have at least one item at ${blockPath}`);
+      }
+      if (block.kind === "definition-list") {
+        for (const [itemIndex, item] of block.items.entries()) {
+          assertNonBlank(item.term, `${blockPath}.items[${itemIndex}].term`);
+          assertNonBlank(item.detail, `${blockPath}.items[${itemIndex}].detail`);
+        }
+        continue;
+      }
+      for (const [itemIndex, item] of block.items.entries()) {
+        assertNonBlank(item, `${blockPath}.items[${itemIndex}]`);
+      }
+    }
+  }
 }
 
 export function validateLegalRegistry(
@@ -171,11 +255,15 @@ export function validateLegalRegistry(
     if (Object.keys(locales).length !== 2 || !locales.ru || !locales.en) {
       throw new Error(`Legal content ${document.releaseIdentity} must define paired RU and EN content`);
     }
-    if (document.content.ru.locale !== "ru" || document.content.en.locale !== "en") {
-      throw new Error(`Legal content ${document.releaseIdentity} has mismatched locale content`);
-    }
-    if (document.content.ru.sections.length === 0 || document.content.en.sections.length === 0) {
-      throw new Error(`Legal content ${document.releaseIdentity} cannot be empty`);
+    const release = releases.find(({ identity }) => identity === document.releaseIdentity);
+    if (release) {
+      validateLocalizedContent(release, document.content.ru, "ru");
+      validateLocalizedContent(release, document.content.en, "en");
+      const ruContract = document.content.ru.sections.map(({ id, requirements }) => ({ id, requirements }));
+      const enContract = document.content.en.sections.map(({ id, requirements }) => ({ id, requirements }));
+      if (JSON.stringify(ruContract) !== JSON.stringify(enContract)) {
+        throw new Error(`Localized section contract mismatch for ${document.releaseIdentity}`);
+      }
     }
   }
 

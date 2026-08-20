@@ -75,4 +75,86 @@ describe("legal document content contracts", () => {
     const serialized = JSON.stringify(LEGAL_DOCUMENTS);
     expect(serialized).not.toMatch(/Markiro|MKR-|tenant|demo|company|optional phone|компани|необязательн.{0,20}телефон/i);
   });
+
+  it("pins complete per-section requirement markers for both locales", () => {
+    const expectedByIdentity = {
+      "VBT-PD-01/DRAFT": [
+        "operator", "scope", "definitions", "principles", "subject-rights", "subjects",
+        "user-data", "sensitive-data-warning", "operational-data", "data-minimization",
+        "purposes", "exclusions", "legal-grounds", "consent-boundary", "operations",
+        "retention", "delivery-lifecycle", "providers", "provider-review", "localization",
+        "cross-border", "security", "incidents", "withdrawal", "browser-storage", "logs",
+        "captcha", "lifecycle", "authoritative-language",
+      ],
+      "VBT-PD-02/DRAFT": [
+        "affirmative-action", "consent-boundary", "lifecycle", "operator", "user-data",
+        "sensitive-data-warning", "operational-data", "purposes", "exclusions", "operations",
+        "providers", "provider-review", "retention", "delivery-lifecycle", "withdrawal",
+        "authoritative-language", "captcha", "logs",
+      ],
+    } as const;
+
+    for (const document of LEGAL_DOCUMENTS) {
+      for (const locale of ["ru", "en"] as const) {
+        const content = document.content[locale];
+        expect(content.documentCode).toBe(document.releaseIdentity.slice(0, 9));
+        expect(content.releaseIdentity).toBe(document.releaseIdentity);
+        expect(content.sections.map(({ id }) => id)).toEqual(
+          document.content[locale === "ru" ? "en" : "ru"].sections.map(({ id }) => id),
+        );
+        expect(content.sections.map(({ requirements }) => requirements)).toEqual(
+          document.content[locale === "ru" ? "en" : "ru"].sections.map(({ requirements }) => requirements),
+        );
+        expect(new Set(content.sections.flatMap(({ requirements }) => requirements))).toEqual(
+          new Set(expectedByIdentity[document.releaseIdentity]),
+        );
+      }
+    }
+  });
+
+  it("states the exact bounded operational inventory in policy and consent RU/EN", () => {
+    for (const document of LEGAL_DOCUMENTS) {
+      for (const locale of ["ru", "en"] as const) {
+        const text = textFor(document.content[locale]);
+        expect(text).toMatch(/UUID/i);
+        expect(text).toMatch(/locale|локал/i);
+        expect(text).toMatch(/allow-list|разрешенн.{0,30}спис/i);
+        expect(text).toMatch(/consent identity|идентификатор согласия/i);
+        expect(text).toMatch(/submission and delivery timestamps|временн.{0,30}отправк.{0,40}доставк/i);
+        expect(text).toMatch(/keyed HMAC|ключев.{0,20}HMAC/i);
+        expect(text).toMatch(/fixed rate-limit window|фиксированн.{0,40}окн.{0,40}ограничен/i);
+        expect(text).toMatch(/raw IP.{0,80}not (?:be )?persisted.{0,80}application database|IP-адрес.{0,100}не (?:должен )?сохраня.{0,80}баз.{0,30}прилож/i);
+        expect(text).toMatch(/delivery state.{0,80}bounded provider message identifier|состоян.{0,30}доставк.{0,100}ограниченн.{0,40}идентификатор.{0,40}поставщик/i);
+        expect(text).toMatch(/minimum network context|минимальн.{0,40}сетев.{0,30}контекст/i);
+        expect(text).toMatch(/no name, contact, or message|имя, контакт и сообщен.{0,30}не переда/i);
+        expect(text).toMatch(/telemetry and logs|телеметри.{0,20}журнал/i);
+        expect(text).toMatch(/exclude.{0,80}personal body.{0,80}token.{0,80}secrets|не (?:должны )?включа.{0,80}персональн.{0,30}содержим.{0,80}токен.{0,80}секрет/i);
+      }
+    }
+  });
+
+  it("states operational controls as binding future requirements, not implementation claims", () => {
+    for (const document of LEGAL_DOCUMENTS) {
+      for (const locale of ["ru", "en"] as const) {
+        const operationalSections = document.content[locale].sections.filter(({ requirements }) =>
+          (requirements as readonly string[]).includes("operational-data"),
+        );
+        expect(operationalSections).toHaveLength(1);
+        const operationalText = textFor({
+          ...document.content[locale],
+          sections: operationalSections,
+        });
+        expect(operationalText).toMatch(
+          locale === "ru"
+            ? /IP-адрес.{0,50}не должен сохраняться.{0,50}баз.{0,30}прилож/i
+            : /raw IP address.{0,50}must not be persisted.{0,50}application database/i,
+        );
+        expect(operationalText).toMatch(
+          locale === "ru"
+            ? /телеметри.{0,30}журнал.{0,50}должны быть ограничены/i
+            : /telemetry and logs.{0,50}must be limited/i,
+        );
+      }
+    }
+  });
 });

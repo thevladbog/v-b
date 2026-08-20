@@ -182,3 +182,102 @@ No browser, assistive-technology, legal, deployment, or publication acceptance i
 - Russian wording, English parity, operator details, provider inventory/roles/regions/terms, and the implemented production data flow still require owner/legal/provider review.
 - No form submission, captcha runtime, analytics, PDF/DOCX artifact, infrastructure, DNS, deployment, or publication was implemented. The site still has direct contact links only; online submission remains disabled.
 - Real browser/accessibility acceptance and deployed-output verification remain future gates. Tasks 7–8 were not implemented.
+
+## Fix round 1/5 — exact inventory and structural contract hardening
+
+### Changes
+
+- Replaced broad operational phrases in both policy and consent, RU and EN, with the exact bounded future-flow contract: request UUID, locale, closed allow-listed source path, consent identity, submission/delivery timestamps, captcha outcome, short-lived keyed HMAC digest of the bounded network source for a fixed rate-limit window, delivery state, and bounded provider message identifiers.
+- Both documents now state that the raw IP address must not be persisted in the application database; SmartCaptcha may receive only the verification token and minimum required network context, never name/contact/message; application telemetry/logs must be limited to event kind, UUID, stage, status, and latency and exclude personal body, captcha token, and secrets.
+- Wording uses prospective binding requirements (`must` / `должен`) rather than claiming those future controls are already implemented.
+- Added localized `documentCode`, `releaseIdentity`, and per-section `requirements` metadata. RU/EN section IDs and requirement-marker sets must remain paired.
+- Deep registry validation now checks localized code/identity/locale against the release and recursively rejects blank titles, descriptions, summaries, headings, paragraph text, list items, definition terms/details, and requirement markers; empty sections, blocks, lists, or marker sets; duplicate/unsafe section IDs; and mismatched RU/EN section contracts.
+- Added mutation fixtures proving swapped policy/consent content, wrong localized identities/locales, blank nested leaves, empty structures, and duplicate/unsafe IDs fail locally while synthetic future active releases still validate.
+- Extracted reusable `validateLegalPageContract` and `listGeneratedLegalRoutes` test utilities. The validator checks exact title/description/lang, singleton canonical and robots directives, reciprocal RU/EN/x-default alternates, one main/H1, every paired locale control, an exact visible draft banner, and unsafe markup inside the legal main.
+- Added malformed negative fixtures for wrong/missing canonical, missing reciprocal alternate, wrong x-default, missing/indexable robots, missing/duplicate main and H1, wrong paired locale href, missing/hidden draft banner, script injection, and inline event handlers.
+- Legal route inventory is now derived recursively from actual `dist` HTML files under the root and `/en/` legal route shapes. It must equal the six canonical legal routes; `/` and `/en/` are explicitly excluded rather than classified as legal pages.
+
+### Package RED / GREEN
+
+The first mutation/content contract expansion was run before production changes:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test
+Test Files  2 failed (2)
+Tests       15 failed | 13 passed (28)
+```
+
+Failures were specific to missing localized code/release metadata and markers, absent exact operational language, accepted content swaps/mismatches, accepted blank nested values, accepted empty structures, and accepted duplicate/unsafe section IDs.
+
+After deep validation, metadata, markers, and exact RU/EN content were added:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test
+Test Files  2 passed (2)
+Tests       28 passed (28)
+```
+
+Self-review then found current-state wording in the new IP/log sentences. A focused prospective-language test produced a second RED:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test
+Test Files  1 failed | 1 passed (2)
+Tests       1 failed | 28 passed (29)
+```
+
+After converting both documents/locales to binding future requirements:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test
+Test Files  2 passed (2)
+Tests       29 passed (29)
+```
+
+### Generated-page RED / GREEN
+
+The legal-page suite imported the wished-for reusable contract and filesystem inventory before the helper existed:
+
+```text
+CI=true corepack pnpm --filter @vbtech/web test -- legal-pages.test.ts
+Test Files  1 failed | 4 passed (5)
+Tests       55 passed (55)
+Primary failure: Cannot find module './helpers/legal-page-contract.js'
+Exit status 1
+```
+
+After implementing the reusable DOM validator, 15 malformed fixtures, and recursive built-route inventory:
+
+```text
+CI=true corepack pnpm --filter @vbtech/web test -- legal-pages.test.ts
+8 page(s) built
+Test Files  5 passed (5)
+Tests       92 passed (92)
+```
+
+### Final fix-round gates
+
+| Command | Result |
+| --- | --- |
+| `CI=true corepack pnpm --filter @vbtech/legal-documents test` | PASS — 2 files, 29 tests |
+| `CI=true corepack pnpm --filter @vbtech/legal-documents typecheck` | PASS |
+| `CI=true corepack pnpm --filter @vbtech/web test -- legal-pages.test.ts` | PASS — 8 pages; 5 files, 92 tests |
+| `CI=true corepack pnpm --filter @vbtech/web typecheck` | PASS — 27 files, 0 errors, 0 warnings, 0 hints |
+| `CI=true corepack pnpm --filter @vbtech/web build` | PASS — 8 static pages |
+| `CI=true corepack pnpm test` | PASS — all 3 packages; content 4, legal 29, web 92 tests |
+| `git diff --check` | PASS |
+
+The first final gate attempt found a test-only TypeScript literal-union `.includes` narrowing error after the new marker fixture was added. The assertion was widened only to the exported string-marker boundary; the complete fresh gate sequence above then passed.
+
+### Generated-output and scope review
+
+- Recursively enumerated built legal routes are exactly `/legal/`, `/privacy/`, `/personal-data-consent/` and their three `/en/` pairs; no landing root is included.
+- All four generated policy/consent pages were inspected after the final build. Each contains the keyed HMAC digest, fixed rate-limit window, raw-IP application-database prohibition, minimum captcha network context, no name/contact/message transfer to captcha, and bounded telemetry/log requirement.
+- All six legal pages retain draft banners and `noindex,nofollow`; both landing roots remain indexable.
+- `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain the only releases. Both still have `revision: null`, `effectiveDate: null`, and `status: draft`; active accessors remain empty/failing and the consent publishability guard remains closed.
+- No form, captcha runtime, contact function, analytics, cookie banner, infrastructure, DNS, deployment, or publication behavior was added. Tasks 7–8 remain untouched.
+
+### Remaining concerns
+
+- The text remains a review candidate, not legal advice or legal approval. Owner/legal review, operator confirmation, and exact provider entity/role/region/term verification remain activation blockers.
+- No effective date or public revision exists. `VBT-PD-02/DRAFT` cannot be accepted by an enabled request.
+- Browser/assistive-technology and deployed-output acceptance remain future gates; none is claimed in this fix round.

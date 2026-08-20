@@ -9,6 +9,38 @@ export type LegalOperatorProfileId = "operator-vbtech-2026-08-20";
 export type LegalDraftIdentity = `${LegalDocumentCode}/DRAFT`;
 export type LegalDocumentIdentity = LegalDraftIdentity | LegalPublishedIdentity;
 
+export type LegalContentRequirement =
+  | "affirmative-action"
+  | "authoritative-language"
+  | "browser-storage"
+  | "captcha"
+  | "consent-boundary"
+  | "cross-border"
+  | "data-minimization"
+  | "definitions"
+  | "delivery-lifecycle"
+  | "exclusions"
+  | "incidents"
+  | "legal-grounds"
+  | "lifecycle"
+  | "localization"
+  | "logs"
+  | "operations"
+  | "operational-data"
+  | "operator"
+  | "principles"
+  | "provider-review"
+  | "providers"
+  | "purposes"
+  | "retention"
+  | "security"
+  | "sensitive-data-warning"
+  | "scope"
+  | "subject-rights"
+  | "subjects"
+  | "user-data"
+  | "withdrawal";
+
 export type LegalBlock =
   | { readonly kind: "paragraph"; readonly text: string }
   | { readonly kind: "ordered-list" | "unordered-list"; readonly items: readonly string[] }
@@ -18,12 +50,15 @@ export type LegalBlock =
     };
 
 export interface LegalDocumentLocaleContent {
+  readonly documentCode: LegalDocumentCode;
+  readonly releaseIdentity: LegalDocumentIdentity;
   readonly locale: LegalLocale;
   readonly title: string;
   readonly description: string;
   readonly summary: string;
   readonly sections: readonly {
     readonly id: string;
+    readonly requirements: readonly LegalContentRequirement[];
     readonly heading: string;
     readonly blocks: readonly LegalBlock[];
   }[];

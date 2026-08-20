@@ -12,6 +12,7 @@ import {
   listActiveLegalDocuments,
   listCurrentLegalDocuments,
   validateLegalRegistry,
+  type LegalDocumentSource,
   type LegalDocumentRelease,
 } from "../src/index.js";
 
@@ -29,8 +30,23 @@ const syntheticActiveDocuments = () => {
   return LEGAL_DOCUMENTS.map((document, index) => ({
     ...document,
     releaseIdentity: releases[index]!.identity,
+    content: {
+      ru: { ...document.content.ru, releaseIdentity: releases[index]!.identity },
+      en: { ...document.content.en, releaseIdentity: releases[index]!.identity },
+    },
   }));
 };
+
+type Mutable<T> = T extends readonly (infer Item)[]
+  ? Mutable<Item>[]
+  : T extends object
+    ? { -readonly [Key in keyof T]: Mutable<T[Key]> }
+    : T;
+
+type MutableLegalDocumentSource = Mutable<LegalDocumentSource>;
+
+const cloneDocuments = (): MutableLegalDocumentSource[] =>
+  structuredClone(LEGAL_DOCUMENTS) as unknown as MutableLegalDocumentSource[];
 
 describe("draft legal document registry", () => {
   it("pins exactly two paired current draft candidates", () => {
@@ -182,5 +198,113 @@ describe("draft legal document registry", () => {
     expect(() => validateLegalRegistry(LEGAL_RELEASES, [LEGAL_DOCUMENTS[0]!])).toThrow(
       /content.*release.*mismatch/i,
     );
+  });
+
+  it("pins localized content to its document code, release identity and locale", () => {
+    for (const document of LEGAL_DOCUMENTS) {
+      const release = LEGAL_RELEASES.find(({ identity }) => identity === document.releaseIdentity);
+      expect(release).toBeDefined();
+      for (const locale of ["ru", "en"] as const) {
+        expect(document.content[locale]).toMatchObject({
+          documentCode: release!.code,
+          releaseIdentity: release!.identity,
+          locale,
+        });
+      }
+    }
+  });
+
+  it("rejects swapped policy and consent localized content", () => {
+    const documents = cloneDocuments();
+    documents[0] = { ...documents[0]!, content: documents[1]!.content };
+    documents[1] = { ...documents[1]!, content: documents[0]!.content };
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, documents)).toThrow(
+      /content document code.*release|localized content identity/i,
+    );
+  });
+
+  it("rejects localized content identity and locale mismatches", () => {
+    const identityMismatch = cloneDocuments();
+    identityMismatch[0]!.content.ru = {
+      ...identityMismatch[0]!.content.ru,
+      releaseIdentity: "VBT-PD-02/DRAFT",
+    } as typeof identityMismatch[0]["content"]["ru"];
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, identityMismatch)).toThrow(
+      /localized content identity/i,
+    );
+
+    const localeMismatch = cloneDocuments();
+    localeMismatch[0]!.content.en = {
+      ...localeMismatch[0]!.content.en,
+      locale: "ru",
+    } as typeof localeMismatch[0]["content"]["en"];
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, localeMismatch)).toThrow(
+      /locale.*mismatch/i,
+    );
+  });
+
+  it.each([
+    ["title", (documents: MutableLegalDocumentSource[]) => { documents[0]!.content.ru.title = " "; }],
+    ["description", (documents: MutableLegalDocumentSource[]) => { documents[0]!.content.ru.description = "\n"; }],
+    ["summary", (documents: MutableLegalDocumentSource[]) => { documents[0]!.content.ru.summary = ""; }],
+    ["heading", (documents: MutableLegalDocumentSource[]) => { documents[0]!.content.ru.sections[0]!.heading = " "; }],
+    ["paragraph text", (documents: MutableLegalDocumentSource[]) => {
+      const block = documents[0]!.content.ru.sections[0]!.blocks[0]!;
+      if (block.kind !== "paragraph") throw new Error("fixture requires paragraph");
+      block.text = " ";
+    }],
+    ["list item", (documents: MutableLegalDocumentSource[]) => {
+      const block = documents[0]!.content.ru.sections[3]!.blocks[0]!;
+      if (block.kind === "paragraph" || block.kind === "definition-list") throw new Error("fixture requires string list");
+      block.items[0] = " ";
+    }],
+    ["definition term", (documents: MutableLegalDocumentSource[]) => {
+      const block = documents[0]!.content.ru.sections[1]!.blocks[0]!;
+      if (block.kind !== "definition-list") throw new Error("fixture requires definitions");
+      block.items[0]!.term = " ";
+    }],
+    ["definition detail", (documents: MutableLegalDocumentSource[]) => {
+      const block = documents[0]!.content.ru.sections[1]!.blocks[0]!;
+      if (block.kind !== "definition-list") throw new Error("fixture requires definitions");
+      block.items[0]!.detail = " ";
+    }],
+  ])("rejects blank localized %s", (_label, mutate) => {
+    const documents = cloneDocuments();
+    mutate(documents);
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, documents)).toThrow(/blank legal content/i);
+  });
+
+  it("rejects empty sections, blocks, lists and requirement markers", () => {
+    const emptySections = cloneDocuments();
+    emptySections[0]!.content.ru.sections = [];
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, emptySections)).toThrow(/at least one section/i);
+
+    const emptyBlocks = cloneDocuments();
+    emptyBlocks[0]!.content.ru.sections[0]!.blocks = [];
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, emptyBlocks)).toThrow(/at least one block/i);
+
+    const emptyList = cloneDocuments();
+    const list = emptyList[0]!.content.ru.sections[3]!.blocks[0]!;
+    if (list.kind === "paragraph") throw new Error("fixture requires list");
+    list.items = [];
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, emptyList)).toThrow(/list.*at least one item/i);
+
+    const emptyRequirements = cloneDocuments();
+    emptyRequirements[0]!.content.ru.sections[0]!.requirements = [];
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, emptyRequirements)).toThrow(
+      /at least one requirement marker/i,
+    );
+  });
+
+  it("rejects duplicate and unsafe section identifiers", () => {
+    const duplicate = cloneDocuments();
+    duplicate[0]!.content.ru.sections[1]!.id = duplicate[0]!.content.ru.sections[0]!.id;
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, duplicate)).toThrow(/duplicate section id/i);
+
+    for (const id of ["Unsafe ID", "../escape", "section<script>", "-leading"]) {
+      const unsafe = cloneDocuments();
+      unsafe[0]!.content.ru.sections[0]!.id = id;
+      expect(() => validateLegalRegistry(LEGAL_RELEASES, unsafe)).toThrow(/unsafe section id/i);
+    }
   });
 });

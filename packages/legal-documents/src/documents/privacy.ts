@@ -1,7 +1,30 @@
-import type { LegalDocumentLocaleContent, LegalLocale } from "../types.js";
+import type {
+  LegalContentRequirement,
+  LegalDocumentLocaleContent,
+  LegalLocale,
+} from "../types.js";
+
+const POLICY_SECTION_REQUIREMENTS = {
+  "operator-and-scope": ["operator", "scope"],
+  "definitions-and-principles": ["definitions", "principles"],
+  "subjects-and-user-data": ["subjects", "user-data", "sensitive-data-warning"],
+  "operational-data": ["operational-data", "data-minimization"],
+  "purposes-and-exclusions": ["purposes", "exclusions"],
+  "grounds-and-consent": ["legal-grounds", "consent-boundary"],
+  operations: ["operations"],
+  "retention-and-destruction": ["retention", "delivery-lifecycle"],
+  providers: ["providers", "provider-review"],
+  "localization-and-transfer": ["localization", "cross-border"],
+  "security-and-incidents": ["security", "incidents"],
+  "subject-rights": ["subject-rights", "withdrawal"],
+  "browser-storage-and-logs": ["browser-storage", "logs", "captcha"],
+  "revisions-and-language": ["lifecycle", "authoritative-language"],
+} as const satisfies Readonly<Record<string, readonly LegalContentRequirement[]>>;
 
 export const PRIVACY_CONTENT = {
   ru: {
+    documentCode: "VBT-PD-01",
+    releaseIdentity: "VBT-PD-01/DRAFT",
     locale: "ru",
     title: "Политика обработки персональных данных — проект",
     description:
@@ -11,6 +34,7 @@ export const PRIVACY_CONTENT = {
     sections: [
       {
         id: "operator-and-scope",
+        requirements: POLICY_SECTION_REQUIREMENTS["operator-and-scope"],
         heading: "1. Оператор и область действия",
         blocks: [
           {
@@ -25,6 +49,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "definitions-and-principles",
+        requirements: POLICY_SECTION_REQUIREMENTS["definitions-and-principles"],
         heading: "2. Термины, принципы и применимые права",
         blocks: [
           {
@@ -44,6 +69,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "subjects-and-user-data",
+        requirements: POLICY_SECTION_REQUIREMENTS["subjects-and-user-data"],
         heading: "3. Субъекты и данные, предоставляемые посетителем",
         blocks: [
           {
@@ -58,25 +84,31 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "operational-data",
+        requirements: POLICY_SECTION_REQUIREMENTS["operational-data"],
         heading: "4. Ограниченные операционные данные",
         blocks: [
           {
             kind: "unordered-list",
             items: [
               "UUID-идентификатор обращения, локаль и исходный путь из закрытого разрешенного списка;",
-              "идентификатор согласия, время отправки и этапов доставки;",
-              "ограниченные сведения о результате captcha, защите от злоупотреблений и сетевом источнике;",
-              "ограниченное состояние и история доставки, включая идентификатор сообщения поставщика.",
+              "идентификатор согласия, временные метки отправки и доставки;",
+              "результат проверки captcha и краткоживущий ключевой HMAC-дайджест ограниченного сетевого источника для фиксированного окна ограничения частоты;",
+              "состояние доставки и ограниченные идентификаторы сообщений поставщика.",
             ],
           },
           {
             kind: "paragraph",
-            text: "Скрытое обогащение сведений о посетителе не выполняется. Произвольные источники перехода и маркетинговые метки не сохраняются.",
+            text: "Исходный IP-адрес не должен сохраняться в базе данных приложения. Для проверки SmartCaptcha может получать только проверочный токен и минимально необходимый сетевой контекст; имя, контакт и сообщение ей не передаются.",
+          },
+          {
+            kind: "paragraph",
+            text: "Предполагаемые телеметрия и журналы приложения должны быть ограничены видом события, UUID обращения, этапом, статусом и длительностью; они не должны включать персональное содержимое обращения, captcha-токен или секреты. Скрытое обогащение не предусматривается, произвольные источники перехода и маркетинговые метки не должны сохраняться.",
           },
         ],
       },
       {
         id: "purposes-and-exclusions",
+        requirements: POLICY_SECTION_REQUIREMENTS["purposes-and-exclusions"],
         heading: "5. Цели и явные исключения",
         blocks: [
           {
@@ -97,6 +129,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "grounds-and-consent",
+        requirements: POLICY_SECTION_REQUIREMENTS["grounds-and-consent"],
         heading: "6. Основания и граница отдельного согласия",
         blocks: [
           {
@@ -111,6 +144,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "operations",
+        requirements: POLICY_SECTION_REQUIREMENTS.operations,
         heading: "7. Операции и способы обработки",
         blocks: [
           {
@@ -121,6 +155,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "retention-and-destruction",
+        requirements: POLICY_SECTION_REQUIREMENTS["retention-and-destruction"],
         heading: "8. Хранение, блокирование, удаление и уничтожение",
         blocks: [
           {
@@ -135,6 +170,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "providers",
+        requirements: POLICY_SECTION_REQUIREMENTS.providers,
         heading: "9. Поставщики и их предполагаемые роли",
         blocks: [
           {
@@ -154,6 +190,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "localization-and-transfer",
+        requirements: POLICY_SECTION_REQUIREMENTS["localization-and-transfer"],
         heading: "10. Российская локализация и трансграничная передача",
         blocks: [
           {
@@ -168,6 +205,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "security-and-incidents",
+        requirements: POLICY_SECTION_REQUIREMENTS["security-and-incidents"],
         heading: "11. Безопасность и инциденты",
         blocks: [
           {
@@ -182,6 +220,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "subject-rights",
+        requirements: POLICY_SECTION_REQUIREMENTS["subject-rights"],
         heading: "12. Доступ, уточнение, блокирование, удаление и отзыв",
         blocks: [
           {
@@ -196,11 +235,12 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "browser-storage-and-logs",
+        requirements: POLICY_SECTION_REQUIREMENTS["browser-storage-and-logs"],
         heading: "13. Хранилище браузера, журналы и captcha",
         blocks: [
           {
             kind: "paragraph",
-            text: "Для выбора темы используется строго необходимая локальная запись vbtech-theme-v1. Сайт не использует аналитические или рекламные cookies. Серверные журналы должны быть ограничены событиями эксплуатации и не содержать текста обращения, captcha-токена или секретов.",
+            text: "Для выбора темы используется строго необходимая локальная запись vbtech-theme-v1. Сайт не использует аналитические или рекламные cookies. Серверная и прикладная телеметрия и журналы должны быть ограничены видом события, UUID обращения, этапом, статусом и длительностью и не включать персональное содержимое обращения, captcha-токен или секреты.",
           },
           {
             kind: "paragraph",
@@ -210,6 +250,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "revisions-and-language",
+        requirements: POLICY_SECTION_REQUIREMENTS["revisions-and-language"],
         heading: "14. Редакции, язык и статус проекта",
         blocks: [
           {
@@ -225,6 +266,8 @@ export const PRIVACY_CONTENT = {
     ],
   },
   en: {
+    documentCode: "VBT-PD-01",
+    releaseIdentity: "VBT-PD-01/DRAFT",
     locale: "en",
     title: "Personal Data Processing Policy — Draft",
     description:
@@ -234,6 +277,7 @@ export const PRIVACY_CONTENT = {
     sections: [
       {
         id: "operator-and-scope",
+        requirements: POLICY_SECTION_REQUIREMENTS["operator-and-scope"],
         heading: "1. Controller and scope",
         blocks: [
           { kind: "paragraph", text: "Intended controller: Богатырев Владислав Сергеевич; postal address: 353745, Краснодарский край, Ленинградский район, ст. Ленинградская, ул. Грузская, д. 26; email: hello@v-b.tech; phone: +7 934 355-14-90; site: https://v-b.tech." },
@@ -242,6 +286,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "definitions-and-principles",
+        requirements: POLICY_SECTION_REQUIREMENTS["definitions-and-principles"],
         heading: "2. Definitions, principles, and applicable rights",
         blocks: [
           {
@@ -258,6 +303,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "subjects-and-user-data",
+        requirements: POLICY_SECTION_REQUIREMENTS["subjects-and-user-data"],
         heading: "3. Data subjects and visitor-provided data",
         blocks: [
           { kind: "paragraph", text: "A visitor will be able to provide only a name of no more than 100 characters, a contact value as email or @telegram of no more than 254 characters, and a message of no more than 4,000 characters. Attachments are not accepted." },
@@ -266,6 +312,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "operational-data",
+        requirements: POLICY_SECTION_REQUIREMENTS["operational-data"],
         heading: "4. Bounded operational data",
         blocks: [
           {
@@ -273,15 +320,17 @@ export const PRIVACY_CONTENT = {
             items: [
               "the enquiry UUID, locale, and source path from a closed allow-list;",
               "the consent identity and submission and delivery timestamps;",
-              "bounded captcha, anti-abuse, and network-source evidence;",
-              "bounded delivery state and history, including a provider message identifier.",
+              "the captcha verification outcome and a short-lived keyed HMAC digest of the bounded network source for a fixed rate-limit window;",
+              "delivery state and bounded provider message identifiers.",
             ],
           },
-          { kind: "paragraph", text: "No hidden enrichment is performed. Arbitrary referrers and marketing parameters are not retained." },
+          { kind: "paragraph", text: "The raw IP address must not be persisted in the application database. During verification SmartCaptcha may receive only the verification token and the minimum network context required; no name, contact, or message is sent to it." },
+          { kind: "paragraph", text: "For the intended flow, application telemetry and logs must be limited to event kind, enquiry UUID, stage, status, and latency; they must exclude the personal body, captcha token, and secrets. No hidden enrichment is intended, and arbitrary referrers and marketing parameters must not be retained." },
         ],
       },
       {
         id: "purposes-and-exclusions",
+        requirements: POLICY_SECTION_REQUIREMENTS["purposes-and-exclusions"],
         heading: "5. Purposes and explicit exclusions",
         blocks: [
           {
@@ -299,6 +348,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "grounds-and-consent",
+        requirements: POLICY_SECTION_REQUIREMENTS["grounds-and-consent"],
         heading: "6. Grounds and separate-consent boundary",
         blocks: [
           { kind: "paragraph", text: "Processing for the form does not begin until the form is enabled in the future. A voluntarily sent enquiry is intended to rely on a separate active revision of consent VBT-PD-02. VBT-PD-02/DRAFT is not active and cannot be accepted by a visitor." },
@@ -307,6 +357,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "operations",
+        requirements: POLICY_SECTION_REQUIREMENTS.operations,
         heading: "7. Operations and processing methods",
         blocks: [
           { kind: "paragraph", text: "Intended operations are collection, recording, organization, accumulation, storage, correction, retrieval, use, necessary transfer to engaged processors, restriction, erasure, and destruction. Processing is mixed: automated and, for correspondence, without automated means." },
@@ -314,6 +365,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "retention-and-destruction",
+        requirements: POLICY_SECTION_REQUIREMENTS["retention-and-destruction"],
         heading: "8. Retention, restriction, erasure, and destruction",
         blocks: [
           { kind: "paragraph", text: "The enquiry and related business correspondence are intended to be retained for no more than one year after the last substantive contact unless another documented ground applies. Substantiated subject requests for restriction, erasure, or destruction are handled separately." },
@@ -322,6 +374,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "providers",
+        requirements: POLICY_SECTION_REQUIREMENTS.providers,
         heading: "9. Providers and intended roles",
         blocks: [
           {
@@ -338,6 +391,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "localization-and-transfer",
+        requirements: POLICY_SECTION_REQUIREMENTS["localization-and-transfer"],
         heading: "10. Russian localization and cross-border transfer",
         blocks: [
           { kind: "paragraph", text: "For the future configuration, primary collection, recording, organization, accumulation, storage, correction, and retrieval of Russian citizens' data must use databases located in the Russian Federation." },
@@ -346,6 +400,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "security-and-incidents",
+        requirements: POLICY_SECTION_REQUIREMENTS["security-and-incidents"],
         heading: "11. Security and incidents",
         blocks: [
           { kind: "paragraph", text: "Intended measures include access controls, data isolation, secret protection, encryption of delivery payloads, change controls, backups, bounded logging, and retention limits proportionate to the data and current threats, without publishing details that could weaken defenses." },
@@ -354,6 +409,7 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "subject-rights",
+        requirements: POLICY_SECTION_REQUIREMENTS["subject-rights"],
         heading: "12. Access, correction, restriction, erasure, and withdrawal",
         blocks: [
           { kind: "paragraph", text: "A request for access, correction, restriction, erasure, destruction, or consent withdrawal may be sent to hello@v-b.tech or the controller's postal address. To protect data, the controller may request enough information to verify identity and locate the enquiry." },
@@ -362,14 +418,16 @@ export const PRIVACY_CONTENT = {
       },
       {
         id: "browser-storage-and-logs",
+        requirements: POLICY_SECTION_REQUIREMENTS["browser-storage-and-logs"],
         heading: "13. Browser storage, logs, and captcha",
         blocks: [
-          { kind: "paragraph", text: "The strictly necessary vbtech-theme-v1 local record stores the theme choice. The site uses no analytics or advertising cookies. Server logs must be bounded to operational events and exclude enquiry text, captcha tokens, and secrets." },
+          { kind: "paragraph", text: "The strictly necessary vbtech-theme-v1 local record stores the theme choice. The site uses no analytics or advertising cookies. Server and application telemetry and logs must be limited to event kind, enquiry UUID, stage, status, and latency and exclude the personal body, captcha token, and secrets." },
           { kind: "paragraph", text: "SmartCaptcha and its resources may load only when online submission is enabled; before that, captcha is inactive and receives no data." },
         ],
       },
       {
         id: "revisions-and-language",
+        requirements: POLICY_SECTION_REQUIREMENTS["revisions-and-language"],
         heading: "14. Revisions, language, and draft status",
         blocks: [
           { kind: "paragraph", text: "Document code: VBT-PD-01. Candidate identity: VBT-PD-01/DRAFT. No public revision has been assigned and no effective date exists. This document is a draft, is not in force, and does not establish legal approval." },
