@@ -1,0 +1,84 @@
+---
+import type { CaseStudy as CaseStudyContent, Locale } from "@vbtech/content";
+
+interface Props {
+  caseStudy: CaseStudyContent;
+  index: number;
+  locale: Locale;
+}
+
+const { caseStudy, index, locale } = Astro.props;
+const labels = locale === "ru"
+  ? {
+      problem: "Задача",
+      role: "Моя роль",
+      solution: "Решение",
+      outcome: "Результат",
+      open: `Открыть проект ${caseStudy.name}`,
+      illustration: `${caseStudy.name} — иллюстрация концепции продуктового интерфейса`,
+      concept: "иллюстрация / концепция, не снимок продукта",
+    }
+  : {
+      problem: "Problem",
+      role: "My role",
+      solution: "Solution",
+      outcome: "Outcome",
+      open: `Open the ${caseStudy.name} project`,
+      illustration: `${caseStudy.name} — product interface concept illustration`,
+      concept: "illustration / concept, not a product capture",
+    };
+const assetByCase: Record<CaseStudyContent["id"], string> = {
+  markiro: "/assets/markiro-mark.svg",
+  idento: "/assets/idento-logo.svg",
+  quokkaq: "/assets/quokkaq-mark.svg",
+};
+const caseNumber = String(index + 1).padStart(3, "0");
+---
+
+<article class={`case case--${caseStudy.id}`} data-case={caseStudy.id}>
+  <div class="case-copy">
+    <p class="case-meta"><span>case-{caseNumber}</span><span>{caseStudy.status}</span></p>
+    <div class="case-title-row">
+      <img src={assetByCase[caseStudy.id]} alt="" width="48" height="48" loading="lazy" />
+      <h3>{caseStudy.name}</h3>
+    </div>
+    <dl class="case-facts">
+      <div><dt>{labels.problem}</dt><dd>{caseStudy.problem}</dd></div>
+      <div><dt>{labels.role}</dt><dd>{caseStudy.role}</dd></div>
+      <div><dt>{labels.solution}</dt><dd>{caseStudy.solution}</dd></div>
+      <div class="case-result"><dt>{labels.outcome}</dt><dd>{caseStudy.outcome}</dd></div>
+    </dl>
+    <ul class="case-tags" aria-label={locale === "ru" ? "Технологии" : "Technologies"}>
+      {caseStudy.tags.map((tag) => <li>{tag}</li>)}
+    </ul>
+    <a class="text-link" href={caseStudy.href}>
+      {labels.open} <span aria-hidden="true">↗</span>
+    </a>
+  </div>
+
+  <figure class="case-visual" data-illustration={caseStudy.id} aria-label={labels.illustration}>
+    <span class="visual-index" aria-hidden="true">{caseNumber}</span>
+    <div class="visual-window" aria-hidden="true">
+      {caseStudy.id === "markiro" && (
+        <>
+          <div class="machine-head"><span>station / line-04</span><b>offline journal · 127</b></div>
+          <div class="machine-grid"><span class="machine-code">010460123456789021ABC123</span><span class="machine-ok">accepted</span></div>
+          <div class="machine-bars">{Array.from({ length: 12 }, () => <i></i>)}</div>
+        </>
+      )}
+      {caseStudy.id === "idento" && (
+        <>
+          <div class="badge-preview"><i class="badge-photo"></i><div><small>ATTENDEE / 0842</small><strong>Alex Morgan</strong><span>Product systems</span></div><i class="badge-qr"></i></div>
+          <div class="machine-head"><span>check-in</span><b>local mode · ready</b></div>
+        </>
+      )}
+      {caseStudy.id === "quokkaq" && (
+        <>
+          <div class="queue-display"><small>NOW SERVING</small><strong>A–042</strong><span>desk 07</span></div>
+          <div class="queue-rail"><i class="done">A–039</i><i class="done">A–040</i><i class="active">A–042</i><i>A–043</i></div>
+        </>
+      )}
+    </div>
+    <figcaption><span>{caseStudy.id} · v-b.tech</span><span>{labels.concept}</span></figcaption>
+  </figure>
+</article>

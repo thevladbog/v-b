@@ -1,0 +1,23 @@
+{
+  "name": "@vbtech/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build",
+    "test": "astro build && vitest run",
+    "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
+    "typecheck": "astro check",
+    "lint": "astro check"
+  },
+  "dependencies": {
+    "@vbtech/content": "workspace:*",
+    "@vbtech/legal-documents": "workspace:*",
+    "astro": "7.1.6"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.4",
+    "parse5": "7.3.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

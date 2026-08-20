@@ -1,0 +1,51 @@
+---
+import type { Locale } from "@vbtech/content";
+
+interface Alternate {
+  locale: Locale | "x-default";
+  path: string;
+}
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  canonicalPath?: string;
+  alternates?: readonly Alternate[];
+  noindex?: boolean;
+}
+
+const productionOrigin = "https://v-b.tech";
+const { locale, title, description, canonicalPath, alternates = [], noindex = false } = Astro.props;
+const absoluteUrl = (path: string) => new URL(path, productionOrigin).toString();
+const canonicalUrl = canonicalPath ? absoluteUrl(canonicalPath) : undefined;
+const person = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: locale === "ru" ? "Влад Богатырев" : "Vlad Bogatyrev",
+  alternateName: locale === "ru" ? "Vlad Bogatyrev" : "Влад Богатырев",
+  url: productionOrigin,
+  sameAs: ["https://github.com/thevladbog", "https://t.me/thevladbog"],
+};
+const ogLocale = locale === "ru" ? "ru_RU" : "en_US";
+const alternateOgLocale = locale === "ru" ? "en_US" : "ru_RU";
+---
+
+<meta name="viewport" content="width=device-width" />
+<meta name="description" content={description} />
+{noindex && <meta name="robots" content="noindex,nofollow" />}
+{canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+{alternates.map((alternate) => (
+  <link rel="alternate" hreflang={alternate.locale} href={absoluteUrl(alternate.path)} />
+))}
+<meta property="og:type" content="website" />
+{canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:locale" content={ogLocale} />
+<meta property="og:locale:alternate" content={alternateOgLocale} />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<script is:inline type="application/ld+json" set:html={JSON.stringify(person)} />
+<title>{title}</title>

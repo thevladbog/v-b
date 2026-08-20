@@ -1,0 +1,25 @@
+---
+import type { SiteContent } from "@vbtech/content";
+
+interface Props {
+  content: SiteContent["expertise"];
+}
+
+const { content } = Astro.props;
+---
+
+<section class="section expertise" id="expertise" data-section="expertise" aria-labelledby="expertise-title">
+  <div class="shell">
+    <header class="section-heading section-heading--split">
+      <div><p class="eyebrow">{content.eyebrow}</p><h2 id="expertise-title">{content.title}</h2></div>
+      <p>{content.lead}</p>
+    </header>
+    <ol class="expertise-grid">
+      {content.items.map((item) => (
+        <li class="expertise-card" data-n={item.number}>
+          <span>{item.number}</span><h3>{item.title}</h3><p>{item.description}</p>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>

@@ -1,0 +1,34 @@
+---
+import { SITE_CONTENT } from "@vbtech/content";
+import AboutContact from "../../components/AboutContact.astro";
+import ApproachTimeline from "../../components/ApproachTimeline.astro";
+import ExpertiseGrid from "../../components/ExpertiseGrid.astro";
+import Hero from "../../components/Hero.astro";
+import ProofRail from "../../components/ProofRail.astro";
+import SelectedWork from "../../components/SelectedWork.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { localizedPath } from "../../lib/locale.js";
+import "../../styles/landing.css";
+
+const locale = "en";
+const page = SITE_CONTENT[locale];
+---
+
+<BaseLayout
+  locale={locale}
+  title={page.meta.title}
+  description={page.meta.description}
+  canonicalPath={localizedPath(locale, "home")}
+  alternates={[
+    { locale: "ru", path: localizedPath("ru", "home") },
+    { locale: "en", path: localizedPath("en", "home") },
+    { locale: "x-default", path: localizedPath("ru", "home") },
+  ]}
+>
+  <Hero content={page.hero} availability={page.availability} />
+  <ProofRail content={page.proof} />
+  <SelectedWork locale={locale} page={page} />
+  <ExpertiseGrid content={page.expertise} />
+  <ApproachTimeline content={page.approach} />
+  <AboutContact locale={locale} about={page.about} contact={page.contact} />
+</BaseLayout>

@@ -1,0 +1,32 @@
+---
+import { listCurrentLegalDocuments } from "@vbtech/legal-documents";
+import LegalLayout from "../../layouts/LegalLayout.astro";
+
+const locale = "ru";
+const documents = listCurrentLegalDocuments(locale);
+const title = "Правовые документы v-b.tech — проекты";
+const description =
+  "Реестр проектов документов v-b.tech: политика обработки персональных данных и согласие для будущей формы обращения.";
+---
+
+<LegalLayout locale={locale} title={title} description={description} route="legal-register">
+  <div class="legal-register">
+    <header class="legal-register-header">
+      <p class="legal-kicker">v-b.tech / legal</p>
+      <h1>Правовые документы</h1>
+      <p>В реестре находятся только кандидаты для проверки. Действующих документов сейчас нет.</p>
+    </header>
+    <ul class="legal-register-list">
+      {documents.map((document) => (
+        <li>
+          <article>
+            <p class="legal-register-meta">{document.code} · {document.identity}</p>
+            <h2><a href={document.routes.ru}>{document.content.title}</a></h2>
+            <p>Статус: проект</p>
+            <p>{document.content.summary}</p>
+          </article>
+        </li>
+      ))}
+    </ul>
+  </div>
+</LegalLayout>

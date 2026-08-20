@@ -1,8 +1,20 @@
 {
-  "name": "v-b-tech-mockup",
+  "name": "v-b-tech",
   "private": true,
-  "type": "module",
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
-    "test": "node --test site/app.test.js"
+    "build": "turbo run build",
+    "test": "corepack pnpm run test:unit && corepack pnpm --dir tools/browser test",
+    "test:unit": "turbo run test --filter='!@vbtech/browser'",
+    "test:package-manager": "turbo run package-manager:contract",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "pnpm": "11.10.0",
+    "turbo": "2.10.4"
   }
 }

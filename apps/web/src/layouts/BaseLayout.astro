@@ -1,0 +1,109 @@
+---
+import { SITE_CONTENT, type Locale } from "@vbtech/content";
+import SeoHead from "../components/SeoHead.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+import { THEME_COLORS, THEME_STORAGE_KEY } from "../lib/theme.js";
+import type { LocalizedRoute } from "../lib/locale.js";
+import "../styles/global.css";
+import "../styles/site-chrome.css";
+
+interface Alternate {
+  locale: Locale | "x-default";
+  path: string;
+}
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  canonicalPath?: string;
+  alternates?: readonly Alternate[];
+  localizedRoute?: LocalizedRoute;
+  routeKind?: "home" | "secondary";
+  noindex?: boolean;
+}
+
+const {
+  locale,
+  title,
+  description,
+  canonicalPath,
+  alternates = [],
+  localizedRoute = "home",
+  routeKind = localizedRoute === "home" ? "home" : "secondary",
+  noindex = false,
+} = Astro.props;
+const { skip } = SITE_CONTENT[locale];
+const themeBootstrap = `(() => {
+  const root = document.documentElement;
+  let stored = null;
+  try {
+    stored = window.localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+  } catch {
+    stored = null;
+  }
+  const mode = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+  let prefersDark = false;
+  try {
+    prefersDark = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  } catch {
+    prefersDark = false;
+  }
+  const theme = mode === "dark" || (mode === "system" && prefersDark) ? "dark" : "light";
+  root.dataset.theme = theme;
+  root.style.colorScheme = theme;
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) {
+    themeColor.content = theme === "dark" ? ${JSON.stringify(THEME_COLORS.dark)} : ${JSON.stringify(THEME_COLORS.light)};
+  }
+})();`;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="theme-color" content={THEME_COLORS.light} />
+    <script is:inline set:html={themeBootstrap} />
+    <link
+      rel="preload"
+      href="/fonts/ibm-plex-sans-latin1-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin="anonymous"
+    />
+    {locale === "ru" && (
+      <link
+        rel="preload"
+        href="/fonts/ibm-plex-sans-cyrillic-400.woff2"
+        as="font"
+        type="font/woff2"
+        crossorigin="anonymous"
+      />
+    )}
+    <SeoHead
+      locale={locale}
+      title={title}
+      description={description}
+      canonicalPath={canonicalPath}
+      alternates={alternates}
+      noindex={noindex}
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">{skip}</a>
+    <SiteHeader locale={locale} localizedRoute={localizedRoute} routeKind={routeKind} />
+    <main id="main-content" tabindex="-1"><slot /></main>
+    <SiteFooter locale={locale} route={localizedRoute} />
+    <script>
+      import { initializeThemeControls } from "../scripts/theme";
+      import { initializeContactForms } from "../scripts/contact-form";
+      import { initializeNavigation } from "../scripts/navigation";
+
+      initializeThemeControls();
+      initializeNavigation();
+      initializeContactForms();
+    </script>
+  </body>
+</html>

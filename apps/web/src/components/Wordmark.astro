@@ -1,0 +1,15 @@
+---
+import type { Locale } from "@vbtech/content";
+import { localizedPath } from "../lib/locale.js";
+
+interface Props {
+  locale: Locale;
+  label: string;
+}
+
+const { locale, label } = Astro.props;
+---
+
+<a class="wordmark" href={localizedPath(locale, "home")} aria-label={label}>
+  <span>v</span><i aria-hidden="true"></i><span>b</span><small>.tech</small>
+</a>

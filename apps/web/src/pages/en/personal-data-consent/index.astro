@@ -1,0 +1,17 @@
+---
+import { getCurrentLegalDocument } from "@vbtech/legal-documents";
+import LegalDocument from "../../../components/LegalDocument.astro";
+import LegalLayout from "../../../layouts/LegalLayout.astro";
+
+const locale = "en";
+const document = getCurrentLegalDocument("VBT-PD-02", locale);
+---
+
+<LegalLayout
+  locale={locale}
+  title={`${document.content.title} | v-b.tech`}
+  description={document.content.description}
+  route="personal-data-consent"
+>
+  <LegalDocument locale={locale} document={document} />
+</LegalLayout>

@@ -1,0 +1,41 @@
+---
+import type { Locale } from "@vbtech/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const labels =
+  locale === "ru"
+    ? {
+        group: "Тема оформления",
+        system: "Тема: системная",
+        light: "Тема: светлая",
+        dark: "Тема: тёмная",
+        systemText: "Система",
+        lightText: "Светлая",
+        darkText: "Тёмная",
+      }
+    : {
+        group: "Color theme",
+        system: "Theme: system",
+        light: "Theme: light",
+        dark: "Theme: dark",
+        systemText: "System",
+        lightText: "Light",
+        darkText: "Dark",
+      };
+---
+
+<section class="theme-control" data-theme-control aria-label={labels.group}>
+  <button type="button" data-theme-mode="system" aria-label={labels.system} aria-pressed="true">
+    {labels.systemText}
+  </button>
+  <button type="button" data-theme-mode="light" aria-label={labels.light} aria-pressed="false">
+    {labels.lightText}
+  </button>
+  <button type="button" data-theme-mode="dark" aria-label={labels.dark} aria-pressed="false">
+    {labels.darkText}
+  </button>
+</section>

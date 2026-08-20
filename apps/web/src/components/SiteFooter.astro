@@ -1,0 +1,49 @@
+---
+import { SITE_CONTENT, type Locale } from "@vbtech/content";
+import { localizedPath, type LocalizedRoute } from "../lib/locale.js";
+import LocaleLinks from "./LocaleLinks.astro";
+import ThemeControl from "./ThemeControl.astro";
+import Wordmark from "./Wordmark.astro";
+
+interface Props {
+  locale: Locale;
+  route?: LocalizedRoute;
+}
+
+const { locale, route = "home" } = Astro.props;
+const page = SITE_CONTENT[locale];
+const legalLabels =
+  locale === "ru"
+    ? {
+        register: "Реестр документов",
+        privacy: "Политика обработки персональных данных",
+        consent: "Согласие на обработку персональных данных",
+      }
+    : {
+        register: "Legal register",
+        privacy: "Privacy policy",
+        consent: "Personal data consent",
+      };
+---
+
+<footer class="site-footer">
+  <div class="shell footer-grid">
+    <div>
+      <Wordmark locale={locale} label={page.navigation.homeLabel} />
+      <p>{page.footerLine}</p>
+    </div>
+    <nav class="footer-legal" aria-label={locale === "ru" ? "Правовые документы" : "Legal documents"}>
+      <a href={localizedPath(locale, "legal-register")}>{legalLabels.register}</a>
+      <a href={localizedPath(locale, "privacy-policy")}>{legalLabels.privacy}</a>
+      <a href={localizedPath(locale, "personal-data-consent")}>{legalLabels.consent}</a>
+    </nav>
+    <div class="footer-actions">
+      <LocaleLinks locale={locale} label={page.navigation.languageLabel} route={route} />
+      <ThemeControl locale={locale} />
+      <p><a href="https://github.com/thevladbog">GitHub</a><a href="mailto:hello@v-b.tech">Email</a></p>
+    </div>
+  </div>
+  <div class="footer-bars" aria-hidden="true">
+    {Array.from({ length: 18 }, (_, index) => <i data-bar={index}></i>)}
+  </div>
+</footer>

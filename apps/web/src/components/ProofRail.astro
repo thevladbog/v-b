@@ -1,0 +1,28 @@
+---
+import type { SiteContent } from "@vbtech/content";
+
+interface Props {
+  content: SiteContent["proof"];
+}
+
+const { content } = Astro.props;
+const proof = [
+  [content.companies, content.companiesCaption, "proof-companies"],
+  [content.years, content.yearsCaption, ""],
+  [content.users, content.usersCaption, ""],
+  [content.errors, content.errorsCaption, ""],
+  [content.time, content.timeCaption, ""],
+] as const;
+---
+
+<section class="proof" data-section="proof" aria-labelledby="proof-title">
+  <div class="shell">
+    <h2 id="proof-title" class="sr-only">{content.label}</h2>
+    <p class="proof-label">{content.label}</p>
+    <dl class="proof-grid">
+      {proof.map(([value, caption, className]) => (
+        <div class={className || undefined}><dt>{value}</dt><dd>{caption}</dd></div>
+      ))}
+    </dl>
+  </div>
+</section>

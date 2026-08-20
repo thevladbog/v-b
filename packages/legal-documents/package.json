@@ -1,0 +1,17 @@
+{
+  "name": "@vbtech/legal-documents",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

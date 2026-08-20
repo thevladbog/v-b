@@ -1,0 +1,123 @@
+---
+import { PUBLIC_CONTACT_SUBMISSION_ENABLED } from "astro:env/client";
+import type { Locale, SiteContent } from "@vbtech/content";
+import { localizedPath } from "../lib/locale.js";
+import { resolveContactSubmissionReadiness } from "../lib/form-state.js";
+
+interface Props {
+  locale: Locale;
+  content: SiteContent["contact"];
+}
+
+const { locale, content } = Astro.props;
+const readiness = resolveContactSubmissionReadiness(PUBLIC_CONTACT_SUBMISSION_ENABLED);
+const disabled = !readiness.submissionEnabled;
+---
+
+<div class="contact-form-shell">
+  <h3 id="contact-form-title">{content.formTitle}</h3>
+  <p class="contact-form-disabled" id="contact-form-disabled">{content.formDisabled}</p>
+
+  <form
+    method="post"
+    action="/api/contact"
+    novalidate
+    data-contact-form
+    data-submission-enabled={String(readiness.submissionEnabled)}
+    data-consent-identity={readiness.consentIdentity}
+    data-error-summary-message={content.errorSummary}
+    aria-labelledby="contact-form-title"
+    aria-describedby="contact-form-disabled contact-form-note"
+  >
+    <p class="contact-form-warning" data-contact-warning>{content.formWarning}</p>
+    <div class="contact-error-summary" data-contact-errors role="alert" hidden></div>
+
+    <fieldset disabled={disabled} aria-describedby="contact-form-disabled">
+      <legend class="sr-only">{content.formTitle}</legend>
+
+      <div class="contact-field">
+        <label for="contact-name">{content.formName}</label>
+        <p id="contact-name-instruction">{content.formNameInstruction}</p>
+        <input
+          id="contact-name"
+          name="name"
+          type="text"
+          autocomplete="name"
+          maxlength="100"
+          required
+          aria-describedby="contact-name-instruction contact-name-error"
+        />
+        <p id="contact-name-error" class="contact-field-error" data-error-message={content.errors.name}></p>
+      </div>
+
+      <div class="contact-field">
+        <label for="contact-contact">{content.formContact}</label>
+        <p id="contact-contact-instruction">{content.formContactInstruction}</p>
+        <input
+          id="contact-contact"
+          name="contact"
+          type="text"
+          inputmode="email"
+          autocomplete="email"
+          maxlength="254"
+          required
+          aria-describedby="contact-contact-instruction contact-contact-error"
+        />
+        <p id="contact-contact-error" class="contact-field-error" data-error-message={content.errors.contact}></p>
+      </div>
+
+      <div class="contact-field">
+        <label for="contact-message">{content.formMessage}</label>
+        <p id="contact-message-instruction">{content.formMessageInstruction}</p>
+        <textarea
+          id="contact-message"
+          name="message"
+          rows="7"
+          autocomplete="off"
+          maxlength="4000"
+          required
+          aria-describedby="contact-message-instruction contact-message-error"
+        ></textarea>
+        <p id="contact-message-error" class="contact-field-error" data-error-message={content.errors.message}></p>
+      </div>
+
+      <div class="contact-field contact-consent">
+        <label for="contact-consent">
+          <input
+            id="contact-consent"
+            name="consent"
+            type="checkbox"
+            value="accepted"
+            required
+            aria-describedby="contact-consent-instruction contact-consent-error"
+          />
+          <span>
+            {content.consentBeforePolicy}{" "}
+            <a
+              class="contact-consent-action"
+              data-contact-consent-link="policy"
+              href={localizedPath(locale, "privacy-policy")}
+            >{content.policyLinkLabel}</a>
+            {" "}{content.consentBetweenLinks}{" "}
+            <a
+              class="contact-consent-action"
+              data-contact-consent-link="consent"
+              href={localizedPath(locale, "personal-data-consent")}
+            >{content.consentLinkLabel}</a>{content.consentAfterLinks}
+          </span>
+        </label>
+        <p id="contact-consent-instruction">
+          {content.formConsentInstruction}{" "}
+          <span class="contact-consent-identity" data-contact-consent-identity>{readiness.consentIdentity}</span>{" "}
+          {content.consentDraftContext}
+        </p>
+        <p id="contact-consent-error" class="contact-field-error" data-error-message={content.errors.consent}></p>
+      </div>
+
+      <button class="contact-submit" type="submit" disabled={disabled}>{content.formSubmit}</button>
+    </fieldset>
+
+    <p id="contact-form-note" class="contact-form-note">{content.formNote}</p>
+    <p data-contact-status role="status" aria-live="polite" aria-atomic="true"></p>
+  </form>
+</div>
