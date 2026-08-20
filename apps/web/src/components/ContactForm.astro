@@ -98,7 +98,11 @@ const disabled = !readiness.submissionEnabled;
             <a href={localizedPath(locale, "personal-data-consent")}>{content.consentLinkLabel}</a>{content.consentAfterLinks}
           </span>
         </label>
-        <p id="contact-consent-instruction">{content.formConsentInstruction} {content.consentDraftContext}</p>
+        <p id="contact-consent-instruction">
+          {content.formConsentInstruction}{" "}
+          <span class="contact-consent-identity" data-contact-consent-identity>{readiness.consentIdentity}</span>{" "}
+          {content.consentDraftContext}
+        </p>
         <p id="contact-consent-error" class="contact-field-error" data-error-message={content.errors.consent}></p>
       </div>
 

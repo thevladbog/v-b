@@ -1,4 +1,8 @@
-import { validateDraft, type ContactField } from "../lib/contact-validation.js";
+import {
+  normalizeContact,
+  validateDraft,
+  type ContactField,
+} from "../lib/contact-validation.js";
 import type { Locale } from "@vbtech/content";
 
 const FIELD_ORDER: readonly ContactField[] = ["name", "contact", "message", "consent"];
@@ -41,7 +45,12 @@ export function bindContactForm(form: HTMLFormElement, locale: Locale): void {
       event.preventDefault();
       const first = form.elements.namedItem(validation.fields[0] ?? "") as HTMLElement | null;
       first?.focus();
+      return;
     }
+
+    name.value = name.value.trim();
+    contact.value = normalizeContact(contact.value);
+    message.value = message.value.trim();
   });
 }
 

@@ -1,4 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
+import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import { parse } from "parse5";
 import { describe, expect, it } from "vitest";
 
@@ -66,6 +67,26 @@ const byId = (document: HtmlNode, id: string) =>
 const readBuilt = (file: string) =>
   readFile(new URL(`../${file}`, import.meta.url), "utf8");
 
+const readBuiltCss = async () => {
+  const directory = new URL("../dist/_astro/", import.meta.url);
+  const files = (await readdir(directory)).filter((file) => file.endsWith(".css"));
+  return (
+    await Promise.all(files.map((file) => readFile(new URL(file, directory), "utf8")))
+  ).join("\n");
+};
+
+const cssDeclaration = (css: string, selector: string, property: string) => {
+  for (const match of css.matchAll(/([^{}]+)\{([^{}]*)}/g)) {
+    if (!match[1].split(",").map((item) => item.trim()).includes(selector)) continue;
+    const declaration = match[2]
+      .split(";")
+      .map((item) => item.split(/:(.*)/s))
+      .find(([name]) => name?.trim() === property);
+    if (declaration) return declaration[1]?.replace(/\s+/g, "").trim();
+  }
+  return undefined;
+};
+
 describe("disabled contact shell", () => {
   it.each(pages)("renders the bounded accessible form in $file", async (page) => {
     const html = await readBuilt(page.file);
@@ -78,7 +99,7 @@ describe("disabled contact shell", () => {
     expect(attr(form, "action")).toBe("/api/contact");
     expect(attr(form, "novalidate")).toBe("");
     expect(attr(form, "data-submission-enabled")).toBe("false");
-    expect(attr(form, "data-consent-identity")).toBe("VBT-PD-02/DRAFT");
+    expect(attr(form, "data-consent-identity")).toBe(CURRENT_CONTACT_CONSENT_ID);
 
     const fieldset = elements(form, (node) => node.tagName === "fieldset")[0]!;
     expect(attr(fieldset, "disabled")).toBe("");
@@ -124,7 +145,11 @@ describe("disabled contact shell", () => {
 
     const legalLinks = elements(form, (node) => node.tagName === "a").map((node) => attr(node, "href"));
     expect(legalLinks).toEqual([page.policyHref, page.consentHref]);
-    expect(text(form)).toContain("VBT-PD-02/DRAFT");
+    const consentIdentity = elements(form, (node) =>
+      attr(node, "data-contact-consent-identity") !== undefined,
+    );
+    expect(consentIdentity).toHaveLength(1);
+    expect(text(consentIdentity[0]!)).toBe(CURRENT_CONTACT_CONSENT_ID);
     expect(text(form)).toContain(page.draftContext);
     const consentLabel = elements(form, (node) =>
       node.tagName === "label" && attr(node, "for") === "contact-consent",
@@ -158,11 +183,19 @@ describe("disabled contact shell", () => {
 
     expect(`${html}\n${javascript}`).not.toMatch(/smartcaptcha|captcha\.yandex|grecaptcha/i);
     expect(javascript).not.toMatch(/\bfetch\s*\(|\bXMLHttpRequest\b|\.sendBeacon\s*\(/);
+    expect(javascript).not.toContain(CURRENT_CONTACT_CONSENT_ID);
     expect(html).not.toContain('data-submission-enabled="true"');
   });
 });
 
 describe("progressive site navigation shell", () => {
+  it("forces enhanced hidden navigation out of layout despite its flex display rule", async () => {
+    const css = await readBuiltCss();
+
+    expect(cssDeclaration(css, ".site-navigation", "display")).toBe("flex");
+    expect(cssDeclaration(css, "[hidden]", "display")).toBe("none!important");
+  });
+
   it.each(pages)("keeps no-JS links visible and emits a localized toggle in $file", async (page) => {
     const document = parse(await readBuilt(page.file)) as unknown as HtmlNode;
     const header = elements(document, (node) => attr(node, "data-site-header") !== undefined)[0]!;

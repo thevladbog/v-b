@@ -69,9 +69,9 @@ describe("contact form binding", () => {
   it("clears prior errors and permits a valid native POST", () => {
     const { controls, errors, summary, submit } = setup();
     submit()?.({ preventDefault() {} });
-    controls.name.value = "Vlad";
-    controls.contact.value = "@abc_1";
-    controls.message.value = "Project enquiry";
+    controls.name.value = "  Vlad  ";
+    controls.contact.value = "  @abc_1  ";
+    controls.message.value = "  Project enquiry  ";
     controls.consent.checked = true;
     let prevented = false;
 
@@ -79,9 +79,26 @@ describe("contact form binding", () => {
 
     expect(prevented).toBe(false);
     expect(summary).toEqual({ hidden: true, textContent: "" });
+    expect(controls.name.value).toBe("Vlad");
+    expect(controls.contact.value).toBe("@abc_1");
+    expect(controls.message.value).toBe("Project enquiry");
     for (const [field, control] of Object.entries(controls)) {
       expect(control.attributes.has("aria-invalid")).toBe(false);
       expect(errors[`#contact-${field}-error`]?.textContent).toBe("");
     }
+  });
+
+  it("preserves typed whitespace when the submit attempt is invalid", () => {
+    const { controls, submit } = setup();
+    controls.name.value = "  Vlad  ";
+    controls.contact.value = "  @abc_1  ";
+    controls.message.value = "  Project enquiry  ";
+    controls.consent.checked = false;
+
+    submit()?.({ preventDefault() {} });
+
+    expect(controls.name.value).toBe("  Vlad  ");
+    expect(controls.contact.value).toBe("  @abc_1  ");
+    expect(controls.message.value).toBe("  Project enquiry  ");
   });
 });

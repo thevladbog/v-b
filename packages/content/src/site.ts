@@ -207,7 +207,7 @@ export const SITE_CONTENT: Readonly<Record<Locale, SiteContent>> = {
       consentBetweenLinks: "и",
       consentLinkLabel: "проектом согласия на обработку персональных данных",
       consentAfterLinks: ".",
-      consentDraftContext: "VBT-PD-02/DRAFT — проект, не вступивший в силу; согласие пока нельзя принять.",
+      consentDraftContext: "Проект не вступил в силу; согласие пока нельзя принять.",
       errorSummary: "Проверьте отмеченные поля.",
       errors: {
         name: "Укажите имя длиной не более 100 символов.",
@@ -257,7 +257,7 @@ export const SITE_CONTENT: Readonly<Record<Locale, SiteContent>> = {
       consentBetweenLinks: "and the",
       consentLinkLabel: "draft personal data processing consent",
       consentAfterLinks: ".",
-      consentDraftContext: "VBT-PD-02/DRAFT is not in force; the draft consent cannot yet be accepted.",
+      consentDraftContext: "The draft consent cannot yet be accepted because it is not in force.",
       errorSummary: "Review the marked fields.",
       errors: {
         name: "Enter a name no longer than 100 characters.",

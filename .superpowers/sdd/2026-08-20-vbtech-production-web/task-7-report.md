@@ -90,3 +90,36 @@
 - Run axe/Lighthouse and the planned browser suite against both locale roots and legal routes.
 - Visually review the longer form panel on narrow screens and both themes.
 - Do not enable submission until the consent has a publishable active identity and the separate backend/captcha/deployment plan passes its own release gates.
+
+## Review fix round 1 — 2026-08-20
+
+This appendix supersedes the earlier statement that valid submitted DOM values are never rewritten. Values remain untouched while typing and after an invalid submit attempt; immediately before a valid native POST, name, contact, and message are trimmed in the DOM so the submitted payload is normalized.
+
+### Reviewer findings addressed
+
+1. **Enhanced mobile navigation hiding.** The generated CSS now contains `[hidden] { display: none !important; }`. This author-level important rule wins over the existing `.site-navigation { display: flex; }` rule when the navigation binding sets `hidden`, while the source HTML still omits `hidden` from the nav so no-JS links remain visible.
+2. **Canonical consent identity ownership.** Both localized `consentDraftContext` strings now contain wording only and no `VBT-PD-*` identity. `ContactForm.astro` renders `readiness.consentIdentity` in a separate `data-contact-consent-identity` span and uses the same value for the form data attribute. Tests import `CURRENT_CONTACT_CONSENT_ID` from `@vbtech/legal-documents`, compare generated HTML against it, reject any `VBT-PD-*` string in `SITE_CONTENT`, and verify that the identity is absent from client JavaScript.
+3. **Submit-time normalization.** The contact binder validates the original DOM values first. Invalid submission prevents default, preserves all typed whitespace, reports errors, and focuses the first invalid control. A valid submission trims name and message and applies `normalizeContact()` to contact immediately before allowing the native POST.
+
+### Round 1 TDD evidence
+
+- RED content: `CI=true corepack pnpm --filter @vbtech/content test` failed 1 of 5 tests because serialized localized content still contained `VBT-PD-02/DRAFT`.
+- RED web: `CI=true corepack pnpm --filter @vbtech/web test -- contact-shell.test.ts contact-form.test.ts` failed 4 tests: valid values remained untrimmed, two locale pages lacked the separate consent identity node, and generated CSS lacked `[hidden]` `display:none!important`.
+- GREEN content: the same content command passed 1 file / 5 tests.
+- GREEN web: the same focused web command passed 9 files / 122 tests.
+
+### Round 1 final gates and artifact inspection
+
+- Focused web tests: exit 0; 9 files / 122 tests.
+- Content tests: exit 0; 1 file / 5 tests.
+- Web typecheck: exit 0; 33 files, 0 errors, 0 warnings, 0 hints.
+- Default web build: exit 0; 8 static pages.
+- Root tests: exit 0; 3 package tasks successful. Web 122 tests, content 5 tests, legal documents 34 tests.
+- Expected fail-closed build with `PUBLIC_CONTACT_SUBMISSION_ENABLED=true`: exit 1 with `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled`; a default build immediately afterward returned exit 0.
+- Generated CSS inspection: `.site-navigation` still resolves to authored `display:flex`; `[hidden]` resolves to authored `display:none!important`.
+- Generated RU and EN inspection: both contain the registry-derived consent identity in the form attribute and separate visible node, disabled fieldsets, and navigation without initial `hidden`.
+- Generated client runtime: 7,402 bytes inspected; canonical consent identity absent; no `fetch`, `XMLHttpRequest`, `sendBeacon`, captcha identifier, or remote script.
+- `rg` found no `VBT-PD-*` identity under `packages/content`.
+- `git diff --check`: exit 0 before report staging.
+
+Task 8 manual browser, screen-reader, axe, zoom, high-contrast, and viewport acceptance remains unrun and unchanged.

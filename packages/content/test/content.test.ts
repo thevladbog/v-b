@@ -22,7 +22,11 @@ describe("site content", () => {
       "consent",
     ]);
     expect(page.contact.directContactContext).toBeTruthy();
-    expect(page.contact.consentDraftContext).toContain("VBT-PD-02/DRAFT");
+    expect(page.contact.consentDraftContext).toBeTruthy();
+  });
+
+  it("keeps canonical legal identities out of localized copy", () => {
+    expect(JSON.stringify(SITE_CONTENT)).not.toMatch(/VBT-PD-\d+/);
   });
 
   it("rejects a blank nested translation", () => {
