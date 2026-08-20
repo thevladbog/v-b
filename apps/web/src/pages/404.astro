@@ -14,16 +14,16 @@ const page = SITE_CONTENT.ru;
   noindex={true}
 >
   <section class="not-found shell" aria-labelledby="not-found-title">
-    <p class="eyebrow">404 / not found</p>
-    <h1 id="not-found-title">Страница не найдена.<br />Page not found.</h1>
+    <p class="eyebrow">404 / <span lang="en">not found</span></p>
+    <h1 id="not-found-title">Страница не найдена.<br /><span lang="en">Page not found.</span></h1>
     <p>
-      Проверьте адрес или вернитесь на главную. Check the address or return to a localized home page.
+      Проверьте адрес или вернитесь на главную. <span lang="en">Check the address or return to a localized home page.</span>
     </p>
     <div class="not-found-actions">
       <a class="button button-primary" href="/">Главная на русском</a>
-      <a class="button button-secondary" href="/en/">English home</a>
+      <a class="button button-secondary" href="/en/" lang="en">English home</a>
       <a class="button button-secondary" href="/#contact">Связаться</a>
-      <a class="button button-secondary" href="/en/#contact">Contact</a>
+      <a class="button button-secondary" href="/en/#contact" lang="en">Contact</a>
     </div>
     <p>{page.footerLine}</p>
   </section>

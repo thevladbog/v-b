@@ -10,6 +10,11 @@ const firstHeadInlineScript = (html: string): string | undefined => {
   return head?.match(/<script>[\s\S]*?<\/script>/)?.[0];
 };
 
+const expectedThemeColors = {
+  light: "#f4f0e8",
+  dark: "#0c0e10",
+} as const;
+
 const generatedRuntime = async (html: string): Promise<string> => {
   const script = html.match(/<script type="module"(?: src="([^"]+)")?>([\s\S]*?)<\/script>/);
   const src = script?.[1];
@@ -95,12 +100,16 @@ describe("generated theme controls", () => {
 
   it("keeps an explicit stored choice when system preference access fails", async () => {
     const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
-    const bootstrap = html.match(/<head><script>([\s\S]*?)<\/script>/)?.[1];
+    const bootstrap = firstHeadInlineScript(html)?.match(/<script>([\s\S]*?)<\/script>/)?.[1];
     const root = { dataset: {}, style: {} };
+    const themeColor = { content: expectedThemeColors.light };
 
     expect(bootstrap).toBeDefined();
     runInNewContext(bootstrap ?? "", {
-      document: { documentElement: root },
+      document: {
+        documentElement: root,
+        querySelector: (selector: string) => selector === 'meta[name="theme-color"]' ? themeColor : null,
+      },
       window: {
         localStorage: { getItem: () => "dark" },
         matchMedia: () => {
@@ -111,6 +120,7 @@ describe("generated theme controls", () => {
 
     expect(root.dataset).toMatchObject({ theme: "dark" });
     expect(root.style).toMatchObject({ colorScheme: "dark" });
+    expect(themeColor.content).toBe(expectedThemeColors.dark);
   });
 
   it.each(themePages)(
@@ -125,6 +135,8 @@ describe("generated theme controls", () => {
       expect(bootstrapIndex).toBeGreaterThan(-1);
       expect(bootstrapIndex).toBeLessThan(stylesheetIndex);
       expect(html).toMatch(/<link rel="stylesheet" href="\/_astro\//);
+      expect(html.match(/<meta name="theme-color"/g)).toHaveLength(1);
+      expect(html).toContain(`<meta name="theme-color" content="${expectedThemeColors.light}">`);
       expect(html.match(/<section class="theme-control" data-theme-control/g)).toHaveLength(2);
 
       for (const mode of ["system", "light", "dark"]) {
@@ -153,6 +165,7 @@ describe("theme control runtime", () => {
     const { header, footer, buttons } = createThemeButtons();
     const root = { dataset: {}, style: {} };
     const preferences = new Map<string, string>();
+    const themeColor = { content: expectedThemeColors.light };
     let systemChange: ChangeListener | undefined;
     const mediaQuery = {
       matches: false,
@@ -166,6 +179,7 @@ describe("theme control runtime", () => {
     bindThemeControls({
       root,
       buttons,
+      themeColor,
       storage: {
         getItem: (key) => preferences.get(key) ?? null,
         setItem: (key, value) => preferences.set(key, value),
@@ -176,6 +190,7 @@ describe("theme control runtime", () => {
     header[2].click();
 
     expect(root.dataset).toMatchObject({ theme: "dark" });
+    expect(themeColor.content).toBe(expectedThemeColors.dark);
     expect(preferences.get(THEME_STORAGE_KEY)).toBe("dark");
     expect(header[2].attributes.get("aria-pressed")).toBe("true");
     expect(footer[2].attributes.get("aria-pressed")).toBe("true");
@@ -186,6 +201,7 @@ describe("theme control runtime", () => {
     systemChange?.();
 
     expect(root.dataset).toMatchObject({ theme: "dark" });
+    expect(themeColor.content).toBe(expectedThemeColors.dark);
     expect(header[0].attributes.get("aria-pressed")).toBe("true");
     expect(footer[0].attributes.get("aria-pressed")).toBe("true");
   });
@@ -193,6 +209,7 @@ describe("theme control runtime", () => {
   it("uses the legacy system-change listener when addEventListener is unavailable", () => {
     const { buttons } = createThemeButtons();
     const root = { dataset: {}, style: {} };
+    const themeColor = { content: expectedThemeColors.light };
     let systemChange: ChangeListener | undefined;
     const mediaQuery = {
       matches: false,
@@ -201,11 +218,12 @@ describe("theme control runtime", () => {
       },
     };
 
-    bindThemeControls({ root, buttons, mediaQuery });
+    bindThemeControls({ root, buttons, mediaQuery, themeColor });
 
     mediaQuery.matches = true;
     systemChange?.();
 
     expect(root.dataset).toMatchObject({ theme: "dark" });
+    expect(themeColor.content).toBe(expectedThemeColors.dark);
   });
 });

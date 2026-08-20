@@ -3,7 +3,7 @@ import { SITE_CONTENT, type Locale } from "@vbtech/content";
 import SeoHead from "../components/SeoHead.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
-import { THEME_STORAGE_KEY } from "../lib/theme.js";
+import { THEME_COLORS, THEME_STORAGE_KEY } from "../lib/theme.js";
 import type { LocalizedRoute } from "../lib/locale.js";
 import "../styles/global.css";
 import "../styles/site-chrome.css";
@@ -53,12 +53,17 @@ const themeBootstrap = `(() => {
   const theme = mode === "dark" || (mode === "system" && prefersDark) ? "dark" : "light";
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) {
+    themeColor.content = theme === "dark" ? ${JSON.stringify(THEME_COLORS.dark)} : ${JSON.stringify(THEME_COLORS.light)};
+  }
 })();`;
 ---
 
 <!doctype html>
 <html lang={locale}>
   <head>
+    <meta name="theme-color" content={THEME_COLORS.light} />
     <script is:inline set:html={themeBootstrap} />
     <link
       rel="preload"

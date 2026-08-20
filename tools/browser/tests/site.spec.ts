@@ -20,6 +20,7 @@ const localizedPairs = [
 ] as const;
 
 const absolute = (path: string) => new URL(path, "https://v-b.tech").toString();
+const themeColors = { light: "#f4f0e8", dark: "#0c0e10" } as const;
 
 for (const { path, locale, alternate } of landingPairs) {
   test(`${path} exposes its locale, paired metadata, and one primary content region`, async ({ page }) => {
@@ -48,7 +49,10 @@ for (const { path, locale, alternate } of landingPairs) {
     const allSystem = page.getByRole("button", { name: locale === "ru" ? "Тема: системная" : "Theme: system" });
     const allLight = page.getByRole("button", { name: locale === "ru" ? "Тема: светлая" : "Theme: light" });
     const allDark = page.getByRole("button", { name: locale === "ru" ? "Тема: тёмная" : "Theme: dark" });
+    const browserChromeColor = page.locator('meta[name="theme-color"]');
 
+    await expect(browserChromeColor).toHaveCount(1);
+    await expect(browserChromeColor).toHaveAttribute("content", themeColors.dark);
     await expect(allSystem).toHaveCount(2);
     for (const button of await allSystem.all()) await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -57,19 +61,34 @@ for (const { path, locale, alternate } of landingPairs) {
     for (const button of await allLight.all()) await expect(button).toHaveAttribute("aria-pressed", "true");
     for (const button of await allSystem.all()) await expect(button).toHaveAttribute("aria-pressed", "false");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(browserChromeColor).toHaveAttribute("content", themeColors.light);
 
     await page.reload();
     for (const button of await allLight.all()) await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(browserChromeColor).toHaveAttribute("content", themeColors.light);
 
+    await page.emulateMedia({ colorScheme: "light" });
     await dark.click();
     for (const button of await allDark.all()) await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(browserChromeColor).toHaveAttribute("content", themeColors.dark);
+
+    await page.reload();
+    for (const button of await allDark.all()) await expect(button).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(browserChromeColor).toHaveAttribute("content", themeColors.dark);
 
     await system.click();
     for (const button of await allSystem.all()) await expect(button).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(browserChromeColor).toHaveAttribute("content", themeColors.light);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(browserChromeColor).toHaveAttribute("content", themeColors.dark);
     await page.emulateMedia({ colorScheme: "light" });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(browserChromeColor).toHaveAttribute("content", themeColors.light);
   });
 
   test(`${path} has no horizontal overflow`, async ({ page }) => {
@@ -134,6 +153,24 @@ for (const { path, locale, alternate } of landingPairs) {
     expect(forbiddenRequests).toEqual([]);
   });
 
+  test(`${path} mobile consent legal actions meet the 44 CSS pixel contract`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "Pixel 7", "Mobile consent actions are accepted on Pixel 7");
+    await page.goto(path);
+    const form = page.locator("form[action='/api/contact']");
+    const actions = [
+      form.getByRole("link", { name: locale === "ru" ? "политикой обработки персональных данных" : "personal data processing policy" }),
+      form.getByRole("link", { name: locale === "ru" ? "проектом согласия на обработку персональных данных" : "draft personal data processing consent" }),
+    ];
+
+    for (const action of actions) {
+      await expect(action).toBeVisible();
+      const box = await action.boundingBox();
+      expect(box, "Consent action must have a measurable box").not.toBeNull();
+      expect(box!.width, "Consent action width").toBeGreaterThanOrEqual(44);
+      expect(box!.height, "Consent action height").toBeGreaterThanOrEqual(44);
+    }
+  });
+
   test(`${path} skip link focuses unobscured main content`, async ({ page }) => {
     await page.goto(path);
     await page.keyboard.press("Tab");
@@ -153,6 +190,37 @@ for (const { path, locale, alternate } of landingPairs) {
         return mainBox !== null && headerBox !== null && mainBox.y >= headerBox.y + headerBox.height - 1;
       })
       .toBe(true);
+  });
+}
+
+for (const path of ["/privacy/", "/404.html"] as const) {
+  test(`${path} bootstraps and maintains resolved browser chrome color`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.addInitScript((storageKey) => {
+      if (window.localStorage.getItem(storageKey) === null) {
+        window.localStorage.setItem(storageKey, "dark");
+      }
+    }, "vbtech-theme-v1");
+    await page.goto(path);
+
+    const chromeColor = page.locator('meta[name="theme-color"]');
+    const theme = page.getByLabel("Тема оформления").first();
+    await expect(chromeColor).toHaveCount(1);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(chromeColor).toHaveAttribute("content", themeColors.dark);
+
+    await theme.getByRole("button", { name: "Тема: светлая" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(chromeColor).toHaveAttribute("content", themeColors.light);
+
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(chromeColor).toHaveAttribute("content", themeColors.light);
+
+    await theme.getByRole("button", { name: "Тема: системная" }).click();
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(chromeColor).toHaveAttribute("content", themeColors.dark);
   });
 }
 

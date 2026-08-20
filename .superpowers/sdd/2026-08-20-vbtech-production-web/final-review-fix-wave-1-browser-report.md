@@ -98,3 +98,41 @@ CI=true corepack pnpm --dir tools/browser test tests/accessibility.spec.ts --pro
 ```
 
 No dependency, manifest, lockfile, backend, captcha, deployment, DNS, form enablement, or legal copy changed. Manual screen-reader acceptance remains unrun.
+
+## Final whole-branch review fix wave 2 — inherited language, resolved theme color, and consent actions
+
+The `/404.html` contract now verifies language inheritance rather than merely checking that English words exist. The document language remains Russian, while each complete English eyebrow, heading, explanatory sentence, and recovery action inherits `en` from the nearest meaningful container. This is covered against parsed generated HTML and the live browser DOM, alongside the unchanged bilingual recovery, `noindex,nofollow`, omitted canonical/hreflang metadata, and the existing unmodified WCAG 2.0/2.1/2.2 A/AA axe run.
+
+One `theme-color` meta now represents the actually resolved page theme. The pre-stylesheet bootstrap sets its exact token color together with `data-theme` and `color-scheme`; the runtime updates it for explicit selection, system selection, media changes, and persisted reloads. Browser coverage crosses OS and explicit preferences in both directions on the landing route and exercises the same behavior on representative legal and 404 shared layouts.
+
+The target audit's former global computed-inline-anchor escape hatch is removed. The only retained exception is explicitly scoped to desktop consent links embedded in sentence text, consistent with the WCAG 2.5.8 inline-text exception. On Pixel 7 these same policy/consent links become primary mobile actions and are always measured. A separate form-semantic RU/EN test proves each is at least 44 × 44 and fails if its mobile styling is removed.
+
+### TDD evidence
+
+RED:
+
+- generated pages had two OS-media `theme-color` metas; explicit or persisted preference did not determine browser chrome;
+- all five complete English 404 fragments/actions inherited the root `ru` language;
+- a deliberate mutation that removed the mobile consent-action rule reproduced 15 px (English) and 33.234375 px (Russian) target heights.
+
+GREEN:
+
+| Gate | Result |
+| --- | --- |
+| Generated theme/discovery | PASS — 21/21 |
+| Generated theme/discovery/contact | PASS — 28/28 |
+| Affected browser selection | PASS — 12 passed / 2 expected Desktop skips |
+| Pixel affected `--repeat-each=3` | PASS — 21/21, zero retries |
+| `CI=true corepack pnpm lint` | PASS — 2 applicable tasks; 0 Astro diagnostics |
+| `CI=true corepack pnpm typecheck` | PASS — 4 workspace tasks |
+| `CI=true corepack pnpm test` | PASS — content 5/5, legal 88/88, web 146/146; Playwright 95 passed / 11 expected Desktop skips |
+| `CI=true corepack pnpm build` | PASS — 9 HTML pages plus three discovery artifacts |
+| `git diff --check` | PASS |
+
+The critical repeat used:
+
+```text
+CI=true corepack pnpm --dir tools/browser test --project='Pixel 7' --grep 'supports light, dark|bootstraps and maintains|/404.html passes core browser acceptance|mobile consent legal actions meet' --repeat-each=3
+```
+
+No dependency, lockfile, backend, captcha, deployment, DNS, form-enablement, legal-copy, or lifecycle change is part of this wave. Manual screen-reader acceptance remains unrun.

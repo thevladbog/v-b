@@ -1,4 +1,4 @@
-import { THEME_STORAGE_KEY, parseTheme, resolveTheme, type ThemeMode } from "../lib/theme.js";
+import { THEME_COLORS, THEME_STORAGE_KEY, parseTheme, resolveTheme, type ThemeMode } from "../lib/theme.js";
 
 const colorSchemeQuery = "(prefers-color-scheme: dark)";
 
@@ -11,6 +11,10 @@ interface ThemeButton {
   dataset: { themeMode?: string };
   setAttribute: (name: string, value: string) => void;
   addEventListener: (event: "click", listener: () => void) => void;
+}
+
+interface ThemeColorMeta {
+  content: string;
 }
 
 interface ThemeStorage {
@@ -27,6 +31,7 @@ interface ThemeMediaQuery {
 interface ThemeRuntimeOptions {
   root: ThemeRoot;
   buttons: Iterable<ThemeButton>;
+  themeColor?: ThemeColorMeta;
   storage?: ThemeStorage;
   mediaQuery?: ThemeMediaQuery;
 }
@@ -50,6 +55,7 @@ const persistMode = (storage: ThemeStorage | undefined, mode: ThemeMode): void =
 export const bindThemeControls = ({
   root,
   buttons: buttonIterable,
+  themeColor,
   storage,
   mediaQuery,
 }: ThemeRuntimeOptions): void => {
@@ -60,6 +66,7 @@ export const bindThemeControls = ({
     const theme = resolveTheme(mode, mediaQuery?.matches ?? false);
     root.dataset.theme = theme;
     root.style.colorScheme = theme;
+    if (themeColor) themeColor.content = THEME_COLORS[theme];
 
     buttons.forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.themeMode === mode));
@@ -111,6 +118,7 @@ export const initializeThemeControls = (): void => {
   bindThemeControls({
     root: document.documentElement,
     buttons: document.querySelectorAll<HTMLButtonElement>("[data-theme-control] button[data-theme-mode]"),
+    themeColor: document.querySelector<HTMLMetaElement>('meta[name="theme-color"]') ?? undefined,
     storage: getStorage(),
     mediaQuery: getMediaQuery(),
   });

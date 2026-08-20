@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { parse } from "parse5";
 import { describe, expect, it } from "vitest";
 import {
   DRAFT_LEGAL_ROUTES,
@@ -7,6 +8,45 @@ import {
 import { serializeLlmsText } from "../src/lib/llms.js";
 
 const readText = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
+
+interface HtmlNode {
+  nodeName: string;
+  tagName?: string;
+  attrs?: { name: string; value: string }[];
+  childNodes?: HtmlNode[];
+  value?: string;
+}
+
+const attr = (node: HtmlNode, name: string) =>
+  node.attrs?.find((attribute) => attribute.name === name)?.value;
+
+const findElement = (root: HtmlNode, predicate: (node: HtmlNode) => boolean): HtmlNode | undefined => {
+  if (root.tagName && predicate(root)) return root;
+  for (const child of root.childNodes ?? []) {
+    const match = findElement(child, predicate);
+    if (match) return match;
+  }
+  return undefined;
+};
+
+const inheritedLanguageOfText = (
+  root: HtmlNode,
+  needle: string,
+  inheritedLanguage?: string,
+): string | undefined => {
+  let result: string | undefined;
+  const visit = (node: HtmlNode, inheritedLanguage?: string): void => {
+    if (result) return;
+    const language = attr(node, "lang") ?? inheritedLanguage;
+    if (node.nodeName === "#text" && node.value?.includes(needle)) {
+      result = language;
+      return;
+    }
+    node.childNodes?.forEach((child) => visit(child, language));
+  };
+  visit(root, inheritedLanguage);
+  return result;
+};
 
 const publicOrigin = "https://v-b.tech";
 const expectedPublicRoutes = ["/", "/en/"] as const;
@@ -128,6 +168,9 @@ Bounded description.
 
   it("generates a noindex 404 artifact with useful localized links", async () => {
     const html = await readText("dist/404.html");
+    const document = parse(html) as unknown as HtmlNode;
+    const htmlElement = findElement(document, (node) => node.tagName === "html");
+    const notFound = findElement(document, (node) => attr(node, "class")?.split(/\s+/).includes("not-found") ?? false);
 
     expect(html).toContain('<meta name="robots" content="noindex,nofollow">');
     expect(html).not.toContain('<link rel="canonical"');
@@ -144,5 +187,18 @@ Bounded description.
     expect(header).toContain('href="/#about"');
     expect(header).toContain('href="/#contact"');
     expect(header).not.toMatch(/href="#(?:work|expertise|approach|about|contact)"/);
+    expect(attr(htmlElement!, "lang")).toBe("ru");
+    expect(notFound).toBeDefined();
+    const documentLanguage = attr(htmlElement!, "lang");
+    expect(inheritedLanguageOfText(notFound!, "Страница не найдена.", documentLanguage)).toBe("ru");
+    for (const englishText of [
+      "not found",
+      "Page not found.",
+      "Check the address or return to a localized home page.",
+      "English home",
+      "Contact",
+    ]) {
+      expect(inheritedLanguageOfText(notFound!, englishText, documentLanguage), englishText).toBe("en");
+    }
   });
 });

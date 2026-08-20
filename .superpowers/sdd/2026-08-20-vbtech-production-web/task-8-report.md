@@ -208,3 +208,43 @@ CI=true corepack pnpm --dir tools/browser test tests/accessibility.spec.ts --pro
 ```
 
 No dependency, manifest, lockfile, backend, captcha, deployment, DNS, form-enablement, or legal-copy change is included.
+
+## Final whole-branch review fix wave 2 — 404 language, theme chrome, and mobile consent targets
+
+The generated 404 document remains primarily Russian, bilingual, `noindex,nofollow`, and without canonical or hreflang metadata. Every complete English fragment now establishes `lang="en"` at its meaningful text or action container: the eyebrow, heading, explanatory sentence, English-home action, and English contact action. The generated contract traverses the parsed DOM with inherited-language state, and the browser assertion performs the same check against real text nodes while the existing WCAG 2.0/2.1/2.2 A/AA axe matrix continues to cover 404 in both themes and projects.
+
+Theme chrome now has one deterministic `theme-color` meta. The no-flash bootstrap updates it to the resolved light (`#f4f0e8`) or dark (`#0c0e10`) token before the stylesheet loads. The runtime keeps it synchronized after explicit light/dark selection, system-theme selection, operating-system media changes, and reload persistence. Browser coverage proves the crossed cases OS-light plus explicit-dark and OS-dark plus explicit-light on the landing page, and repeats the shared-layout lifecycle on `/privacy/` and `/404.html`.
+
+The generic 44 CSS px target audit no longer excludes every computed-inline anchor. Its only inline-anchor exception is the desktop consent sentence, where WCAG 2.5.8 permits inline links within a sentence; that exception is identified by the consent-link semantic marker and applies only above the mobile breakpoint. Pixel 7 always measures those policy/consent links after their mobile action styling. A focused RU/EN regression locates them by form semantics and proves their rendered boxes are at least 44 × 44, so removing the contact action class/style cannot silently pass.
+
+Focused RED evidence:
+
+1. The theme/generated contracts failed because pages emitted two media-query metas, bootstrap left the light content in place for stored dark, and runtime media changes did not update it.
+2. The 404 generated and browser language checks reported `ru` inheritance for the complete English fragments.
+3. Temporarily removing only the existing mobile consent-action rule made the focused Pixel test fail: the English action was exactly 15 px high and the wrapped Russian action was 33.234375 px high. The rule was then restored unchanged; this mutation proves the regression gate is sensitive to the reviewed failure.
+
+Focused GREEN evidence:
+
+- generated theme/discovery contracts: 21/21;
+- generated theme/discovery/contact contracts: 28/28;
+- combined affected browser selection: 12 passed and 2 expected Desktop skips;
+- affected Pixel 7 repeat: 21/21 with `--repeat-each=3`, zero retries.
+
+Final verification:
+
+| Gate | Result |
+| --- | --- |
+| `CI=true corepack pnpm lint` | PASS — 2 applicable tasks; 0 Astro diagnostics |
+| `CI=true corepack pnpm typecheck` | PASS — 4 workspace tasks |
+| `CI=true corepack pnpm test` | PASS — content 5/5, legal 88/88, web 146/146; Playwright 95 passed / 11 expected Desktop skips |
+| `CI=true corepack pnpm build` | PASS — 9 HTML pages plus three discovery artifacts |
+| Affected Pixel 7 `--repeat-each=3` | PASS — 21/21, zero retries |
+| `git diff --check` | PASS |
+
+The repeat command was:
+
+```text
+CI=true corepack pnpm --dir tools/browser test --project='Pixel 7' --grep 'supports light, dark|bootstraps and maintains|/404.html passes core browser acceptance|mobile consent legal actions meet' --repeat-each=3
+```
+
+No dependency, manifest, lockfile, backend, captcha, deployment, DNS, form enablement, legal-copy, or lifecycle change is included. Manual screen-reader acceptance remains unrun and is not implied by the DOM-language checks or axe.

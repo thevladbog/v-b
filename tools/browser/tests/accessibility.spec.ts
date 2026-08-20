@@ -77,14 +77,18 @@ async function assertVisibleTargets(page: Page): Promise<void> {
             element instanceof HTMLTextAreaElement) &&
           element.matches(":disabled");
         const isDormantSkipLink = element.matches(".skip-link:not(:focus-visible)");
-        // Inline links embedded in prose are not primary/chrome controls. They remain covered by axe;
-        // the project's stricter 44 CSS px gate applies to every other visible, enabled action.
-        const isInlineProseLink = element instanceof HTMLAnchorElement && style.display === "inline";
+        // WCAG's inline-text exception remains limited to the desktop consent sentence. On the
+        // mobile breakpoint these links are promoted to deliberate 44px actions and must be audited.
+        const isDesktopConsentProseLink =
+          element instanceof HTMLAnchorElement &&
+          element.hasAttribute("data-contact-consent-link") &&
+          style.display === "inline" &&
+          !window.matchMedia("(max-width: 40rem)").matches;
 
         return (
           !isDisabledFormControl &&
           !isDormantSkipLink &&
-          !isInlineProseLink &&
+          !isDesktopConsentProseLink &&
           style.display !== "none" &&
           style.visibility !== "hidden" &&
           style.opacity !== "0" &&
@@ -103,6 +107,36 @@ async function assertVisibleTargets(page: Page): Promise<void> {
   );
 
   expect(undersized, `Undersized visible targets:\n${undersized.join("\n")}`).toEqual([]);
+}
+
+async function assert404LanguageParts(page: Page): Promise<void> {
+  const section = page.locator(".not-found");
+  await expect(section).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ru");
+
+  for (const englishText of [
+    "not found",
+    "Page not found.",
+    "Check the address or return to a localized home page.",
+    "English home",
+    "Contact",
+  ]) {
+    await expect
+      .poll(() =>
+        section.evaluate((root, needle) => {
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+          let node = walker.nextNode();
+          while (node) {
+            if (node.nodeValue?.includes(needle)) {
+              return node.parentElement?.closest("[lang]")?.getAttribute("lang") ?? null;
+            }
+            node = walker.nextNode();
+          }
+          return null;
+        }, englishText),
+      )
+      .toBe("en");
+  }
 }
 
 async function assertFooterActionsRemainInline(page: Page): Promise<void> {
@@ -146,6 +180,7 @@ for (const path of allHtmlRoutes) {
     }
     await expect(page.getByRole("main")).toHaveCount(1);
     await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+    if (path === "/404.html") await assert404LanguageParts(page);
 
     const locale = path.startsWith("/en/") ? "en" : "ru";
     const themeControl = page.getByLabel(themeLabels[locale].group).first();
