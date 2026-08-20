@@ -1,23 +1,22 @@
 ---
-import { LOCALE_PATHS, SITE_CONTENT } from "@vbtech/content";
+import { SITE_CONTENT } from "@vbtech/content";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { localizedPath } from "../../lib/locale.js";
 
 const locale = "en";
-const canonicalPath = LOCALE_PATHS[locale];
 const page = SITE_CONTENT[locale];
 ---
 
-<!doctype html>
-<html lang={locale}>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <meta name="description" content={page.meta.description} />
-    <link rel="canonical" href={canonicalPath} />
-    <title>{page.meta.title}</title>
-  </head>
-  <body>
-    <main>
-      <h1 set:html={page.hero.title} />
-    </main>
-  </body>
-</html>
+<BaseLayout
+  locale={locale}
+  title={page.meta.title}
+  description={page.meta.description}
+  canonicalPath={localizedPath(locale, "home")}
+  alternates={[
+    { locale: "ru", path: localizedPath("ru", "home") },
+    { locale: "en", path: localizedPath("en", "home") },
+    { locale: "x-default", path: localizedPath("ru", "home") },
+  ]}
+>
+  <h1 set:html={page.hero.title} />
+</BaseLayout>

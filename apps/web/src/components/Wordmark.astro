@@ -1,0 +1,13 @@
+---
+import type { Locale } from "@vbtech/content";
+import { localizedPath } from "../lib/locale.js";
+
+interface Props {
+  locale: Locale;
+  label: string;
+}
+
+const { locale, label } = Astro.props;
+---
+
+<a href={localizedPath(locale, "home")} aria-label={label}>v-b.tech</a>

@@ -1,0 +1,41 @@
+---
+import { SITE_CONTENT, type Locale } from "@vbtech/content";
+import { localizedPath } from "../lib/locale.js";
+import LocaleLinks from "./LocaleLinks.astro";
+import Wordmark from "./Wordmark.astro";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const page = SITE_CONTENT[locale];
+const legalLabels =
+  locale === "ru"
+    ? {
+        register: "Реестр документов",
+        privacy: "Политика обработки персональных данных",
+        consent: "Согласие на обработку персональных данных",
+      }
+    : {
+        register: "Legal register",
+        privacy: "Privacy policy",
+        consent: "Personal data consent",
+      };
+---
+
+<footer>
+  <Wordmark locale={locale} label={page.navigation.homeLabel} />
+  <p>{page.footerLine}</p>
+  <nav aria-label={locale === "ru" ? "Правовые документы" : "Legal documents"}>
+    <a href={localizedPath(locale, "legal-register")}>{legalLabels.register}</a>
+    <a href={localizedPath(locale, "privacy-policy")}>{legalLabels.privacy}</a>
+    <a href={localizedPath(locale, "personal-data-consent")}>{legalLabels.consent}</a>
+  </nav>
+  <LocaleLinks locale={locale} label={page.navigation.languageLabel} />
+  <div data-theme-control-slot aria-hidden="true"></div>
+  <p>
+    <a href="https://github.com/thevladbog">GitHub</a>
+    <a href="mailto:hello@v-b.tech">Email</a>
+  </p>
+</footer>

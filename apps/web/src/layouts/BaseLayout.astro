@@ -1,0 +1,41 @@
+---
+import { SITE_CONTENT, type Locale } from "@vbtech/content";
+import SeoHead from "../components/SeoHead.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import SiteHeader from "../components/SiteHeader.astro";
+
+interface Alternate {
+  locale: Locale | "x-default";
+  path: string;
+}
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  canonicalPath: string;
+  alternates: readonly Alternate[];
+}
+
+const { locale, title, description, canonicalPath, alternates } = Astro.props;
+const { skip } = SITE_CONTENT[locale];
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <SeoHead
+      locale={locale}
+      title={title}
+      description={description}
+      canonicalPath={canonicalPath}
+      alternates={alternates}
+    />
+  </head>
+  <body>
+    <a href="#main-content">{skip}</a>
+    <SiteHeader locale={locale} />
+    <main id="main-content"><slot /></main>
+    <SiteFooter locale={locale} />
+  </body>
+</html>

@@ -1,0 +1,29 @@
+---
+import { SITE_CONTENT, type Locale } from "@vbtech/content";
+import LocaleLinks from "./LocaleLinks.astro";
+import Wordmark from "./Wordmark.astro";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const page = SITE_CONTENT[locale];
+---
+
+<header>
+  <Wordmark locale={locale} label={page.navigation.homeLabel} />
+  <nav aria-label={page.navigation.primaryLabel}>
+    <a href="#work">{page.navigation.work}</a>
+    <a href="#expertise">{page.navigation.expertise}</a>
+    <a href="#approach">{page.navigation.approach}</a>
+    <a href="#about">{page.navigation.about}</a>
+    <a href="#contact">{page.navigation.contact}</a>
+  </nav>
+  <LocaleLinks locale={locale} label={page.navigation.languageLabel} />
+  <div data-theme-control-slot aria-hidden="true"></div>
+  <p>
+    <a href="https://t.me/thevladbog">{page.contact.telegram}</a>
+    <a href="mailto:hello@v-b.tech">{page.contact.email}</a>
+  </p>
+</header>
