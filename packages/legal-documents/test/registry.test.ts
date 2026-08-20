@@ -114,19 +114,54 @@ describe("draft legal document registry", () => {
     ["Linux file URL", "file:///home/alice/source/operator.ts"],
     ["slash-escaped macOS JSON", String.raw`{"source":"\/Users\/alice\/source\/operator.ts"}`],
     ["slash-escaped Linux JSON", String.raw`{"source":"\/home\/alice\/source\/operator.ts"}`],
-    ["contextual Linux path", "source path: /home/alice/source/operator.ts"],
+    ["path field", "{path:'/home/alice/project/app.css'}"],
+    ["file field", "{file:'/home/alice/project/app.css'}"],
+    ["filename field", "{filename:'/home/alice/project/app.css'}"],
+    ["fileName field", "{fileName:'/home/alice/project/app.css'}"],
+    ["sourceFile field", "{sourceFile:'/home/alice/project/app.ts'}"],
+    ["sourceMap field", "{sourceMap:'/home/alice/project/app.css.map'}"],
+    ["absolutePath field", "{absolutePath:'/home/alice/project/app.css'}"],
+    ["sourceRoot field", "{sourceRoot:'/home/alice/project'}"],
+    ["sources array field", "{sources:['/home/alice/project/app.ts']}"],
+    [
+      "CSS sourceMappingURL field",
+      "/*# sourceMappingURL=/home/alice/project/app.css.map */",
+    ],
   ])("generated artifacts detect a %s developer-home path", (_label, value) => {
     expect(containsDeveloperHomePath(value, "generated-artifact")).toBe(true);
   });
 
   it.each([
+    [
+      "CSS comma delimiter",
+      "background:url(https://example.test/a),url(/Users/alice/project/app.css)",
+    ],
+    [
+      "semicolon delimiter",
+      "background:url(https://example.test/a);absolutePath:/Users/alice/project/app.css",
+    ],
+    ["list delimiter", "https://example.test/a,/Users/alice/project/app.css"],
+    [
+      "quoted delimiter",
+      'background:url("https://example.test/a"),url("/Users/alice/project/app.css")',
+    ],
+  ])("preserves a developer path after a hosted URL %s", (_label, value) => {
+    expect(containsDeveloperHomePath(value, "generated-artifact")).toBe(true);
+  });
+
+  it.each([
     ["hosted URL", "https://example.test/home/docs/page"],
+    ["hosted CSS URL", "background:url(https://example.test/home/docs/page)"],
     ["root-relative href-like path", "/home/docs/page"],
     ["query path", "?next=/home/docs/page"],
     [
       "ordinary prose and URLs",
       "Read the home docs at /home/docs/page or https://example.test/Users/guide.",
     ],
+    ["Resource label", "Resource: /home/docs/page"],
+    ["resource field", "{resource:'/home/docs/page'}"],
+    ["arbitrary source suffix", "DataSource: /home/docs/page"],
+    ["extended field token", "{fileNameExtra:'/home/docs/page'}"],
   ])("generated artifacts do not classify a %s as a developer home", (_label, value) => {
     expect(containsDeveloperHomePath(value, "generated-artifact")).toBe(false);
   });

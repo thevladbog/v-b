@@ -1,14 +1,14 @@
 const MAX_INPUT_LENGTH = 4 * 1024 * 1024;
 const MAX_NORMALIZATION_PASSES = 8;
 
-const HOSTED_URL = /\bhttps?:\/\/[^\s"'<>]+/gi;
+const HOSTED_URL = /\bhttps?:\/\/[^\s"'`()<>\[\]\{\},;\\]+/gi;
 const FILE_HOME_URL = /file:\/\/\/(?:Users|home)\/[^/\s"'<>]+(?:\/|$)/i;
 const STRICT_POSIX_HOME_PATH = /(?:^|[\s"'({:,;\[])\/(?:Users|home)\/[^/\s"'<>]+(?:\/|$)/i;
 const GENERATED_MACOS_HOME_PATH = /(?:^|[\s"'({:,;\[])\/Users\/[^/\s"'<>]+(?:\/|$)/i;
 // Bare /home/<segment> is ambiguous with a root-relative web route: strict provenance rejects
 // it, while generated artifacts require file:// or an explicit filesystem-value label.
 const GENERATED_LINUX_HOME_CONTEXT =
-  /(?:^|[\s,{;])["']?(?:(?:[a-z][a-z0-9_-]*)?source|source\s+path|path|file|cwd|workdir|checkout|directory)["']?\s*(?::|=)\s*["']?\/home\/[^/\s"'<>]+(?:\/|$)/i;
+  /(?:^|[\s,{;])["']?(?:path|absolutePath|file|filename|source|sourceFile|sourceMap|sourcePath|sourceRoot|sourceMappingURL|sources|cwd|workdir|directory)["']?\s*(?::|=)\s*(?:\[\s*)?["']?\/home\/[^/\s"'<>]+(?:\/|$)/i;
 const WINDOWS_HOME_PATH = /(?:^|[\s"'=({:,;\[])[A-Z]:\\Users\\[^\\/\s"'<>]+(?:\\|$)/i;
 
 export type DeveloperHomePathContext = "strict-provenance" | "generated-artifact";

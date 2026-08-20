@@ -308,3 +308,78 @@ Tests        146 passed (146)
 - Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
 - `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
 - Enabled submission remains blocked; no publication, deployment, backend change, or activation occurred.
+
+## Provenance fix round 3/5 — bounded URL spans and exact Linux fields
+
+### Commit contract and scope
+
+- Base SHA: `bdde4e2246ce10db02449c25e74a7ed5d623c093`.
+- Exact commit subject: `test: bound provenance URL and field parsing`.
+- Final commit SHA is supplied in the controller handoff because the commit cannot contain its own stable SHA.
+- This is test-only detector work. Production provenance, legal copy, lifecycle/current derivation, browser tests, backend, deployment, form behavior, and the lockfile were not changed.
+
+### P1 — hosted URL span boundary
+
+The previous hosted-URL mask stopped only at whitespace, quotes, or angle brackets. In CSS or list text it could consume `)`, comma, semicolon, and every adjacent token, hiding a following real developer path. For example, masking `background:url(https://example.test/a),url(/Users/alice/project/app.css)` removed the second `url(...)` as part of the hosted URL.
+
+The mask now ends at its URI token boundary: whitespace, quotes/backtick, angle/round/square/curly brackets, comma, semicolon, or backslash. Replacement still affects only the matched hosted URL span, leaving the delimiter and following content available to the existing contextual detector.
+
+Positive fixtures place `/Users/alice/project/app.css` after a hosted URL through CSS `),url(...)`, semicolon, comma/list, and quoted delimiters. A hosted URL by itself and a hosted URL inside `background:url(...)` remain negative.
+
+### P2 — exact Linux filesystem fields
+
+The previous generated-artifact Linux context allowed an arbitrary alphanumeric prefix ending in `source`. That made `Resource`, `{resource: ...}`, and `DataSource` look like filesystem fields while missing required names such as `fileName`, `sourceFile`, `sourceMap`, and `absolutePath`.
+
+The generated-artifact policy now accepts only complete, case-insensitive field/context tokens followed by `:` or `=`: `path`, `absolutePath`, `file`, `filename`/`fileName`, `source`, `sourceFile`, `sourceMap`, `sourcePath`, `sourceRoot`, `sourceMappingURL`, `sources`, `cwd`, `workdir`, and `directory`. `sources` permits the immediately following array opener used by source maps. These names cover ordinary build metadata, CSS source-map directives, and source-map JSON without suffix matching.
+
+Positive object/CSS/source-map fixtures cover `fileName`, `filename`, `sourceFile`, `sourceMap`, `absolutePath`, `sourceRoot`, `sources`, and `sourceMappingURL` with `/home/alice/...`. Negative fixtures cover `Resource`, `resource`, `DataSource`, and `fileNameExtra`, in addition to the existing hosted URL, root-relative route, query, and ordinary prose/URL cases.
+
+The 4 MiB input limit, eight-pass escape normalization, strict/generated scan modes, file URL rules, and the documented bare `/home/...` ambiguity remain unchanged.
+
+### TDD evidence
+
+The first expanded fixture run exposed 11 failures. Source-map equivalents were then added before the detector change, and the complete RED was rerun:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  1 failed | 1 passed (2)
+Tests       14 failed | 62 passed (76)
+Failures    URL delimiter over-consumption; missing exact fields; loose source/resource matches
+Exit status 1
+```
+
+The initial RED invocation was interrupted before tests because pnpm unexpectedly attempted to recreate `node_modules` using unavailable registry access. The exact frozen-lockfile dependency graph was restored from the local store (`309 reused`, `0 downloaded`) without a lockfile change, then the RED above ran normally.
+
+After the two bounded regex changes, exact `source` was retained as a complete token for the existing slash-escaped JSON fixture, and all focused tests passed:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  2 passed (2)
+Tests       77 passed (77)
+
+CI=true corepack pnpm --filter @vbtech/web test -- legal-pages.test.ts
+Build        9 static pages
+Test Files   11 passed (11)
+Tests        146 passed (146)
+```
+
+### Verification gates
+
+| Gate | Result |
+| --- | --- |
+| Legal tests | PASS — 2 files, 77 tests |
+| Legal typecheck | PASS |
+| Web legal regression/full package test | PASS — 11 files, 146 tests |
+| Web typecheck | PASS — 39 files, 0 errors, 0 warnings, 0 hints |
+| Default web build | PASS — 9 static pages plus text/XML endpoints |
+| Strict legal metadata scan | PASS |
+| Contextual generated-output scan | PASS across every text/client artifact |
+| `PUBLIC_CONTACT_SUBMISSION_ENABLED=true` web build | EXPECTED FAIL — exit 1, `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled` |
+| Normal build after deliberate failure | PASS — complete 9-page output restored |
+| `git diff --check` | PASS |
+
+### Legal and activation boundary
+
+- Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
+- `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
+- Enabled submission remains blocked; no publication, deployment, backend change, or activation occurred.
