@@ -110,12 +110,24 @@ const accessibleText = (node: HtmlNode): string =>
 
 const normalizedText = (value: string) => value.replace(/\s+/g, " ").trim();
 
-const effectiveAccessibleName = (document: HtmlNode, node: HtmlNode) => {
+const effectiveAccessibleName = (
+  document: HtmlNode,
+  node: HtmlNode,
+  visited: ReadonlySet<HtmlNode> = new Set(),
+): string => {
+  if (visited.has(node)) return "";
+  const activePath = new Set(visited).add(node);
   const labelledBy = attr(node, "aria-labelledby")?.trim().split(/\s+/).filter(Boolean) ?? [];
   const referenced = labelledBy.flatMap((id) =>
     elements(document, (candidate) => attr(candidate, "id") === id)
   );
-  if (referenced.length > 0) return normalizedText(referenced.map(text).join(" "));
+  if (referenced.length > 0) {
+    return normalizedText(
+      referenced.map((candidate) =>
+        effectiveAccessibleName(document, candidate, activePath)
+      ).join(" "),
+    );
+  }
 
   const ariaLabel = attr(node, "aria-label");
   if (ariaLabel?.trim()) return normalizedText(ariaLabel);
@@ -132,6 +144,14 @@ const isEffectivelyHidden = (node: HtmlNode) => {
     }
   }
   return false;
+};
+
+const visibleText = (node: HtmlNode): string => {
+  if (isEffectivelyHidden(node)) return "";
+  if (node.nodeName === "#text") {
+    return (node as HtmlNode & { value?: string }).value ?? "";
+  }
+  return normalizedText((node.childNodes ?? []).map(visibleText).join(" "));
 };
 
 const elementById = (document: HtmlNode, id: string) =>
@@ -202,30 +222,77 @@ const quotedCssValue = (css: string, quoteIndex: number) => {
 
 const cssAssetUrls = (css: string) => {
   const urls: string[] = [];
-  for (const match of css.matchAll(/url\s*\(/gi)) {
-    let index = (match.index ?? 0) + match[0].length;
-    while (/\s/.test(css[index] ?? "")) index += 1;
+  const commentEnd = (index: number) => {
+    const end = css.indexOf("*/", index + 2);
+    return end < 0 ? css.length : end + 2;
+  };
+  const skipTrivia = (start: number) => {
+    let index = start;
+    while (index < css.length) {
+      if (/\s/.test(css[index] ?? "")) {
+        index += 1;
+        continue;
+      }
+      if (css.startsWith("/*", index)) {
+        index = commentEnd(index);
+        continue;
+      }
+      break;
+    }
+    return index;
+  };
+  const urlFunction = (start: number) => {
+    if (css.slice(start, start + 3).toLowerCase() !== "url") return undefined;
+    if (start > 0 && /[\w-]/.test(css[start - 1])) return undefined;
+    let index = skipTrivia(start + 3);
+    if (css[index] !== "(") return undefined;
+    index = skipTrivia(index + 1);
     if (css[index] === '"' || css[index] === "'") {
       const quoted = quotedCssValue(css, index);
-      if (!quoted) continue;
-      index = quoted.end;
-      while (/\s/.test(css[index] ?? "")) index += 1;
-      if (css[index] === ")" && quoted.value.trim()) urls.push(quoted.value.trim());
-      continue;
+      if (!quoted) return undefined;
+      index = skipTrivia(quoted.end);
+      if (css[index] !== ")") return undefined;
+      return { end: index + 1, value: quoted.value.trim() };
     }
     const close = css.indexOf(")", index);
-    if (close < 0) continue;
-    const value = css.slice(index, close).trim();
-    if (value) urls.push(value);
-  }
+    if (close < 0) return undefined;
+    return { end: close + 1, value: css.slice(index, close).trim() };
+  };
 
-  for (const match of css.matchAll(/@import\s+/gi)) {
-    let index = (match.index ?? 0) + match[0].length;
-    while (/\s/.test(css[index] ?? "")) index += 1;
-    if (css.slice(index).match(/^url\s*\(/i)) continue;
-    if (css[index] !== '"' && css[index] !== "'") continue;
-    const quoted = quotedCssValue(css, index);
-    if (quoted?.value.trim()) urls.push(quoted.value.trim());
+  for (let index = 0; index < css.length;) {
+    if (css.startsWith("/*", index)) {
+      index = commentEnd(index);
+      continue;
+    }
+    if (css[index] === '"' || css[index] === "'") {
+      index = quotedCssValue(css, index)?.end ?? css.length;
+      continue;
+    }
+    if (
+      css.slice(index, index + 7).toLowerCase() === "@import" &&
+      !/[\w-]/.test(css[index + 7] ?? "")
+    ) {
+      const valueStart = skipTrivia(index + 7);
+      const importedUrl = urlFunction(valueStart);
+      if (importedUrl) {
+        if (importedUrl.value) urls.push(importedUrl.value);
+        index = importedUrl.end;
+        continue;
+      }
+      if (css[valueStart] === '"' || css[valueStart] === "'") {
+        const quoted = quotedCssValue(css, valueStart);
+        if (quoted?.value.trim()) urls.push(quoted.value.trim());
+        index = quoted?.end ?? css.length;
+        continue;
+      }
+    }
+    const fetchedUrl = urlFunction(index);
+    if (fetchedUrl) {
+      if (fetchedUrl.value) urls.push(fetchedUrl.value);
+      index = fetchedUrl.end;
+      continue;
+    }
+    index += 1;
   }
   return urls;
 };
@@ -243,6 +310,10 @@ const assetUrls = (document: HtmlNode) => {
     "apple-touch-icon", "dns-prefetch", "icon", "manifest", "mask-icon", "modulepreload",
     "preconnect", "prefetch", "preload", "prerender", "stylesheet",
   ]);
+  const svgPresentationUrlAttributes = [
+    "filter", "mask", "clip-path", "fill", "stroke", "marker-start", "marker-mid",
+    "marker-end", "cursor",
+  ] as const;
 
   for (const node of elements(document)) {
     const tagName = node.tagName?.toLowerCase() ?? "";
@@ -268,14 +339,13 @@ const assetUrls = (document: HtmlNode) => {
     if (node.namespaceURI === "http://www.w3.org/2000/svg" && tagName !== "a") {
       const href = attr(node, "href") ?? attr(node, "xlink:href");
       pushUrl(href);
+      for (const attributeName of svgPresentationUrlAttributes) {
+        const value = attr(node, attributeName);
+        if (value) urls.push(...cssAssetUrls(value));
+      }
     }
     const style = attr(node, "style");
     if (style) urls.push(...cssAssetUrls(style));
-    for (const attribute of node.attrs ?? []) {
-      if (attribute.name !== "style" && /url\s*\(/i.test(attribute.value)) {
-        urls.push(...cssAssetUrls(attribute.value));
-      }
-    }
   }
 
   for (const style of elements(document, (node) => node.tagName === "style")) {
@@ -385,7 +455,7 @@ const figureContractProblems = (document: HtmlNode, locale: PageLocale) => {
     const caption = figure && descendants(figure, "figcaption")[0];
     const disclosureNodes = caption
       ? [caption, ...descendants(caption)].filter((node) =>
-          !isEffectivelyHidden(node) && normalizedText(text(node)) === expected.disclosure
+          !isEffectivelyHidden(node) && normalizedText(visibleText(node)) === expected.disclosure
         )
       : [];
     if (!caption || isEffectivelyHidden(caption) || disclosureNodes.length === 0) {
@@ -403,13 +473,17 @@ const browsingContextProblems = (document: HtmlNode, locale: PageLocale) => {
     targetElements.has(node.tagName ?? "") && attr(node, "target") !== undefined
   )) {
     const tagName = link.tagName ?? "";
-    const target = (attr(link, "target") ?? "").trim();
+    const target = attr(link, "target") ?? "";
     const targetKeyword = target.toLowerCase();
     const visiblePurpose = normalizedText(accessibleText(link));
     const destination = (tagName === "form" ? attr(link, "action") : attr(link, "href"))?.trim();
     const identifier = tagName === "a"
       ? visiblePurpose || destination || "unnamed link"
       : `${tagName} ${destination || "(no destination)"}`;
+    if (target !== target.trim()) {
+      problems.push(`${identifier}: target has leading or trailing whitespace`);
+      continue;
+    }
     if (targetKeyword === "_self") continue;
     if (tagName !== "a" || targetKeyword !== "_blank") {
       problems.push(`${identifier}: target ${target || "(empty)"} opens an unsupported browsing context`);
@@ -537,6 +611,37 @@ describe("negative structural guard fixtures", () => {
     ]);
   });
 
+  it("recursively resolves aria-labelledby overrides for the effective figure name", () => {
+    const document = documentFor(`
+      <article data-case="markiro">
+        <span id="figure-name" aria-label="Wrong effective figure name">Markiro — product interface concept illustration</span>
+        <figure aria-labelledby="figure-name">
+          <figcaption><span>illustration / concept, not a product capture</span></figcaption>
+        </figure>
+      </article>
+    `);
+
+    expect(figureContractProblems(document, "en")).toEqual([
+      "markiro: accessible figure label is not exact",
+    ]);
+  });
+
+  it("protects recursive aria-labelledby resolution from cycles", () => {
+    const document = documentFor(`
+      <article data-case="markiro">
+        <span id="figure-name" aria-labelledby="figure-name-override">Markiro — product interface concept illustration</span>
+        <span id="figure-name-override" aria-labelledby="figure-name" aria-label="Wrong cycle name">Wrong cycle name</span>
+        <figure aria-labelledby="figure-name">
+          <figcaption><span>illustration / concept, not a product capture</span></figcaption>
+        </figure>
+      </article>
+    `);
+
+    expect(figureContractProblems(document, "en")).toEqual([
+      "markiro: accessible figure label is not exact",
+    ]);
+  });
+
   it("rejects a presentational figure even when its label and caption match", () => {
     const document = documentFor(`
       <article data-case="markiro">
@@ -556,6 +661,20 @@ describe("negative structural guard fixtures", () => {
       <article data-case="markiro">
         <figure aria-label="Markiro — product interface concept illustration">
           <div inert><figcaption><span>illustration / concept, not a product capture</span></figcaption></div>
+        </figure>
+      </article>
+    `);
+
+    expect(figureContractProblems(document, "en")).toEqual([
+      "markiro: visible disclosure is not exact",
+    ]);
+  });
+
+  it("rejects a disclosure that exists only in a hidden figcaption descendant", () => {
+    const document = documentFor(`
+      <article data-case="markiro">
+        <figure aria-label="Markiro — product interface concept illustration">
+          <figcaption><span hidden>illustration / concept, not a product capture</span><span aria-hidden="true"></span></figcaption>
         </figure>
       </article>
     `);
@@ -603,6 +722,31 @@ describe("negative structural guard fixtures", () => {
     ]);
   });
 
+  it("recursively resolves aria-labelledby overrides for new-tab purpose", () => {
+    const document = documentFor(`
+      <span id="complete-link-name" aria-label="opens in a new tab">Contact team (opens in a new tab)</span>
+      <a href="https://example.com/contact" target="_blank" rel="noopener noreferrer"
+        aria-labelledby="complete-link-name">Contact team</a>
+    `);
+
+    expect(browsingContextProblems(document, "en")).toEqual([
+      "Contact team: new-tab label does not include its purpose",
+    ]);
+  });
+
+  it("rejects browsing targets padded with whitespace", () => {
+    const document = documentFor(`
+      <a href="/same" target=" _self ">Same context</a>
+      <a href="https://example.com/contact" target=" _blank " rel="noopener noreferrer"
+        aria-label="Contact team (opens in a new tab)">Contact team</a>
+    `);
+
+    expect(browsingContextProblems(document, "en")).toEqual([
+      "Same context: target has leading or trailing whitespace",
+      "Contact team: target has leading or trailing whitespace",
+    ]);
+  });
+
   it("finds fetch-like link relations, CSS imports, and SVG filter/image loads", () => {
     const document = documentFor(`
       <link rel="preconnect" href="https://cdn.example.com">
@@ -630,8 +774,8 @@ describe("negative structural guard fixtures", () => {
       @import "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans";
       .remote { background-image: url(https://cdn.example.com/background.png); }
     `)).toEqual([
-      "https://cdn.example.com/background.png",
       "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans",
+      "https://cdn.example.com/background.png",
     ]);
   });
 
@@ -653,13 +797,41 @@ describe("negative structural guard fixtures", () => {
     ]);
   });
 
+  it("collects only fetch-capable SVG presentation attributes", () => {
+    const document = documentFor(`
+      <div aria-label="url(https://not-an-asset.example/label)" title="url(https://not-an-asset.example/title)"></div>
+      <svg aria-label="url(https://not-an-asset.example/svg-label)" title="url(https://not-an-asset.example/svg-title)"
+        filter="url(https://cdn.example.com/filter.svg#active)"
+        marker-end="url(https://cdn.example.com/marker.svg#arrow)"></svg>
+    `);
+
+    expect(assetUrls(document)).toEqual([
+      "https://cdn.example.com/filter.svg#active",
+      "https://cdn.example.com/marker.svg#arrow",
+    ]);
+  });
+
   it("collects quoted CSS fetch URLs containing whitespace", () => {
     expect(cssAssetUrls(`
       @import "https://fonts.googleapis.com/css family.css";
       .hero { background-image: url("https://cdn.example.com/hero image.png"); }
     `)).toEqual([
+      "https://fonts.googleapis.com/css family.css",
+      "https://cdn.example.com/hero image.png",
+    ]);
+  });
+
+  it("ignores CSS comments and ordinary strings while preserving actual fetches", () => {
+    expect(cssAssetUrls(`
+      /* url(https://not-an-asset.example/comment.png) */
+      .note::before { content: "url(https://not-an-asset.example/content.png)"; }
+      .hero { background-image: url("https://cdn.example.com/hero image.png"); }
+      @import "https://fonts.googleapis.com/css family.css";
+      @import url("https://cdn.example.com/theme file.css") screen;
+    `)).toEqual([
       "https://cdn.example.com/hero image.png",
       "https://fonts.googleapis.com/css family.css",
+      "https://cdn.example.com/theme file.css",
     ]);
   });
 
