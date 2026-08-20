@@ -1,14 +1,38 @@
-import { readFile } from "node:fs/promises";
+import { execFile as execFileCallback } from "node:child_process";
+import { readFile, realpath } from "node:fs/promises";
+import { promisify } from "node:util";
 
-const requiredVersion = "11.10.0";
+const execFile = promisify(execFileCallback);
 const rootPackage = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
+const requiredPackageManager = "pnpm@11.10.0";
+const requiredVersion = "11.10.0";
+const packageDirectory = new URL("../node_modules/pnpm/", import.meta.url);
+const packageManifest = JSON.parse(
+  await readFile(new URL("package.json", packageDirectory), "utf8"),
+);
+const expectedExecutable = await realpath(
+  new URL("bin/pnpm.mjs", packageDirectory),
+);
 const userAgent = process.env.npm_config_user_agent ?? "";
-const executable = process.env.npm_execpath ?? "";
+const reportedExecutable = process.env.npm_execpath ?? "";
 
-if (rootPackage.packageManager !== `pnpm@${requiredVersion}`) {
-  throw new Error(`root packageManager must be pnpm@${requiredVersion}`);
+if (rootPackage.packageManager !== requiredPackageManager) {
+  throw new Error(`root packageManager must be ${requiredPackageManager}`);
+}
+
+if (packageManifest.version !== requiredVersion) {
+  throw new Error(
+    `workspace pnpm package must be ${requiredVersion}; received ${packageManifest.version ?? "no version"}`,
+  );
+}
+
+const { stdout } = await execFile(process.execPath, [expectedExecutable, "--version"]);
+if (stdout.trim() !== requiredVersion) {
+  throw new Error(
+    `workspace pnpm executable must report ${requiredVersion}; received ${stdout.trim() || "no version"}`,
+  );
 }
 
 if (!userAgent.startsWith(`pnpm/${requiredVersion} `)) {
@@ -17,10 +41,23 @@ if (!userAgent.startsWith(`pnpm/${requiredVersion} `)) {
   );
 }
 
-if (!/node_modules[\\/]pnpm[\\/]bin[\\/]pnpm\.mjs$/.test(executable)) {
+if (!reportedExecutable) {
+  throw new Error("Turbo child did not report npm_execpath");
+}
+
+let resolvedReportedExecutable;
+try {
+  resolvedReportedExecutable = await realpath(reportedExecutable);
+} catch {
   throw new Error(
-    `Turbo child must resolve a workspace pnpm executable; received ${executable || "no npm_execpath"}`,
+    `Turbo child reported a nonexistent pnpm executable: ${reportedExecutable}`,
   );
 }
 
-console.log(`pnpm child contract: ${userAgent}; ${executable}`);
+if (resolvedReportedExecutable !== expectedExecutable) {
+  throw new Error(
+    `Turbo child must use the repo-local pnpm executable; received ${resolvedReportedExecutable}`,
+  );
+}
+
+console.log(`pnpm child contract: ${requiredVersion}; ${expectedExecutable}`);
