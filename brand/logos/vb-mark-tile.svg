@@ -1,0 +1,12 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- v–b monogram tile · v-b.tech · dark -->
+  <rect width="120" height="120" rx="28" fill="#15181B"/>
+  <rect x="0.5" y="0.5" width="119" height="119" rx="27.5" stroke="#2A2F35"/>
+  <!-- v (monoline chevron) -->
+  <path d="M48 23 L60 43 L72 23" stroke="#E8EAEC" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- signal dash -->
+  <rect x="45" y="55.5" width="30" height="9" rx="4.5" fill="#F5A623"/>
+  <!-- b (monoline stem + bowl) -->
+  <path d="M51.5 74 L51.5 97" stroke="#E8EAEC" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="60.5" cy="88.5" r="9" stroke="#E8EAEC" stroke-width="7" fill="none"/>
+</svg>

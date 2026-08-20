@@ -1,0 +1,24 @@
+.DS_Store
+
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Astro and build output
+.astro/
+dist/
+coverage/
+
+# Browser and test artifacts
+playwright-report/
+test-results/
+.playwright-mcp/
+
+# Local runtime state
+*.log
+*.pid
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example

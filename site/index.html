@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0c0e10">
+    <meta name="description" content="Проектирую и разрабатываю сложные цифровые продукты — от воркфлоу и интерфейса до инфраструктуры, запуска и эксплуатации.">
+    <title>Влад Богатырев — продуктовый инженер полного цикла</title>
+    <link rel="icon" href="../brand/logos/vb-favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main" data-i18n="skip">Перейти к содержанию</a>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="wordmark" href="#top" aria-label="v-b.tech, на главную" data-i18n-aria-label="homeLabel"><span>v</span><i aria-hidden="true"></i><span>b</span><small>.tech</small></a>
+        <button class="menu-button" type="button" data-menu-button data-i18n-aria-label="menuOpen" aria-expanded="false" aria-controls="site-navigation" aria-label="Открыть меню"><span></span><span></span></button>
+        <nav id="site-navigation" class="site-navigation" data-navigation data-i18n-aria-label="primaryNav" aria-label="Основная навигация">
+          <a href="#work" data-i18n="navWork">кейсы</a>
+          <a href="#expertise" data-i18n="navExpertise">экспертиза</a>
+          <a href="#approach" data-i18n="navApproach">подход</a>
+          <a href="#about" data-i18n="navAbout">обо мне</a>
+          <div class="locale-switch" aria-label="Язык" data-i18n-aria-label="languageLabel"><button type="button" data-locale="ru" aria-pressed="true">RU</button><span aria-hidden="true">/</span><button type="button" data-locale="en" aria-pressed="false">EN</button></div>
+          <a class="header-contact" href="#contact" data-i18n="navContact">обсудить проект</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="shell hero-grid">
+          <div class="hero-copy">
+            <div class="availability"><span aria-hidden="true"></span><b data-i18n="availability">Открыт к избранным проектам</b></div>
+            <p class="eyebrow" data-i18n="heroKicker">Влад Богатырев · продуктовый инженер</p>
+            <h1 id="hero-title" data-i18n-html="heroTitle">Отвечаю за продукт <em>целиком.</em></h1>
+            <p class="hero-lead" data-i18n="heroLead">Проектирую и разрабатываю сложные цифровые продукты — от воркфлоу и интерфейса до инфраструктуры, запуска и эксплуатации.</p>
+            <p class="hero-speciality" data-i18n="heroSpeciality">Особенно силён там, где софт встречается с физическим миром: киоски, сканеры, принтеры, терминалы и нестабильная связь.</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#contact"><span data-i18n="discuss">Обсудить проект</span><i aria-hidden="true">↘</i></a>
+              <a class="button button-secondary" href="#work"><span data-i18n="viewWork">Смотреть кейсы</span><i aria-hidden="true">↓</i></a>
+            </div>
+          </div>
+          <div class="signal-field" aria-hidden="true">
+            <div class="signal-meta"><span>VB / PRODUCT ENGINEERING</span><span>55.75°N · 37.62°E</span></div>
+            <div class="signal-orbit signal-orbit--outer"></div><div class="signal-orbit signal-orbit--inner"></div>
+            <div class="signal-axis signal-axis--x"></div><div class="signal-axis signal-axis--y"></div>
+            <div class="signal-core"><span>v</span><i></i><span>b</span></div>
+            <div class="signal-dashes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="signal-status"><b>PRODUCT / ONLINE</b><span>systems with recovery paths</span></div>
+          </div>
+        </div>
+        <div class="hero-ticker" aria-hidden="true"><div><span>product logic</span><i></i><span>interface</span><i></i><span>architecture</span><i></i><span>launch</span><i></i><span>operations</span><i></i><span>product logic</span><i></i><span>interface</span><i></i><span>architecture</span><i></i><span>launch</span><i></i><span>operations</span><i></i></div></div>
+      </section>
+
+      <section class="proof" aria-labelledby="proof-title">
+        <div class="shell">
+          <h2 id="proof-title" class="sr-only" data-i18n="proofLabel">Опыт в эксплуатации, не только в макетах</h2>
+          <p class="proof-label" data-i18n="proofLabel">Опыт в эксплуатации, не только в макетах</p>
+          <div class="proof-grid">
+            <article class="proof-companies"><strong data-i18n="proofCompanies">Yandex · Kaspersky · Sberbank</strong><span data-i18n="proofCompaniesCaption">коммерческий опыт</span></article>
+            <article><strong data-i18n="proofYears">4+</strong><span data-i18n="proofYearsCaption">года разработки продуктов</span></article>
+            <article><strong data-i18n="proofUsers">1 000+</strong><span data-i18n="proofUsersCaption">пользователей продуктов</span></article>
+            <article><strong data-i18n="proofErrors">−20%</strong><span data-i18n="proofErrorsCaption">операционных ошибок</span></article>
+            <article><strong data-i18n="proofTime">15 → 1 мин</strong><span data-i18n="proofTimeCaption">ключевая операция</span></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section work" id="work" aria-labelledby="work-title">
+        <div class="shell">
+          <header class="section-heading"><p class="eyebrow" data-i18n="workEyebrow">01 / выбранные кейсы</p><h2 id="work-title" data-i18n="workTitle">Системы с последствиями в реальном мире</h2><p data-i18n="workLead">Не галерея интерфейсов: задача, моя зона ответственности, инженерное решение и эффект для операции.</p></header>
+          <div class="case-list" data-case-list></div>
+          <aside class="work-cta"><p data-i18n="workCta">Есть похожая задача? Давайте разберём её.</p><a class="button button-primary" href="#contact"><span data-i18n="discuss">Обсудить проект</span><i aria-hidden="true">↘</i></a></aside>
+          <div class="more-projects"><p class="eyebrow" data-i18n="moreEyebrow">ещё проекты</p><div class="project-manifest" data-more-projects></div></div>
+        </div>
+      </section>
+
+      <section class="section expertise" id="expertise" aria-labelledby="expertise-title">
+        <div class="shell">
+          <header class="section-heading section-heading--split"><div><p class="eyebrow" data-i18n="expertiseEyebrow">02 / экспертиза</p><h2 id="expertise-title" data-i18n="expertiseTitle">Одна точка ответственности</h2></div><p data-i18n="expertiseLead">Подключаюсь не как исполнитель отдельного экрана, а как партнёр, который удерживает продукт, систему и запуск в одном контуре.</p></header>
+          <div class="expertise-grid" data-expertise-list></div>
+        </div>
+      </section>
+
+      <section class="section approach" id="approach" aria-labelledby="approach-title">
+        <div class="shell">
+          <header class="section-heading"><p class="eyebrow" data-i18n="approachEyebrow">03 / как работаю</p><h2 id="approach-title" data-i18n="approachTitle">От неопределённости до работающей операции</h2><p data-i18n="approachLead">Каждый этап оставляет проверяемый результат: решение можно обсудить, протестировать, запустить и восстановить после сбоя.</p></header>
+          <div class="approach-list" data-approach-list></div>
+        </div>
+      </section>
+
+      <section class="section about" id="about" aria-labelledby="about-title">
+        <div class="shell about-grid">
+          <div class="about-copy">
+            <p class="eyebrow" data-i18n="aboutEyebrow">04 / обо мне</p><h2 id="about-title" data-i18n="aboutTitle">Инженерное мышление без туннельного зрения</h2>
+            <p data-i18n="aboutBody">Я — Влад Богатырев. Соединяю продуктовую логику, дизайн интерфейсов и техническую реализацию. Моя сильная сторона — разложить сложный физический процесс на понятный воркфлоу, собрать систему и довести её до реальной эксплуатации.</p>
+            <p data-i18n="aboutBodyTwo">Работаю самостоятельно, при необходимости подключаю специалистов под узкие задачи и остаюсь одной точкой ответственности за результат.</p>
+            <div class="about-signature"><span>Vlad Bogatyrev</span><i></i><small>product / engineering / operations</small></div>
+          </div>
+          <div class="contact-panel" id="contact">
+            <p class="eyebrow" data-i18n="contactEyebrow">контакт / новый проект</p><h2 data-i18n="contactTitle">Расскажите, что должно начать работать лучше</h2>
+            <p class="contact-lead" data-i18n="contactLead">Подойдёт короткое описание продукта, процесса или текущего сбоя. На первом разговоре разберём задачу и поймём, есть ли хороший рабочий формат.</p>
+            <div class="contact-links"><a href="https://t.me/thevladbog" target="_blank" rel="noopener"><span data-i18n="telegram">Telegram</span><b>@thevladbog ↗</b></a><a href="mailto:hello@v-b.tech"><span data-i18n="email">Email</span><b>hello@v-b.tech ↗</b></a></div>
+            <form class="contact-form" data-contact-form novalidate>
+              <div class="form-field">
+                <label for="contact-name" data-i18n="formName">Имя</label>
+                <input id="contact-name" aria-describedby="contact-name-error" name="name" autocomplete="name" data-i18n-placeholder="formName" placeholder="Имя">
+                <small id="contact-name-error" data-error-for="name"></small>
+              </div>
+              <div class="form-field">
+                <label for="contact-channel" data-i18n="formContact">Email или Telegram</label>
+                <input id="contact-channel" aria-describedby="contact-channel-error" name="contact" autocomplete="email" data-i18n-placeholder="formContact" placeholder="Email или Telegram">
+                <small id="contact-channel-error" data-error-for="contact"></small>
+              </div>
+              <div class="form-field form-message">
+                <label for="contact-message" data-i18n="formMessage">Что вы хотите спроектировать или улучшить?</label>
+                <textarea id="contact-message" aria-describedby="contact-message-error" name="message" rows="4" data-i18n-placeholder="formMessage" placeholder="Что вы хотите спроектировать или улучшить?"></textarea>
+                <small id="contact-message-error" data-error-for="message"></small>
+              </div>
+              <div class="form-footer"><button class="button button-primary" type="submit"><span data-i18n="formSubmit">Подготовить обращение</span><i aria-hidden="true">↗</i></button><p data-i18n="formNote">Мокап: данные никуда не отправляются.</p></div>
+              <p class="form-status" data-form-status aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-grid">
+        <div><a class="wordmark" href="#top" aria-label="v-b.tech, на главную" data-i18n-aria-label="homeLabel"><span>v</span><i aria-hidden="true"></i><span>b</span><small>.tech</small></a><p>Vlad Bogatyrev / Влад Богатырев</p></div>
+        <p data-i18n="footerLine">Продукты, которые продолжают работать, когда условия перестают быть идеальными.</p>
+        <div class="footer-actions"><div class="locale-switch" aria-label="Язык" data-i18n-aria-label="languageLabel"><button type="button" data-locale="ru" aria-pressed="true">RU</button><span aria-hidden="true">/</span><button type="button" data-locale="en" aria-pressed="false">EN</button></div><a href="https://github.com/thevladbog" target="_blank" rel="noopener">GitHub ↗</a><a href="mailto:hello@v-b.tech">Email ↗</a></div>
+      </div>
+      <div class="footer-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </footer>
+  </body>
+</html>

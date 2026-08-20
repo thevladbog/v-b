@@ -1,0 +1,46 @@
+/* ============================================
+   v-b.tech · design tokens · v0.1 · 2026-08-20
+   ============================================ */
+:root {
+  /* color.neutral — Graphite */
+  --vb-graphite-950: #0C0E10; /* page bg (dark) */
+  --vb-graphite-900: #101214; /* surface / cards */
+  --vb-graphite-850: #15181B; /* tiles, inputs */
+  --vb-graphite-800: #1B1F23; /* subtle borders */
+  --vb-graphite-700: #2A2F35; /* borders */
+  --vb-graphite-500: #5A626B; /* disabled text */
+  --vb-graphite-400: #7C858F; /* muted text */
+  --vb-graphite-300: #A6ADB5; /* secondary text */
+  --vb-graphite-200: #CBD0D5;
+  --vb-graphite-100: #E8EAEC; /* primary text (dark bg) */
+  --vb-paper:        #F5F5F2; /* page bg (light) */
+
+  /* color.accent — Signal Amber */
+  --vb-amber-600: #D98E04; /* accent text on light bg (AA) */
+  --vb-amber-500: #F5A623; /* brand, primary CTA, the dash */
+  --vb-amber-400: #FFB930; /* hover */
+  --vb-amber-glow: rgba(245, 166, 35, 0.14);
+
+  /* color.semantic */
+  --vb-online: #34C77B; /* success / online */
+  --vb-error:  #E5533C; /* error / offline */
+  --vb-info:   #4C9AF0; /* links / info */
+
+  /* typography — IBM Plex */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* scale: display 52/700/-0.03em · h2 34/700 · h3 19/600 ·
+     body 16/400/1.6 · label mono 13/500/caps/+0.12em · code mono 14 */
+
+  /* spacing (4px base) */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px; --sp-24: 96px;
+
+  /* radius */
+  --r-sm: 4px; --r-md: 8px; --r-lg: 12px; --r-xl: 20px;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 150ms;
+  --dur-med: 300ms;
+}

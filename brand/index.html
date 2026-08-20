@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>v–b.tech — Brand Identity v0.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ============ DESIGN TOKENS ============ */
+  :root {
+    /* Neutral — Graphite scale */
+    --vb-graphite-950: #0C0E10;
+    --vb-graphite-900: #101214;
+    --vb-graphite-850: #15181B;
+    --vb-graphite-800: #1B1F23;
+    --vb-graphite-700: #2A2F35;
+    --vb-graphite-500: #5A626B;
+    --vb-graphite-400: #7C858F;
+    --vb-graphite-300: #A6ADB5;
+    --vb-graphite-200: #CBD0D5;
+    --vb-graphite-100: #E8EAEC;
+    --vb-paper: #F5F5F2;
+
+    /* Accent — Signal Amber */
+    --vb-amber-600: #D98E04;
+    --vb-amber-500: #F5A623;
+    --vb-amber-400: #FFB930;
+    --vb-amber-glow: rgba(245, 166, 35, 0.14);
+
+    /* Semantic */
+    --vb-online: #34C77B;
+    --vb-error: #E5533C;
+    --vb-info: #4C9AF0;
+
+    /* Typography */
+    --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+    /* Spacing scale (4px base) */
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+    --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px; --sp-24: 96px;
+
+    /* Radius */
+    --r-sm: 4px; --r-md: 8px; --r-lg: 12px; --r-xl: 20px;
+
+    /* Motion */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-fast: 150ms; --dur-med: 300ms;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--vb-graphite-950);
+    color: var(--vb-graphite-100);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 var(--sp-8); }
+
+  /* ============ HEADER ============ */
+  header {
+    border-bottom: 1px solid var(--vb-graphite-800);
+    padding: var(--sp-6) 0;
+    position: sticky; top: 0;
+    background: rgba(12,14,16,0.85);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; }
+  .header-logo { display: flex; align-items: baseline; gap: 2px; font-family: var(--font-mono); font-weight: 600; font-size: 20px; letter-spacing: -0.02em; }
+  .header-logo .dash { display: inline-block; width: 14px; height: 5px; border-radius: 3px; background: var(--vb-amber-500); margin: 0 3px; transform: translateY(-3px); }
+  .header-meta { font-family: var(--font-mono); font-size: 12px; color: var(--vb-graphite-500); }
+
+  /* ============ SECTIONS ============ */
+  section { padding: var(--sp-24) 0; border-bottom: 1px solid var(--vb-graphite-800); }
+  .sec-num {
+    font-family: var(--font-mono); font-size: 13px; color: var(--vb-amber-500);
+    letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: var(--sp-3);
+  }
+  h2 { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: var(--sp-6); }
+  h3 { font-size: 19px; font-weight: 600; margin: var(--sp-8) 0 var(--sp-3); }
+  p.lead { font-size: 19px; color: var(--vb-graphite-300); max-width: 720px; }
+  p.note { font-size: 14px; color: var(--vb-graphite-400); max-width: 720px; margin-top: var(--sp-3); }
+
+  .card {
+    background: var(--vb-graphite-900);
+    border: 1px solid var(--vb-graphite-800);
+    border-radius: var(--r-lg);
+    padding: var(--sp-8);
+  }
+
+  /* ============ HERO ============ */
+  .hero { padding: var(--sp-24) 0; text-align: left; }
+  .hero-domain {
+    font-family: var(--font-mono); font-size: clamp(48px, 9vw, 96px); font-weight: 600;
+    letter-spacing: -0.04em; line-height: 1;
+    display: flex; align-items: center; flex-wrap: wrap;
+  }
+  .hero-domain .dash {
+    display: inline-block; width: 0.52em; height: 0.16em; border-radius: 0.09em;
+    background: var(--vb-amber-500); margin: 0 0.08em;
+    box-shadow: 0 0 32px var(--vb-amber-glow), 0 0 12px rgba(245,166,35,0.35);
+    animation: pulse 3.2s var(--ease-out) infinite;
+  }
+  .hero-domain .tld { color: var(--vb-graphite-500); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+  .hero-tagline { margin-top: var(--sp-8); font-size: 22px; color: var(--vb-graphite-300); max-width: 640px; }
+  .hero-tagline strong { color: var(--vb-graphite-100); font-weight: 600; }
+
+  /* ============ POSITIONING ============ */
+  .pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-4); margin-top: var(--sp-8); }
+  .pos-card h4 { font-family: var(--font-mono); font-size: 13px; color: var(--vb-amber-500); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--sp-3); }
+  .pos-card p { font-size: 15px; color: var(--vb-graphite-300); }
+  .statement {
+    margin-top: var(--sp-8); padding: var(--sp-8);
+    border-left: 3px solid var(--vb-amber-500);
+    background: var(--vb-graphite-900); border-radius: 0 var(--r-lg) var(--r-lg) 0;
+    font-size: 21px; line-height: 1.5; max-width: 800px;
+  }
+  .statement em { color: var(--vb-amber-400); font-style: normal; }
+  .taglines { margin-top: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-3); max-width: 720px; }
+  .tagline-row { display: flex; align-items: baseline; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4); background: var(--vb-graphite-900); border: 1px solid var(--vb-graphite-800); border-radius: var(--r-md); }
+  .tagline-row .lang { font-family: var(--font-mono); font-size: 11px; color: var(--vb-graphite-500); min-width: 64px; }
+  .tagline-row.rec { border-color: var(--vb-amber-600); }
+  .badge {
+    display: inline-block; font-family: var(--font-mono); font-size: 11px;
+    padding: 2px 8px; border-radius: 99px; letter-spacing: 0.06em;
+    background: var(--vb-amber-glow); color: var(--vb-amber-400); border: 1px solid var(--vb-amber-600);
+    vertical-align: middle; margin-left: var(--sp-2);
+  }
+
+  /* ============ LOGO CONCEPTS ============ */
+  .logo-stage {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 220px; border-radius: var(--r-lg);
+    background: var(--vb-graphite-900); border: 1px solid var(--vb-graphite-800);
+    margin-bottom: var(--sp-4); position: relative; overflow: hidden;
+  }
+  .logo-stage.light { background: var(--vb-paper); border-color: var(--vb-graphite-200); }
+  .concept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-6); margin-top: var(--sp-8); }
+  .concept full { grid-column: 1 / -1; }
+  .concept-label { font-family: var(--font-mono); font-size: 12px; color: var(--vb-graphite-400); position: absolute; top: 12px; left: 16px; }
+  .concept p { font-size: 14px; color: var(--vb-graphite-400); }
+  .concept h4 { font-size: 16px; font-weight: 600; margin-bottom: var(--sp-2); }
+
+  .wm { font-family: var(--font-mono); font-weight: 600; letter-spacing: -0.03em; display: flex; align-items: center; }
+  .wm .dash { display: inline-block; border-radius: 999px; background: var(--vb-amber-500); }
+  .wm-xl { font-size: 72px; } .wm-xl .dash { width: 38px; height: 12px; margin: 0 7px; }
+  .wm-md { font-size: 36px; } .wm-md .dash { width: 19px; height: 6px; margin: 0 4px; }
+  .wm-dark { color: var(--vb-graphite-100); }
+  .wm-light { color: var(--vb-graphite-900); }
+
+  .tile {
+    width: 120px; height: 120px; border-radius: 28px;
+    background: var(--vb-graphite-850); border: 1px solid var(--vb-graphite-700);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-weight: 600; font-size: 40px; line-height: 0.9;
+    gap: 6px;
+  }
+  .tile .dash { width: 30px; height: 9px; border-radius: 999px; background: var(--vb-amber-500); }
+  .tile-sm { width: 64px; height: 64px; border-radius: 16px; font-size: 22px; gap: 3px; }
+  .tile-sm .dash { width: 16px; height: 5px; }
+  .tile-xs { width: 32px; height: 32px; border-radius: 8px; }
+  .tile-xs .dash { width: 14px; height: 4px; }
+  .sizes-row { display: flex; align-items: flex-end; gap: var(--sp-8); }
+
+  .verdict { display: flex; gap: var(--sp-4); margin-top: var(--sp-3); font-size: 13px; }
+  .verdict span { font-family: var(--font-mono); }
+  .verdict .plus { color: var(--vb-online); }
+  .verdict .minus { color: var(--vb-graphite-500); }
+
+  /* ============ COLOR ============ */
+  .swatch-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--sp-3); margin-top: var(--sp-6); }
+  .swatch { border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--vb-graphite-800); }
+  .swatch .chip { height: 72px; }
+  .swatch .meta { padding: var(--sp-2) var(--sp-3); background: var(--vb-graphite-900); }
+  .swatch .meta b { display: block; font-size: 12px; font-weight: 600; }
+  .swatch .meta code { font-family: var(--font-mono); font-size: 11px; color: var(--vb-graphite-500); }
+
+  /* ============ TYPOGRAPHY ============ */
+  .type-row { display: grid; grid-template-columns: 220px 1fr; gap: var(--sp-6); padding: var(--sp-4) 0; border-bottom: 1px solid var(--vb-graphite-800); align-items: baseline; }
+  .type-row:last-child { border-bottom: none; }
+  .type-meta { font-family: var(--font-mono); font-size: 12px; color: var(--vb-graphite-500); }
+
+  /* ============ CODE BLOCK ============ */
+  pre {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    background: var(--vb-graphite-900); border: 1px solid var(--vb-graphite-800);
+    border-radius: var(--r-lg); padding: var(--sp-6); overflow-x: auto;
+    color: var(--vb-graphite-300); margin-top: var(--sp-6);
+  }
+  pre .c { color: var(--vb-graphite-500); }
+  pre .k { color: var(--vb-amber-400); }
+  pre .v { color: var(--vb-info); }
+
+  /* ============ PRODUCT SYSTEM ============ */
+  .prod-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-4); margin-top: var(--sp-6); }
+  .prod {
+    display: flex; align-items: center; gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-6);
+    background: var(--vb-graphite-900); border: 1px solid var(--vb-graphite-800); border-radius: var(--r-lg);
+  }
+  .prod .tile-sm { flex-shrink: 0; }
+  .prod b { font-size: 17px; display: block; }
+  .prod small { color: var(--vb-graphite-400); font-size: 13px; }
+  .prod .lockup { font-family: var(--font-mono); font-size: 11px; color: var(--vb-graphite-500); display: block; margin-top: 2px; }
+  .prod .lockup i { font-style: normal; color: var(--vb-amber-500); }
+
+  /* ============ HERO MOCK ============ */
+  .mock {
+    margin-top: var(--sp-8); border-radius: var(--r-xl); overflow: hidden;
+    border: 1px solid var(--vb-graphite-700);
+    background: linear-gradient(160deg, var(--vb-graphite-900) 0%, var(--vb-graphite-950) 100%);
+  }
+  .mock-nav { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-4) var(--sp-8); border-bottom: 1px solid var(--vb-graphite-800); }
+  .mock-nav .links { font-family: var(--font-mono); font-size: 13px; color: var(--vb-graphite-400); display: flex; gap: var(--sp-6); }
+  .mock-body { padding: var(--sp-16) var(--sp-8) var(--sp-16); }
+  .mock-status { font-family: var(--font-mono); font-size: 13px; color: var(--vb-online); display: inline-flex; align-items: center; gap: 8px; margin-bottom: var(--sp-6); }
+  .mock-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--vb-online); box-shadow: 0 0 10px var(--vb-online); }
+  .mock h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; max-width: 700px; }
+  .mock h1 em { font-style: normal; color: var(--vb-amber-400); }
+  .mock p { margin-top: var(--sp-4); color: var(--vb-graphite-400); max-width: 560px; }
+  .mock-cta { margin-top: var(--sp-8); display: flex; gap: var(--sp-3); }
+  .btn { font-family: var(--font-mono); font-size: 14px; font-weight: 500; padding: 12px 24px; border-radius: var(--r-md); cursor: pointer; border: none; transition: all var(--dur-fast) var(--ease-out); }
+  .btn-primary { background: var(--vb-amber-500); color: var(--vb-graphite-950); }
+  .btn-primary:hover { background: var(--vb-amber-400); }
+  .btn-ghost { background: transparent; color: var(--vb-graphite-300); border: 1px solid var(--vb-graphite-700); }
+  .btn-ghost:hover { border-color: var(--vb-graphite-500); color: var(--vb-graphite-100); }
+
+  footer { padding: var(--sp-12) 0; text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--vb-graphite-600, #3a4046); }
+
+  @media (max-width: 800px) {
+    .pos-grid, .concept-grid, .prod-grid { grid-template-columns: 1fr; }
+    .swatch-grid { grid-template-columns: repeat(3, 1fr); }
+    .type-row { grid-template-columns: 1fr; gap: var(--sp-2); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="header-logo wm-dark">v<span class="dash"></span>b<span style="color:var(--vb-graphite-500)">.tech</span></div>
+    <div class="header-meta">BRAND IDENTITY · v0.1 · 2026-08-20</div>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <div class="hero-domain wm-dark">v<span class="dash"></span>b<span class="tld">.tech</span></div>
+  <p class="hero-tagline">Айдентика строится вокруг дефиса в домене: это <strong>сигнальный индикатор</strong> — LED на железе, штрих на этикетке, мост между <strong>цифровым и физическим</strong>.</p>
+</div>
+
+<!-- ============ 01 POSITIONING ============ -->
+<section>
+  <div class="wrap">
+    <div class="sec-num">01 · Позиционирование</div>
+    <h2>Software for physical operations</h2>
+    <p class="lead">Все продукты (QuokkaQ, Idento, Scanio, Mercadia.POS, склад) объединяет одно: софт, который работает там, где есть очереди, принтеры, сканеры и плохой Wi-Fi. Это и есть бренд.</p>
+
+    <div class="statement">
+      Я строю системы для физических операций — очереди, бейджи, склады, кассы.<br>
+      Оффлайн-первые. Дружат с железом. <em>Работают, когда Wi-Fi — нет.</em>
+    </div>
+
+    <h3>Варианты слогана</h3>
+    <div class="taglines">
+      <div class="tagline-row rec"><span class="lang">EN</span><span>Systems that keep working when Wi-Fi doesn't.</span><span class="badge">РЕКОМЕНДУЮ</span></div>
+      <div class="tagline-row"><span class="lang">EN</span><span>Software that touches the real world.</span></div>
+      <div class="tagline-row"><span class="lang">RU</span><span>Софт для физического мира: очереди, склады, бейджи, кассы.</span></div>
+    </div>
+
+    <div class="pos-grid">
+      <div class="card pos-card">
+        <h4>Для кого</h4>
+        <p>Компании с офлайн-операциями: филиальные сети, ивенты, склады, ритейл. И инженеры, которым интересен offline-first.</p>
+      </div>
+      <div class="card pos-card">
+        <h4>Отличие</h4>
+        <p>Не «ещё один SaaS», а системы с интеграцией железа: киоски, принтеры, сканеры, ТСД — и офлайн как штатный режим.</p>
+      </div>
+      <div class="card pos-card">
+        <h4>Характер</h4>
+        <p>Инженерный, спокойный, конкретный. Факты вместо прилагательных. Никаких «революционных решений».</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 LOGO ============ -->
+<section>
+  <div class="wrap">
+    <div class="sec-num">02 · Логотип</div>
+    <h2>Концепт A: «Сигнальный дефис» <span class="badge">РЕКОМЕНДУЮ</span></h2>
+    <p class="lead">Дефис из домена превращается в фирменный глиф — янтарную сигнальную полосу. Это LED-индикатор устройства, штрих на баркоде и соединение V↔B одновременно. На сайте он может «дышать» (пульсировать), показывая статус online/offline.</p>
+
+    <div class="concept-grid">
+      <div class="concept" style="grid-column: 1 / -1;">
+        <div class="logo-stage" style="min-height:280px;">
+          <span class="concept-label">wordmark / dark</span>
+          <div class="wm wm-xl wm-dark">v<span class="dash"></span>b<span style="color:var(--vb-graphite-500)">.tech</span></div>
+        </div>
+      </div>
+      <div class="concept">
+        <div class="logo-stage light">
+          <span class="concept-label" style="color:var(--vb-graphite-400)">wordmark / light</span>
+          <div class="wm wm-md wm-light">v<span class="dash"></span>b<span style="color:var(--vb-graphite-400)">.tech</span></div>
+        </div>
+        <h4>Инверсия</h4>
+        <p>На светлом фоне графит заменяет белый, янтарь не меняется — он и есть константа бренда.</p>
+      </div>
+      <div class="concept">
+        <div class="logo-stage">
+          <span class="concept-label">монограмма / фавиконка</span>
+          <div class="sizes-row">
+            <div class="tile"><span>v</span><span class="dash"></span><span>b</span></div>
+            <div class="tile tile-sm"><span>v</span><span class="dash"></span><span>b</span></div>
+            <div class="tile tile-xs"><span class="dash"></span></div>
+          </div>
+        </div>
+        <h4>Масштабирование</h4>
+        <p>Плитка «v–b» вертикально для аватаров; на 16–32px остаётся только дефис — глиф узнаваем сам по себе.</p>
+      </div>
+    </div>
+
+    <h3>Альтернативные концепты</h3>
+    <div class="concept-grid">
+      <div class="concept">
+        <div class="logo-stage">
+          <span class="concept-label">концепт B / barcode</span>
+          <svg width="220" height="110" viewBox="0 0 220 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="15" width="8" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="36" y="15" width="4" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="48" y="15" width="14" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="70" y="15" width="6" height="60" rx="2" fill="#F5A623"/>
+            <rect x="84" y="15" width="4" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="96" y="15" width="10" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="114" y="15" width="4" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="126" y="15" width="8" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="142" y="15" width="14" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="164" y="15" width="4" height="60" rx="2" fill="#E8EAEC"/>
+            <rect x="176" y="15" width="8" height="60" rx="2" fill="#E8EAEC"/>
+            <text x="110" y="98" text-anchor="middle" font-family="IBM Plex Mono" font-size="14" font-weight="600" fill="#A6ADB5" letter-spacing="4">V-B.TECH</text>
+          </svg>
+        </div>
+        <h4>Концепт B: Баркод</h4>
+        <p>Штрих-код как метафора «машиночитаемого физического мира». Янтарный штрих = дефис.</p>
+        <div class="verdict">
+          <span class="plus">+ идеально бьётся с Idento/складом</span>
+          <span class="minus">− клише в лейбл-индустрии, хуже масштабируется</span>
+        </div>
+      </div>
+      <div class="concept">
+        <div class="logo-stage">
+          <span class="concept-label">концепт C / schematic</span>
+          <svg width="240" height="110" viewBox="0 0 240 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="45" cy="55" r="16" stroke="#E8EAEC" stroke-width="3" fill="none"/>
+            <text x="45" y="61" text-anchor="middle" font-family="IBM Plex Mono" font-size="16" font-weight="600" fill="#E8EAEC">v</text>
+            <path d="M61 55 H105 V35 H150" stroke="#F5A623" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="105" cy="55" r="4" fill="#F5A623"/>
+            <circle cx="195" cy="35" r="16" stroke="#E8EAEC" stroke-width="3" fill="none"/>
+            <text x="195" y="41" text-anchor="middle" font-family="IBM Plex Mono" font-size="16" font-weight="600" fill="#E8EAEC">b</text>
+            <path d="M150 35 H179" stroke="#F5A623" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h4>Концепт C: Схема</h4>
+        <p>Печатная плата / схема соединений: узлы v и b, соединённые трассой. «Мост между системами».</p>
+        <div class="verdict">
+          <span class="plus">+ инженерный характер</span>
+          <span class="minus">− сложная форма, слабая фавиконка, «ещё один tech-логотип с платой»</span>
+        </div>
+      </div>
+    </div>
+    <p class="note">Почему A: единственный концепт, где знак = домен (узнаваемость без пояснений), масштабируется до 16px, имеет встроенную анимацию-метафору (индикатор online/offline — прямая отсылка к offline-first) и не пересекается с клише категории.</p>
+  </div>
+</section>
+
+<!-- ============ 03 COLOR ============ -->
+<section>
+  <div class="wrap">
+    <div class="sec-num">03 · Цвет</div>
+    <h2>Графит + сигнальный янтарь</h2>
+    <p class="lead">Тёмная тема — основная (аудитория: инженеры и технические заказчики). Янтарь — цвет индустриальных индикаторов и предупреждающей разметки складов, а не «стартаперский фиолетовый». Он используется дозированно: дефис, акценты, primary-кнопка.</p>
+
+    <div class="swatch-grid">
+      <div class="swatch"><div class="chip" style="background:#0C0E10"></div><div class="meta"><b>Graphite 950</b><code>#0C0E10 · фон</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#101214"></div><div class="meta"><b>Graphite 900</b><code>#101214 · карточки</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#2A2F35"></div><div class="meta"><b>Graphite 700</b><code>#2A2F35 · бордеры</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#A6ADB5"></div><div class="meta"><b>Graphite 300</b><code>#A6ADB5 · втор. текст</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#E8EAEC"></div><div class="meta"><b>Graphite 100</b><code>#E8EAEC · текст</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#F5F5F2"></div><div class="meta"><b>Paper</b><code>#F5F5F2 · light-фон</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#F5A623"></div><div class="meta"><b>Signal Amber</b><code>#F5A623 · акцент</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFB930"></div><div class="meta"><b>Amber 400</b><code>#FFB930 · hover</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#D98E04"></div><div class="meta"><b>Amber 600</b><code>#D98E04 · on light</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#34C77B"></div><div class="meta"><b>Online</b><code>#34C77B · success</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#E5533C"></div><div class="meta"><b>Error</b><code>#E5533C · offline/err</code></div></div>
+      <div class="swatch"><div class="chip" style="background:#4C9AF0"></div><div class="meta"><b>Info</b><code>#4C9AF0 · ссылки</code></div></div>
+    </div>
+    <p class="note">Контраст: Graphite 100 на Graphite 950 — 15.8:1 (AAA). Amber 500 на Graphite 950 — 8.9:1 (AAA для крупного, AA для мелкого текста). На светлом фоне для текста использовать Amber 600.</p>
+  </div>
+</section>
+
+<!-- ============ 04 TYPOGRAPHY ============ -->
+<section>
+  <div class="wrap">
+    <div class="sec-num">04 · Типографика</div>
+    <h2>IBM Plex: Sans + Mono</h2>
+    <p class="lead">Семейство с инженерным наследием (спроектировано для IBM), open-source, есть кириллица. Mono — голос бренда: логотип, метки, цифры, код. Sans — рабочая лошадка для текста.</p>
+
+    <div class="card" style="margin-top: var(--sp-8);">
+      <div class="type-row">
+        <div class="type-meta">display / Sans 700 / 52px / -0.03em</div>
+        <div style="font-size:52px; font-weight:700; letter-spacing:-0.03em; line-height:1.1;">Очереди без хаоса</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">h2 / Sans 700 / 34px</div>
+        <div style="font-size:34px; font-weight:700; letter-spacing:-0.02em;">Оффлайн-первый по умолчанию</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">h3 / Sans 600 / 19px</div>
+        <div style="font-size:19px; font-weight:600;">Интеграция с принтерами и сканерами</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">body / Sans 400 / 16px / 1.6</div>
+        <div style="color:var(--vb-graphite-300)">Система продолжает принимать посетителей, печатать талоны и синхронизирует данные, когда связь восстанавливается.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">label / Mono 500 / 13px / caps</div>
+        <div style="font-family:var(--font-mono); font-size:13px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:var(--vb-amber-500)">GS1 · SSCC · DATAMATRIX · ZPL</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">code / Mono 400 / 14px</div>
+        <div style="font-family:var(--font-mono); font-size:14px; color:var(--vb-graphite-300)">docker compose up -d && vb sync --offline-queue</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 TOKENS ============ -->
+<section>
+  <div class="wrap">
+    <div class="sec-num">05 · Токены</div>
+    <h2>CSS-переменные — прямо в код</h2>
+    <pre><span class="c">/* v-b.tech design tokens · v0.1 */</span>
+:root {
+  <span class="c">/* color.neutral */</span>
+  <span class="k">--vb-graphite-950</span>: <span class="v">#0C0E10</span>;  <span class="c">/* page bg (dark) */</span>
+  <span class="k">--vb-graphite-900</span>: <span class="v">#101214</span>;  <span class="c">/* surface */</span>
+  <span class="k">--vb-graphite-700</span>: <span class="v">#2A2F35</span>;  <span class="c">/* border */</span>
+  <span class="k">--vb-graphite-300</span>: <span class="v">#A6ADB5</span>;  <span class="c">/* text.secondary */</span>
+  <span class="k">--vb-graphite-100</span>: <span class="v">#E8EAEC</span>;  <span class="c">/* text.primary */</span>
+  <span class="k">--vb-paper</span>:        <span class="v">#F5F5F2</span>;  <span class="c">/* page bg (light) */</span>
+
+  <span class="c">/* color.accent — Signal Amber */</span>
+  <span class="k">--vb-amber-500</span>: <span class="v">#F5A623</span>;  <span class="c">/* brand, primary CTA */</span>
+  <span class="k">--vb-amber-400</span>: <span class="v">#FFB930</span>;  <span class="c">/* hover */</span>
+  <span class="k">--vb-amber-600</span>: <span class="v">#D98E04</span>;  <span class="c">/* text on light bg */</span>
+
+  <span class="c">/* color.semantic */</span>
+  <span class="k">--vb-online</span>: <span class="v">#34C77B</span>;  <span class="k">--vb-error</span>: <span class="v">#E5533C</span>;  <span class="k">--vb-info</span>: <span class="v">#4C9AF0</span>;
+
+  <span class="c">/* typography */</span>
+  <span class="k">--font-sans</span>: <span class="v">'IBM Plex Sans', system-ui, sans-serif</span>;
+  <span class="k">--font-mono</span>: <span class="v">'IBM Plex Mono', ui-monospace, monospace</span>;
+
+  <span class="c">/* spacing: 4 8 12 16 24 32 48 64 96 · radius: 4 8 12 20 */</span>
+  <span class="c">/* motion: 150ms/300ms · cubic-bezier(0.16, 1, 0.3, 1) */</span>
+}</pre>
+  </div>
+</section>
+
+<!-- ============ 06 PRODUCT SYSTEM ============ -->
+<section>
+  <div class="wrap">
+    <div class="sec-num">06 · Продуктовая система</div>
+    <h2>Endorsed-бренд: продукты живут сами, v–b их подписывает</h2>
+    <p class="lead">Продукты сохраняют свои имена и характеры, но получают единую подпись «a v–b.tech system» и общие токены. Так каждый продукт усиливает портфолио, а не распыляет его.</p>
+
+    <div class="prod-grid">
+      <div class="prod">
+        <div class="tile tile-sm"><span>v</span><span class="dash"></span><span>b</span></div>
+        <div><b>QuokkaQ</b><small>Управление потоками посетителей: киоски, табло, маршрутизация</small><span class="lockup">QuokkaQ · <i>a v–b.tech system</i></span></div>
+      </div>
+      <div class="prod">
+        <div class="tile tile-sm"><span>v</span><span class="dash"></span><span>b</span></div>
+        <div><b>Idento</b><small>Бейджи и чек-ин на ивентах: CSV → печать → QR-сканирование</small><span class="lockup">Idento · <i>a v–b.tech system</i></span></div>
+      </div>
+      <div class="prod">
+        <div class="tile tile-sm"><span>v</span><span class="dash"></span><span>b</span></div>
+        <div><b>Scanio</b><small>Сканирование и маркировка для склада</small><span class="lockup">Scanio · <i>a v–b.tech system</i></span></div>
+      </div>
+      <div class="prod">
+        <div class="tile tile-sm"><span>v</span><span class="dash"></span><span>b</span></div>
+        <div><b>Mercadia.POS</b><small>Кассовые операции для розницы</small><span class="lockup">Mercadia.POS · <i>a v–b.tech system</i></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 07 APPLICATION ============ -->
+<section style="border-bottom:none;">
+  <div class="wrap">
+    <div class="sec-num">07 · Применение</div>
+    <h2>Так может выглядеть главная v–b.tech</h2>
+
+    <div class="mock">
+      <div class="mock-nav">
+        <div class="wm wm-dark" style="font-family:var(--font-mono); font-weight:600; font-size:18px;">v<span class="dash" style="width:12px;height:4px;border-radius:99px;background:var(--vb-amber-500);display:inline-block;margin:0 3px;transform:translateY(-4px);"></span>b<span style="color:var(--vb-graphite-500)">.tech</span></div>
+        <div class="links"><span>systems</span><span>writing</span><span>about</span></div>
+      </div>
+      <div class="mock-body">
+        <div class="mock-status">all systems operational — even offline</div>
+        <h1>Софт для физических операций.<br>Работает, <em>когда Wi-Fi — нет.</em></h1>
+        <p>Маркировка, очереди, бейджи, кассы. Оффлайн-первые системы с интеграцией железа — киоски, принтеры, сканеры, ТСД.</p>
+        <div class="mock-cta">
+          <button class="btn btn-primary">Смотреть системы</button>
+          <button class="btn btn-ghost">GitHub →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>v–b.tech brand identity · v0.1 · сгенерировано 2026-08-20</footer>
+
+</body>
+</html>
