@@ -281,3 +281,76 @@ The first final gate attempt found a test-only TypeScript literal-union `.includ
 - The text remains a review candidate, not legal advice or legal approval. Owner/legal review, operator confirmation, and exact provider entity/role/region/term verification remain activation blockers.
 - No effective date or public revision exists. `VBT-PD-02/DRAFT` cannot be accepted by an enabled request.
 - Browser/assistive-technology and deployed-output acceptance remain future gates; none is claimed in this fix round.
+
+## Fix round 2/5 — release-specific content evidence and telemetry boundary
+
+### Commit contract
+
+- Fix-round base SHA: `6f09934609080b3f758563e4d8c2e9b43f6dfa88`.
+- Exact focused commit subject: `fix: bind legal text to release contracts`.
+- The final fix-round SHA is supplied in the controller handoff because a commit cannot embed its own stable SHA. No report-only follow-up commit is created.
+
+### Changes
+
+- Clarified every RU/EN policy and consent telemetry statement: the enquiry UUID remains a bounded correlation identifier, and the only permitted application telemetry fields are event kind, enquiry UUID, stage, status, and latency. The text now explicitly excludes the user-provided name, contact, and message fields, all other personal request-body data, captcha token, and secrets.
+- Preserved the exact network boundary: a short-lived keyed HMAC digest of the bounded network source may exist only for the fixed rate-limit window; raw IP must not persist in the application database; SmartCaptcha may receive its verification token and minimum necessary network context during verification but never name, contact, or message.
+- Added an independent `LEGAL_DOCUMENT_CONTRACTS` mapping keyed by `VBT-PD-01` and `VBT-PD-02`. Each code has one exact ordered list of section IDs and one exact ordered requirement-marker list for every section. Registry validation compares each localized document directly to this mapping, so matching RU/EN drift cannot validate merely because both locales changed together.
+- Added section- and locale-specific evidence patterns for every required marker in both documents. Validation joins only the heading and typed text/list/definition content from the marker's own section, then checks that section's bounded evidence. Nonblank replacement prose cannot satisfy metadata alone, and wording moved to a different section does not satisfy the original marker.
+- Corrected the policy/consent swap mutation to save both original content references before assignment. The direct swap is rejected by code/identity metadata; an additional genuine body swap relabels shallow metadata and is rejected by the independent code-specific section contract.
+
+### RED / GREEN evidence
+
+Tests were changed before production content/validation. The initial focused run produced the requested RED:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test
+Test Files  2 failed (2)
+Tests       5 failed | 29 passed (34)
+Failures:
+- bounded correlation telemetry wording was absent;
+- a genuine policy/consent body swap with relabeled shallow identities was accepted;
+- matching two-locale marker removal/section remap/marker move was accepted;
+- arbitrary nonblank RU prose retaining markers was accepted;
+- arbitrary nonblank EN prose retaining markers was accepted.
+Exit status 1
+```
+
+The corrected direct-swap fixture was already rejected by the round-1 code/identity checks. The true new swap RED used saved original references and then relabeled only the shallow identities, proving the body/contract gap rather than repeating the metadata check.
+
+After adding the independent contracts, localized per-marker evidence, and exact telemetry language:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test
+Test Files  2 passed (2)
+Tests       34 passed (34)
+```
+
+The first typecheck after implementation identified an overly narrow inferred lookup type in the new internal evidence table (`TS7053` plus the derived implicit pattern type). The table received an explicit bounded `LegalDocumentCode -> section -> locale -> requirement` type. The complete legal test and typecheck rerun then passed.
+
+### Final fix-round gates
+
+| Command | Result |
+| --- | --- |
+| `CI=true corepack pnpm --filter @vbtech/legal-documents test` | PASS — 2 files, 34 tests |
+| `CI=true corepack pnpm --filter @vbtech/legal-documents typecheck` | PASS — no TypeScript errors |
+| `CI=true corepack pnpm --filter @vbtech/web test -- legal-pages.test.ts` | PASS — build 8 pages; 5 files, 92 tests |
+| `CI=true corepack pnpm --filter @vbtech/web typecheck` | PASS — 27 files, 0 errors, 0 warnings, 0 hints |
+| `CI=true corepack pnpm --filter @vbtech/web build` | PASS — 8 static pages |
+| `CI=true corepack pnpm test` | PASS — all 3 packages; content 4, legal 34, web 92 tests |
+| `git diff --check` | PASS |
+
+### Generated-output and self-review
+
+- The generated inventory remains exactly eight HTML routes: six legal routes plus `/` and `/en/`. Exactly the six legal pages carry `noindex,nofollow`; neither landing root does.
+- All four generated policy/consent pages were inspected after the final build. RU and EN rendering contain the bounded-correlation UUID statement, the exact five permitted telemetry fields, and the explicit name/contact/message, other body data, captcha-token, and secrets exclusions. Captcha network context and raw-IP persistence boundaries remain present.
+- The reusable page-contract suite remains unchanged and passes all canonical, reciprocal alternate, x-default, paired-locale, draft-banner, semantic-rendering, single-main/H1, route-inventory, and unsafe-rendering checks.
+- Self-review confirmed the contract is independent of the content-local marker constants, exact order is compared per document code and locale, evidence is evaluated within the marked section, and every contract marker has RU and EN evidence.
+- `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain the only releases. Both still have `status: draft`, `revision: null`, and `effectiveDate: null`; the active registry remains empty and the consent publishability guard remains closed.
+- No form, captcha runtime, function, analytics, infrastructure, deployment, publication, or Task 7–8 behavior was added.
+
+### Remaining concerns
+
+- These remain noindex draft candidates, not legal advice, approval, active documents, or publishable consent. No public revision or effective date exists.
+- `VBT-PD-02/DRAFT` cannot be accepted while submission is disabled and must not be accepted by any enabled request.
+- Owner/legal review, operator confirmation, exact production-flow verification, and provider entity/role/region/current-term review remain mandatory activation blockers.
+- Browser/assistive-technology and deployed-output acceptance remain future gates and are not claimed.

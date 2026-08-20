@@ -216,12 +216,95 @@ describe("draft legal document registry", () => {
 
   it("rejects swapped policy and consent localized content", () => {
     const documents = cloneDocuments();
-    documents[0] = { ...documents[0]!, content: documents[1]!.content };
-    documents[1] = { ...documents[1]!, content: documents[0]!.content };
+    const policyContent = documents[0]!.content;
+    const consentContent = documents[1]!.content;
+    documents[0] = { ...documents[0]!, content: consentContent };
+    documents[1] = { ...documents[1]!, content: policyContent };
     expect(() => validateLegalRegistry(LEGAL_RELEASES, documents)).toThrow(
       /content document code.*release|localized content identity/i,
     );
   });
+
+  it("rejects genuinely swapped bodies even when their shallow identities are relabeled", () => {
+    const documents = cloneDocuments();
+    const policyContent = documents[0]!.content;
+    const consentContent = documents[1]!.content;
+    documents[0] = {
+      ...documents[0]!,
+      content: {
+        ru: {
+          ...consentContent.ru,
+          documentCode: "VBT-PD-01",
+          releaseIdentity: "VBT-PD-01/DRAFT",
+        },
+        en: {
+          ...consentContent.en,
+          documentCode: "VBT-PD-01",
+          releaseIdentity: "VBT-PD-01/DRAFT",
+        },
+      },
+    };
+    documents[1] = {
+      ...documents[1]!,
+      content: {
+        ru: {
+          ...policyContent.ru,
+          documentCode: "VBT-PD-02",
+          releaseIdentity: "VBT-PD-02/DRAFT",
+        },
+        en: {
+          ...policyContent.en,
+          documentCode: "VBT-PD-02",
+          releaseIdentity: "VBT-PD-02/DRAFT",
+        },
+      },
+    };
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, documents)).toThrow(
+      /release-specific section contract/i,
+    );
+  });
+
+  it("rejects matching section-contract drift in both locales", () => {
+    const removedMarker = cloneDocuments();
+    for (const locale of ["ru", "en"] as const) {
+      removedMarker[0]!.content[locale].sections[0]!.requirements = ["operator"];
+    }
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, removedMarker)).toThrow(
+      /release-specific section contract/i,
+    );
+
+    const remappedSection = cloneDocuments();
+    for (const locale of ["ru", "en"] as const) {
+      remappedSection[0]!.content[locale].sections[0]!.id = "controller-and-scope";
+    }
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, remappedSection)).toThrow(
+      /release-specific section contract/i,
+    );
+
+    const movedMarker = cloneDocuments();
+    for (const locale of ["ru", "en"] as const) {
+      const operational = movedMarker[0]!.content[locale].sections[3]!;
+      const purposes = movedMarker[0]!.content[locale].sections[4]!;
+      operational.requirements = ["operational-data"];
+      purposes.requirements = [...purposes.requirements, "data-minimization"];
+    }
+    expect(() => validateLegalRegistry(LEGAL_RELEASES, movedMarker)).toThrow(
+      /release-specific section contract/i,
+    );
+  });
+
+  it.each(["ru", "en"] as const)(
+    "rejects arbitrary %s prose that retains requirement markers",
+    (locale) => {
+      const documents = cloneDocuments();
+      documents[0]!.content[locale].sections[0]!.blocks = [
+        { kind: "paragraph", text: "Arbitrary nonblank replacement prose." },
+      ];
+      expect(() => validateLegalRegistry(LEGAL_RELEASES, documents)).toThrow(
+        /missing localized evidence.*operator/i,
+      );
+    },
+  );
 
   it("rejects localized content identity and locale mismatches", () => {
     const identityMismatch = cloneDocuments();

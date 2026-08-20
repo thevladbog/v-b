@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { LEGAL_DOCUMENTS, type LegalDocumentLocaleContent } from "../src/index.js";
+import {
+  LEGAL_DOCUMENT_CONTRACTS,
+  LEGAL_DOCUMENTS,
+  type LegalDocumentLocaleContent,
+} from "../src/index.js";
 
 const textFor = (content: LegalDocumentLocaleContent) =>
   content.sections.flatMap(({ heading, blocks }) => [
@@ -105,6 +109,9 @@ describe("legal document content contracts", () => {
         expect(content.sections.map(({ requirements }) => requirements)).toEqual(
           document.content[locale === "ru" ? "en" : "ru"].sections.map(({ requirements }) => requirements),
         );
+        expect(content.sections.map(({ id, requirements }) => ({ id, requirements }))).toEqual(
+          LEGAL_DOCUMENT_CONTRACTS[content.documentCode],
+        );
         expect(new Set(content.sections.flatMap(({ requirements }) => requirements))).toEqual(
           new Set(expectedByIdentity[document.releaseIdentity]),
         );
@@ -153,6 +160,34 @@ describe("legal document content contracts", () => {
           locale === "ru"
             ? /телеметри.{0,30}журнал.{0,50}должны быть ограничены/i
             : /telemetry and logs.{0,50}must be limited/i,
+        );
+      }
+    }
+  });
+
+  it("pins the bounded correlation telemetry boundary without excluding its UUID", () => {
+    for (const document of LEGAL_DOCUMENTS) {
+      for (const locale of ["ru", "en"] as const) {
+        const logSections = document.content[locale].sections.filter(({ requirements }) =>
+          (requirements as readonly string[]).includes("logs"),
+        );
+        expect(logSections).toHaveLength(1);
+        const text = textFor({ ...document.content[locale], sections: logSections });
+
+        expect(text).toMatch(
+          locale === "ru"
+            ? /UUID.{0,50}ограниченн.{0,40}корреляц/i
+            : /UUID.{0,50}bounded correlation identifier/i,
+        );
+        expect(text).toMatch(
+          locale === "ru"
+            ? /вид.{0,20}событ.{0,50}UUID.{0,50}этап.{0,50}статус.{0,50}длительност/i
+            : /event kind.{0,50}UUID.{0,50}stage.{0,50}status.{0,50}latency/i,
+        );
+        expect(text).toMatch(
+          locale === "ru"
+            ? /не (?:должны )?включа.{0,80}(?:поля|данные).{0,30}им.{0,30}контакт.{0,30}сообщен.{0,80}(?:ин.{0,20})?персональн.{0,30}содержим.{0,80}captcha-токен.{0,50}секрет/i
+            : /must exclude.{0,80}user-provided fields.{0,30}name.{0,30}contact.{0,30}message.{0,80}other personal body data.{0,80}captcha token.{0,50}secrets/i,
         );
       }
     }

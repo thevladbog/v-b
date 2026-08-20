@@ -1,5 +1,6 @@
 import { CONSENT_CONTENT } from "./documents/consent.js";
 import { PRIVACY_CONTENT } from "./documents/privacy.js";
+import { LEGAL_DOCUMENT_CONTRACTS, LEGAL_REQUIREMENT_EVIDENCE } from "./contracts.js";
 import { isValidIsoDate, isValidLegalRevision } from "./identity.js";
 import type {
   LegalDocumentCode,
@@ -8,6 +9,7 @@ import type {
   LegalDocumentView,
   LegalDocumentLocaleContent,
   LegalLocale,
+  LegalBlock,
 } from "./types.js";
 
 export const LEGAL_SOURCE_REVIEW = {
@@ -115,6 +117,49 @@ function assertNonBlank(value: unknown, path: string): asserts value is string {
   }
 }
 
+function blockText(block: LegalBlock): readonly string[] {
+  if (block.kind === "paragraph") return [block.text];
+  if (block.kind === "definition-list") {
+    return block.items.flatMap(({ term, detail }) => [term, detail]);
+  }
+  return block.items;
+}
+
+function validateReleaseSpecificContract(
+  release: LegalDocumentRelease,
+  content: LegalDocumentLocaleContent,
+  locale: LegalLocale,
+): void {
+  const expected = LEGAL_DOCUMENT_CONTRACTS[release.code];
+  const actual = content.sections.map(({ id, requirements }) => ({ id, requirements }));
+  const expectedShape = expected.map(({ id, requirements }) => ({ id, requirements }));
+  if (JSON.stringify(actual) !== JSON.stringify(expectedShape)) {
+    throw new Error(
+      `Localized content does not match the release-specific section contract for ${release.code}.${locale}`,
+    );
+  }
+
+  const evidenceBySection = LEGAL_REQUIREMENT_EVIDENCE[release.code];
+  for (const [sectionIndex, section] of content.sections.entries()) {
+    const expectedSection = expected[sectionIndex]!;
+    const evidence = evidenceBySection[expectedSection.id]?.[locale];
+    const text = [section.heading, ...section.blocks.flatMap(blockText)].join(" ");
+    for (const requirement of expectedSection.requirements) {
+      const patterns = evidence?.[requirement];
+      if (!patterns || patterns.length === 0) {
+        throw new Error(
+          `Missing internal evidence contract for ${release.code}.${locale}.${section.id}.${requirement}`,
+        );
+      }
+      if (patterns.some((pattern) => !pattern.test(text))) {
+        throw new Error(
+          `Missing localized evidence for ${requirement} in ${release.code}.${locale}.${section.id}`,
+        );
+      }
+    }
+  }
+}
+
 function validateLocalizedContent(
   release: LegalDocumentRelease,
   content: LegalDocumentLocaleContent,
@@ -189,6 +234,8 @@ function validateLocalizedContent(
       }
     }
   }
+
+  validateReleaseSpecificContract(release, content, locale);
 }
 
 export function validateLegalRegistry(

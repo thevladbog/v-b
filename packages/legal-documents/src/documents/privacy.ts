@@ -102,7 +102,7 @@ export const PRIVACY_CONTENT = {
           },
           {
             kind: "paragraph",
-            text: "Предполагаемые телеметрия и журналы приложения должны быть ограничены видом события, UUID обращения, этапом, статусом и длительностью; они не должны включать персональное содержимое обращения, captcha-токен или секреты. Скрытое обогащение не предусматривается, произвольные источники перехода и маркетинговые метки не должны сохраняться.",
+            text: "UUID обращения используется только как ограниченный идентификатор корреляции. Предполагаемые телеметрия и журналы приложения должны быть ограничены видом события, UUID обращения, этапом, статусом и длительностью; они не должны включать предоставленные пользователем поля — имя, контакт и сообщение — или иное персональное содержимое обращения, captcha-токен или секреты. Скрытое обогащение не предусматривается, произвольные источники перехода и маркетинговые метки не должны сохраняться.",
           },
         ],
       },
@@ -240,11 +240,11 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "Для выбора темы используется строго необходимая локальная запись vbtech-theme-v1. Сайт не использует аналитические или рекламные cookies. Серверная и прикладная телеметрия и журналы должны быть ограничены видом события, UUID обращения, этапом, статусом и длительностью и не включать персональное содержимое обращения, captcha-токен или секреты.",
+            text: "Для выбора темы используется строго необходимая локальная запись vbtech-theme-v1. Сайт не использует аналитические или рекламные cookies. UUID обращения используется только как ограниченный идентификатор корреляции. Серверная и прикладная телеметрия и журналы должны быть ограничены видом события, UUID обращения, этапом, статусом и длительностью и не должны включать предоставленные пользователем поля — имя, контакт и сообщение — или иное персональное содержимое обращения, captcha-токен или секреты.",
           },
           {
             kind: "paragraph",
-            text: "SmartCaptcha и связанные с ней ресурсы могут загружаться только когда онлайн-отправка включена; до этого момента captcha не работает и данные ей не передаются.",
+            text: "SmartCaptcha и связанные с ней ресурсы могут загружаться только когда онлайн-отправка включена; для проверки она может получить проверочный токен и минимально необходимый сетевой контекст, но имя, контакт и сообщение ей не передаются. До включения отправки captcha не работает и данные ей не передаются.",
           },
         ],
       },
@@ -325,7 +325,7 @@ export const PRIVACY_CONTENT = {
             ],
           },
           { kind: "paragraph", text: "The raw IP address must not be persisted in the application database. During verification SmartCaptcha may receive only the verification token and the minimum network context required; no name, contact, or message is sent to it." },
-          { kind: "paragraph", text: "For the intended flow, application telemetry and logs must be limited to event kind, enquiry UUID, stage, status, and latency; they must exclude the personal body, captcha token, and secrets. No hidden enrichment is intended, and arbitrary referrers and marketing parameters must not be retained." },
+          { kind: "paragraph", text: "The enquiry UUID is used only as a bounded correlation identifier. For the intended flow, application telemetry and logs must be limited to event kind, enquiry UUID, stage, status, and latency; they must exclude the user-provided fields — name, contact, and message — and any other personal body data, captcha token, and secrets. No hidden enrichment is intended, and arbitrary referrers and marketing parameters must not be retained." },
         ],
       },
       {
@@ -421,8 +421,8 @@ export const PRIVACY_CONTENT = {
         requirements: POLICY_SECTION_REQUIREMENTS["browser-storage-and-logs"],
         heading: "13. Browser storage, logs, and captcha",
         blocks: [
-          { kind: "paragraph", text: "The strictly necessary vbtech-theme-v1 local record stores the theme choice. The site uses no analytics or advertising cookies. Server and application telemetry and logs must be limited to event kind, enquiry UUID, stage, status, and latency and exclude the personal body, captcha token, and secrets." },
-          { kind: "paragraph", text: "SmartCaptcha and its resources may load only when online submission is enabled; before that, captcha is inactive and receives no data." },
+          { kind: "paragraph", text: "The strictly necessary vbtech-theme-v1 local record stores the theme choice. The site uses no analytics or advertising cookies. The enquiry UUID is used only as a bounded correlation identifier. Server and application telemetry and logs must be limited to event kind, enquiry UUID, stage, status, and latency and must exclude the user-provided fields — name, contact, and message — and any other personal body data, captcha token, and secrets." },
+          { kind: "paragraph", text: "SmartCaptcha and its resources may load only when online submission is enabled; during verification it may receive the verification token and the minimum network context required, but no name, contact, or message is sent to it. Before submission is enabled, captcha is inactive and receives no data." },
         ],
       },
       {
