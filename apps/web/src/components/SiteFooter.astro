@@ -2,6 +2,7 @@
 import { SITE_CONTENT, type Locale } from "@vbtech/content";
 import { localizedPath } from "../lib/locale.js";
 import LocaleLinks from "./LocaleLinks.astro";
+import ThemeControl from "./ThemeControl.astro";
 import Wordmark from "./Wordmark.astro";
 
 interface Props {
@@ -33,7 +34,7 @@ const legalLabels =
     <a href={localizedPath(locale, "personal-data-consent")}>{legalLabels.consent}</a>
   </nav>
   <LocaleLinks locale={locale} label={page.navigation.languageLabel} />
-  <div data-theme-control-slot aria-hidden="true"></div>
+  <ThemeControl locale={locale} />
   <p>
     <a href="https://github.com/thevladbog">GitHub</a>
     <a href="mailto:hello@v-b.tech">Email</a>

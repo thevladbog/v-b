@@ -3,6 +3,8 @@ import { SITE_CONTENT, type Locale } from "@vbtech/content";
 import SeoHead from "../components/SeoHead.astro";
 import SiteFooter from "../components/SiteFooter.astro";
 import SiteHeader from "../components/SiteHeader.astro";
+import { THEME_STORAGE_KEY } from "../lib/theme.js";
+import "../styles/global.css";
 
 interface Alternate {
   locale: Locale | "x-default";
@@ -19,11 +21,31 @@ interface Props {
 
 const { locale, title, description, canonicalPath, alternates } = Astro.props;
 const { skip } = SITE_CONTENT[locale];
+const themeBootstrap = `(() => {
+  const root = document.documentElement;
+  let stored = null;
+  try {
+    stored = window.localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+  } catch {
+    stored = null;
+  }
+  const mode = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+  let prefersDark = false;
+  try {
+    prefersDark = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  } catch {
+    prefersDark = false;
+  }
+  const theme = mode === "dark" || (mode === "system" && prefersDark) ? "dark" : "light";
+  root.dataset.theme = theme;
+  root.style.colorScheme = theme;
+})();`;
 ---
 
 <!doctype html>
 <html lang={locale}>
   <head>
+    <script is:inline set:html={themeBootstrap} />
     <SeoHead
       locale={locale}
       title={title}
@@ -37,5 +59,10 @@ const { skip } = SITE_CONTENT[locale];
     <SiteHeader locale={locale} />
     <main id="main-content"><slot /></main>
     <SiteFooter locale={locale} />
+    <script>
+      import { initializeThemeControls } from "../scripts/theme";
+
+      initializeThemeControls();
+    </script>
   </body>
 </html>

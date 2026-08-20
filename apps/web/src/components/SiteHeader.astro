@@ -1,6 +1,7 @@
 ---
 import { SITE_CONTENT, type Locale } from "@vbtech/content";
 import LocaleLinks from "./LocaleLinks.astro";
+import ThemeControl from "./ThemeControl.astro";
 import Wordmark from "./Wordmark.astro";
 
 interface Props {
@@ -21,7 +22,7 @@ const page = SITE_CONTENT[locale];
     <a href="#contact">{page.navigation.contact}</a>
   </nav>
   <LocaleLinks locale={locale} label={page.navigation.languageLabel} />
-  <div data-theme-control-slot aria-hidden="true"></div>
+  <ThemeControl locale={locale} />
   <p>
     <a href="https://t.me/thevladbog">{page.contact.telegram}</a>
     <a href="mailto:hello@v-b.tech">{page.contact.email}</a>
