@@ -211,6 +211,7 @@ Bounded operational data:
 - consent identifier;
 - submission and delivery timestamps;
 - captcha validation outcome;
+- short-lived keyed network-source digest used only for abuse rate limiting;
 - bounded delivery state and provider message identifiers.
 
 The system does not collect company, phone, attachments, marketing preferences, behavioural history or arbitrary referrer/UTM values in the first release.
@@ -270,7 +271,7 @@ Submitting the same request ID is idempotent. A transaction-level lock or unique
 
 Personal payload is encrypted before durable storage. The outbox retries bounded transient delivery failures with backoff. After terminal delivery or terminal failure handling, encrypted mail payload is erased on a short operational schedule. The mailbox copy and business correspondence are retained for no longer than one year after the last substantive contact unless a separately documented legal basis applies.
 
-Operational telemetry contains event kind, request ID, stage, status and latency but no name, contact or message. Logs must not contain request bodies, captcha tokens, secrets or rendered email.
+Rate limiting stores only a keyed HMAC of the bounded network source and fixed time window with short expiry; raw IP addresses are not persisted in the application database. Operational telemetry contains event kind, request ID, stage, status and latency but no name, contact or message. Logs must not contain request bodies, captcha tokens, secrets or rendered email.
 
 ## 11. Branded email system
 
