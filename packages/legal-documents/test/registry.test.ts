@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { containsDeveloperHomePath } from "../../../test/helpers/developer-home-path.js";
 import {
   CURRENT_CONTACT_CONSENT_ID,
   LEGAL_ACTIVATION_CHECKLIST,
@@ -49,8 +50,6 @@ type MutableLegalDocumentSource = Mutable<LegalDocumentSource>;
 const cloneDocuments = (): MutableLegalDocumentSource[] =>
   structuredClone(LEGAL_DOCUMENTS) as unknown as MutableLegalDocumentSource[];
 
-const DEVELOPER_HOME_PATH = /(?:\/Users\/[^/]+|\/home\/[^/]+|[A-Z]:\\Users\\[^\\]+)/i;
-
 const retainedPolicyHistory = () => {
   const superseded: LegalDocumentRelease = {
     code: "VBT-PD-01",
@@ -93,6 +92,19 @@ const retainedPolicyHistory = () => {
 };
 
 describe("draft legal document registry", () => {
+  it.each([
+    ["raw Windows", String.raw`C:\Users\alice\source\operator.ts`],
+    ["JSON-escaped Windows", JSON.stringify({ source: String.raw`C:\Users\alice\source\operator.ts` })],
+    ["macOS", "/Users/alice/source/operator.ts"],
+    ["Linux", "/home/alice/source/operator.ts"],
+  ])("detects a %s developer-home path", (_label, value) => {
+    expect(containsDeveloperHomePath(value)).toBe(true);
+  });
+
+  it("does not classify an ordinary URL path as a developer home", () => {
+    expect(containsDeveloperHomePath("https://example.test/home/docs/page")).toBe(false);
+  });
+
   it("pins exactly two paired current draft candidates", () => {
     expect(LEGAL_RELEASES).toHaveLength(2);
     expect(LEGAL_RELEASES.map(({ code }) => code)).toEqual(["VBT-PD-01", "VBT-PD-02"]);
@@ -148,7 +160,7 @@ describe("draft legal document registry", () => {
     expect(LEGAL_SOURCE_REVIEW.operatorSource).toBe(
       "operator-snapshot:operator-vbtech-2026-08-20",
     );
-    expect(JSON.stringify(LEGAL_SOURCE_REVIEW)).not.toMatch(DEVELOPER_HOME_PATH);
+    expect(containsDeveloperHomePath(JSON.stringify(LEGAL_SOURCE_REVIEW))).toBe(false);
     expect(LEGAL_SOURCE_REVIEW.sources).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ url: expect.stringContaining("ips.pravo.gov.ru") }),

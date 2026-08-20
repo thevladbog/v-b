@@ -168,3 +168,71 @@ The web package test script builds first and runs the full web unit suite even w
 - There is still no active legal document; `VBT-PD-02/DRAFT` remains unpublishable and unacceptable for enabled submission.
 - All six legal routes remain draft-only and `noindex,nofollow` under their existing generated-page contract.
 - No legal wording, approval, publication, deployment, backend behavior, browser test, or form activation changed in this fix.
+
+## Provenance fix round 1/5 — boundary-aware home-path detection
+
+### Commit contract and scope
+
+- Base SHA: `f8f7977dca053f19e012555313188cc89b65dd24`.
+- Exact commit subject: `test: harden legal provenance path detection`.
+- Final commit SHA is supplied in the controller handoff because the commit cannot contain its own stable SHA.
+- This is a test-only correction. The production provenance identifier, legal copy, lifecycle/current derivation, browser tests, backend, deployment, and form behavior are unchanged.
+
+### Review finding and correction
+
+The first provenance contract duplicated one regex in the legal and web test suites. That regex detected raw `C:\Users\alice\...`, `/Users/alice/...`, and `/home/alice/...`, but it missed the doubled separators emitted by JSON serialization (`C:\\Users\\alice\\...`) and falsely matched `/home/docs/page` inside `https://example.test/home/docs/page`.
+
+Both suites now consume one shared test-only `containsDeveloperHomePath` detector. It normalizes doubled Windows separators for comparison, accepts a developer-home path only at the start of the string or after a bounded path-value delimiter, and separately recognizes Windows and POSIX home roots. This preserves detection in serialized metadata and generated artifacts without interpreting a normal absolute URL path as a Linux home.
+
+Explicit fixtures cover:
+
+- positive raw Windows `C:\Users\alice\source\operator.ts`;
+- positive JSON-serialized Windows output with doubled separators;
+- positive macOS `/Users/alice/...` and Linux `/home/alice/...` paths;
+- negative `https://example.test/home/docs/page` URL content;
+- the real serialized `LEGAL_SOURCE_REVIEW` metadata and every generated text/client artifact in `apps/web/dist`.
+
+### TDD evidence
+
+The duplicated detector was first consolidated without changing behavior; the existing focused suites remained green. The new boundary fixtures then produced the required RED:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  1 failed | 1 passed (2)
+Tests       2 failed | 40 passed (42)
+Failures    JSON-escaped Windows path returned false; ordinary HTTPS /home/ URL returned true
+Exit status 1
+```
+
+After the bounded normalization/detection change:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  2 passed (2)
+Tests       42 passed (42)
+
+CI=true corepack pnpm --filter @vbtech/web test -- legal-pages.test.ts
+Build        9 static pages
+Test Files   11 passed (11)
+Tests        146 passed (146)
+```
+
+### Verification gates
+
+| Gate | Result |
+| --- | --- |
+| Legal tests | PASS — 2 files, 42 tests |
+| Legal typecheck | PASS |
+| Web legal regression/full package test | PASS — 11 files, 146 tests |
+| Web typecheck | PASS — 39 files, 0 errors, 0 warnings, 0 hints |
+| Default web build | PASS — 9 static pages plus text/XML endpoints |
+| Real generated-output portability scan | PASS through the shared detector |
+| `PUBLIC_CONTACT_SUBMISSION_ENABLED=true` web build | EXPECTED FAIL — exit 1, `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled` |
+| Normal build after deliberate failure | PASS — complete 9-page output restored |
+| `git diff --check` | PASS |
+
+### Legal and activation boundary
+
+- Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
+- `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
+- Enabled submission remains blocked by the draft consent guard; no publication, deployment, or activation occurred.

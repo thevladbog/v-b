@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { parse } from "parse5";
 import { describe, expect, it } from "vitest";
+import { containsDeveloperHomePath } from "../../../test/helpers/developer-home-path.js";
 import {
   listGeneratedLegalRoutes,
   validateLegalPageContract,
@@ -114,7 +115,6 @@ const linkedStyles = async (html: string) => {
   };
 };
 
-const DEVELOPER_HOME_PATH = /(?:\/Users\/[^/]+|\/home\/[^/]+|[A-Z]:\\Users\\[^\\]+)/i;
 const TEXT_OUTPUT_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".mjs", ".svg", ".txt", ".xml"]);
 
 const listTextOutputFiles = async (directory: URL): Promise<URL[]> => {
@@ -170,7 +170,7 @@ describe("draft legal pages", () => {
     const files = await listTextOutputFiles(new URL("../dist/", import.meta.url));
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
-      expect(await readFile(file, "utf8"), file.pathname).not.toMatch(DEVELOPER_HOME_PATH);
+      expect(containsDeveloperHomePath(await readFile(file, "utf8")), file.pathname).toBe(false);
     }
   });
 
