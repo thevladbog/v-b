@@ -100,6 +100,20 @@ const text = (node: HtmlNode): string =>
     ? (node as HtmlNode & { value?: string }).value ?? ""
     : (node.childNodes ?? []).map(text).join(" ").replace(/\s+/g, " ").trim();
 
+const linkedStyles = async (html: string) => {
+  const document = parse(html) as unknown as HtmlNode;
+  const hrefs = elements(document, "link")
+    .filter((node) => attr(node, "rel") === "stylesheet")
+    .map((node) => attr(node, "href"))
+    .filter((href): href is string => Boolean(href));
+  return {
+    hrefs,
+    css: (await Promise.all(
+      hrefs.map((href) => readFile(new URL(`../dist${href}`, import.meta.url), "utf8")),
+    )).join("\n"),
+  };
+};
+
 const fixtureContract: LegalPageContract = {
   locale: "ru",
   route: "/legal/",
@@ -226,6 +240,78 @@ describe("draft legal pages", () => {
       : ["/en/legal/", "/en/privacy/", "/en/personal-data-consent/"]) {
       expect(html).toContain(`href="${route}"`);
     }
+  });
+
+  it.each(pages)("loads shared site chrome without landing composition on $route", async (page) => {
+    const html = await readBuilt(page.file);
+    const document = parse(html) as unknown as HtmlNode;
+    const { hrefs, css } = await linkedStyles(html);
+
+    expect(hrefs.length).toBeGreaterThan(0);
+    expect(hrefs.every((href) => href.startsWith("/"))).toBe(true);
+    expect(css).toMatch(/@font-face/);
+    for (const selector of [
+      ".shell",
+      ".skip-link",
+      ".wordmark",
+      ".site-header",
+      ".site-navigation",
+      ".locale-links",
+      ".theme-control",
+      ".site-footer",
+      ".footer-grid",
+      ".footer-legal",
+      ".footer-actions",
+      ".footer-bars",
+    ]) {
+      expect(css).toContain(selector);
+    }
+    for (const declaration of [
+      /@font-face\{[^}]*font-family:IBM Plex Sans[^}]*url\(\/fonts\/ibm-plex-sans-latin1-400\.woff2\)/,
+      /\.shell\{[^}]*width:min\(/,
+      /\.skip-link\{[^}]*position:fixed/,
+      /\.site-header\{[^}]*position:sticky/,
+      /\.site-navigation[^{}]*\{[^}]*display:flex/,
+      /\.locale-links[^{}]*\{[^}]*display:flex/,
+      /\.theme-control button\{[^}]*min-height:2\.75rem/,
+      /\.site-footer\{[^}]*border-top:/,
+      /\.footer-grid\{[^}]*display:grid/,
+    ]) {
+      expect(css).toMatch(declaration);
+    }
+    for (const landingSelector of [
+      ".hero-grid",
+      ".signal-field",
+      ".case-visual",
+      ".expertise-grid",
+      ".approach-list",
+      ".contact-panel",
+    ]) {
+      expect(css).not.toContain(landingSelector);
+    }
+    const cssUrls = [...css.matchAll(/url\((?:"|')?([^"')]+)(?:"|')?\)/g)]
+      .map((match) => match[1]!);
+    expect(cssUrls.length).toBeGreaterThan(0);
+    expect(cssUrls.every((url) => url.startsWith("/fonts/"))).toBe(true);
+
+    const fetchedLinks = elements(document, "link").filter((node) =>
+      ["stylesheet", "preload", "modulepreload"].includes(attr(node, "rel") ?? ""),
+    );
+    expect(fetchedLinks.every((node) => (attr(node, "href") ?? "").startsWith("/"))).toBe(true);
+    expect(elements(document, "script")
+      .map((node) => attr(node, "src"))
+      .filter((src): src is string => Boolean(src))
+      .every((src) => src.startsWith("/"))).toBe(true);
+  });
+
+  it("keeps shared chrome owned by BaseLayout and landing composition isolated", async () => {
+    const [baseLayout, landingStyles] = await Promise.all([
+      readFile(new URL("../src/layouts/BaseLayout.astro", import.meta.url), "utf8"),
+      readFile(new URL("../src/styles/landing.css", import.meta.url), "utf8"),
+    ]);
+    expect(baseLayout).toContain('../styles/site-chrome.css');
+    expect(landingStyles).not.toMatch(/@font-face|\.site-header|\.site-footer|\.skip-link/);
+    expect(landingStyles).toMatch(/\.hero-grid|\.signal-field|\.case-visual/);
   });
 
   it("keeps both landing roots indexable with unchanged home locale links", async () => {

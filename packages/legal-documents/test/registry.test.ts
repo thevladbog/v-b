@@ -7,6 +7,7 @@ import {
   LEGAL_SOURCE_REVIEW,
   OPERATOR_PROFILES,
   assertContactConsentPublishable,
+  deriveCurrentLegalReleases,
   getActiveLegalDocument,
   getCurrentLegalDocument,
   listActiveLegalDocuments,
@@ -47,6 +48,47 @@ type MutableLegalDocumentSource = Mutable<LegalDocumentSource>;
 
 const cloneDocuments = (): MutableLegalDocumentSource[] =>
   structuredClone(LEGAL_DOCUMENTS) as unknown as MutableLegalDocumentSource[];
+
+const retainedPolicyHistory = () => {
+  const superseded: LegalDocumentRelease = {
+    code: "VBT-PD-01",
+    identity: "VBT-PD-01/2026.08/01",
+    revision: "2026.08/01",
+    effectiveDate: "2026-08-20",
+    status: "superseded",
+    operatorProfileId: "operator-vbtech-2026-08-20",
+    routes: {
+      ru: "/legal/archive/privacy-2026-08/",
+      en: "/en/legal/archive/privacy-2026-08/",
+    },
+  };
+  const active: LegalDocumentRelease = {
+    code: "VBT-PD-01",
+    identity: "VBT-PD-01/2026.09/01",
+    revision: "2026.09/01",
+    effectiveDate: "2026-09-15",
+    status: "active",
+    supersedes: superseded.identity,
+    operatorProfileId: "operator-vbtech-2026-08-20",
+    routes: { ru: "/privacy/", en: "/en/privacy/" },
+  };
+  const consent = LEGAL_RELEASES[1]!;
+  const policyTemplate = LEGAL_DOCUMENTS[0]!;
+  const sourceFor = (release: LegalDocumentRelease): LegalDocumentSource => ({
+    releaseIdentity: release.identity,
+    content: {
+      ru: { ...policyTemplate.content.ru, releaseIdentity: release.identity },
+      en: { ...policyTemplate.content.en, releaseIdentity: release.identity },
+    },
+  });
+  return {
+    active,
+    superseded,
+    consent,
+    releases: [active, superseded, consent] as LegalDocumentRelease[],
+    documents: [sourceFor(active), sourceFor(superseded), LEGAL_DOCUMENTS[1]!] as LegalDocumentSource[],
+  };
+};
 
 describe("draft legal document registry", () => {
   it("pins exactly two paired current draft candidates", () => {
@@ -123,6 +165,34 @@ describe("draft legal document registry", () => {
     expect(() => validateLegalRegistry(syntheticActiveReleases(), syntheticActiveDocuments())).not.toThrow();
   });
 
+  it("derives the same current release per code from retained history in either order", () => {
+    const history = retainedPolicyHistory();
+    expect(() => validateLegalRegistry(history.releases, history.documents)).not.toThrow();
+    expect(() => validateLegalRegistry(
+      [...history.releases].reverse(),
+      [...history.documents].reverse(),
+    )).not.toThrow();
+    const forward = deriveCurrentLegalReleases(history.releases);
+    const reverse = deriveCurrentLegalReleases([...history.releases].reverse());
+    expect(forward.map(({ identity }) => identity)).toEqual([
+      history.active.identity,
+      history.consent.identity,
+    ]);
+    expect(reverse.map(({ identity }) => identity)).toEqual(
+      forward.map(({ identity }) => identity),
+    );
+    const withNextDraft = [...history.releases, LEGAL_RELEASES[0]!];
+    expect(deriveCurrentLegalReleases(withNextDraft)[0]!.identity).toBe(history.active.identity);
+  });
+
+  it("requires an active or draft current release for every document code", () => {
+    const history = retainedPolicyHistory();
+    history.releases[0] = { ...history.active, status: "withdrawn" } as LegalDocumentRelease;
+    expect(() => deriveCurrentLegalReleases(history.releases)).toThrow(
+      /no current active or draft legal release.*VBT-PD-01/i,
+    );
+  });
+
   it("rejects duplicate identities, duplicate routes and duplicate active releases", () => {
     expect(() => validateLegalRegistry([...LEGAL_RELEASES, LEGAL_RELEASES[0]!], LEGAL_DOCUMENTS)).toThrow(
       /duplicate release identity/i,
@@ -145,6 +215,128 @@ describe("draft legal document registry", () => {
     } as LegalDocumentRelease;
     expect(() => validateLegalRegistry([...active, secondPolicy], syntheticActiveDocuments())).toThrow(
       /multiple active releases/i,
+    );
+  });
+
+  it("rejects invalid supersedes targets, status relationships, forks, and cycles", () => {
+    const missing = retainedPolicyHistory();
+    missing.active = {
+      ...missing.active,
+      supersedes: "VBT-PD-01/2026.07/01",
+    } as typeof missing.active;
+    missing.releases[0] = missing.active;
+    expect(() => validateLegalRegistry(missing.releases, missing.documents)).toThrow(
+      /supersedes target.*does not exist/i,
+    );
+
+    const wrongCode = retainedPolicyHistory();
+    wrongCode.active = {
+      ...wrongCode.active,
+      supersedes: "VBT-PD-02/2026.08/01",
+    } as typeof wrongCode.active;
+    wrongCode.releases[0] = wrongCode.active;
+    const consentHistory = {
+      ...wrongCode.superseded,
+      code: "VBT-PD-02",
+      identity: "VBT-PD-02/2026.08/01",
+      routes: {
+        ru: "/legal/archive/consent-2026-08/",
+        en: "/en/legal/archive/consent-2026-08/",
+      },
+    } as LegalDocumentRelease;
+    wrongCode.releases.push(consentHistory);
+    wrongCode.documents.push({
+      ...LEGAL_DOCUMENTS[1]!,
+      releaseIdentity: consentHistory.identity,
+      content: {
+        ru: { ...LEGAL_DOCUMENTS[1]!.content.ru, releaseIdentity: consentHistory.identity },
+        en: { ...LEGAL_DOCUMENTS[1]!.content.en, releaseIdentity: consentHistory.identity },
+      },
+    });
+    expect(() => validateLegalRegistry(wrongCode.releases, wrongCode.documents)).toThrow(
+      /supersedes target.*same document code/i,
+    );
+
+    const wrongStatus = retainedPolicyHistory();
+    wrongStatus.releases[1] = {
+      ...wrongStatus.superseded,
+      status: "withdrawn",
+    } as LegalDocumentRelease;
+    expect(() => validateLegalRegistry(wrongStatus.releases, wrongStatus.documents)).toThrow(
+      /supersedes target.*status superseded/i,
+    );
+
+    const draftSource = retainedPolicyHistory();
+    draftSource.releases[2] = {
+      ...draftSource.consent,
+      supersedes: draftSource.superseded.identity,
+    } as unknown as LegalDocumentRelease;
+    expect(() => validateLegalRegistry(draftSource.releases, draftSource.documents)).toThrow(
+      /draft.*cannot.*supersede/i,
+    );
+
+    const orphaned = retainedPolicyHistory();
+    orphaned.active = { ...orphaned.active, supersedes: undefined } as unknown as typeof orphaned.active;
+    orphaned.releases[0] = orphaned.active;
+    expect(() => validateLegalRegistry(orphaned.releases, orphaned.documents)).toThrow(
+      /superseded release.*must be referenced/i,
+    );
+
+    const fork = retainedPolicyHistory();
+    const secondSuccessor = {
+      ...fork.superseded,
+      identity: "VBT-PD-01/2026.10/01",
+      revision: "2026.10/01",
+      effectiveDate: "2026-10-01",
+      supersedes: fork.superseded.identity,
+      routes: {
+        ru: "/legal/archive/privacy-2026-10/",
+        en: "/en/legal/archive/privacy-2026-10/",
+      },
+    } as LegalDocumentRelease;
+    fork.releases.push(secondSuccessor);
+    fork.documents.push({
+      ...fork.documents[1]!,
+      releaseIdentity: secondSuccessor.identity,
+      content: {
+        ru: { ...fork.documents[1]!.content.ru, releaseIdentity: secondSuccessor.identity },
+        en: { ...fork.documents[1]!.content.en, releaseIdentity: secondSuccessor.identity },
+      },
+    });
+    expect(() => validateLegalRegistry(fork.releases, fork.documents)).toThrow(
+      /multiple releases supersede/i,
+    );
+
+    const cycle = retainedPolicyHistory();
+    cycle.active = { ...cycle.active, supersedes: undefined } as unknown as typeof cycle.active;
+    cycle.releases[0] = cycle.active;
+    const first = {
+      ...cycle.superseded,
+      supersedes: "VBT-PD-01/2026.07/01",
+    } as LegalDocumentRelease;
+    const second = {
+      ...cycle.superseded,
+      identity: "VBT-PD-01/2026.07/01",
+      revision: "2026.07/01",
+      effectiveDate: "2026-07-20",
+      supersedes: cycle.superseded.identity,
+      routes: {
+        ru: "/legal/archive/privacy-2026-07/",
+        en: "/en/legal/archive/privacy-2026-07/",
+      },
+    } as LegalDocumentRelease;
+    cycle.releases[1] = first;
+    cycle.releases.push(second);
+    cycle.documents.push({
+      ...cycle.documents[1]!,
+      releaseIdentity: second.identity,
+      content: {
+        ru: { ...cycle.documents[1]!.content.ru, releaseIdentity: second.identity },
+        en: { ...cycle.documents[1]!.content.en, releaseIdentity: second.identity },
+      },
+    });
+    expect(() => validateLegalRegistry(cycle.releases, cycle.documents)).toThrow(
+      /supersedes graph.*cycle/i,
     );
   });
 

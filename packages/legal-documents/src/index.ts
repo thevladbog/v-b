@@ -9,6 +9,7 @@ export {
   LEGAL_RELEASES,
   LEGAL_SOURCE_REVIEW,
   assertContactConsentPublishable,
+  deriveCurrentLegalReleases,
   getActiveLegalDocument,
   getCurrentLegalDocument,
   listActiveLegalDocuments,

@@ -66,25 +66,86 @@ export const LEGAL_RELEASES = [
   },
 ] as const satisfies readonly LegalDocumentRelease[];
 
-const CURRENT_CONTACT_CONSENT_CANDIDATE = LEGAL_RELEASES.find(
-  ({ code }) => code === "VBT-PD-02",
-);
-if (!CURRENT_CONTACT_CONSENT_CANDIDATE) {
-  throw new Error("Current contact consent candidate is missing");
-}
-export const CURRENT_CONTACT_CONSENT_ID = CURRENT_CONTACT_CONSENT_CANDIDATE.identity;
-
 export const LEGAL_DOCUMENTS = [
   { releaseIdentity: "VBT-PD-01/DRAFT", content: PRIVACY_CONTENT },
   { releaseIdentity: "VBT-PD-02/DRAFT", content: CONSENT_CONTENT },
 ] as const satisfies readonly LegalDocumentSource[];
 
-const CURRENT_RELEASES: readonly LegalDocumentRelease[] = LEGAL_RELEASES;
-
 const CODES = ["VBT-PD-01", "VBT-PD-02"] as const;
 const STATUSES = ["draft", "active", "superseded", "withdrawn"] as const;
 const ROUTE_PATTERN = /^\/(?:en\/)?[a-z0-9-]+(?:\/[a-z0-9-]+)*\/$/;
 const SECTION_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
+export function deriveCurrentLegalReleases(
+  releases: readonly LegalDocumentRelease[],
+): readonly LegalDocumentRelease[] {
+  const byIdentity = new Map(releases.map((release) => [release.identity, release]));
+  if (byIdentity.size !== releases.length) {
+    throw new Error("Duplicate release identity prevents current legal release derivation");
+  }
+  const incomingSupersedes = new Map<string, string>();
+
+  for (const release of releases) {
+    if (release.status === "draft" || !release.supersedes) continue;
+    const target = byIdentity.get(release.supersedes);
+    if (!target) {
+      throw new Error(
+        `Supersedes target ${release.supersedes} for ${release.identity} does not exist`,
+      );
+    }
+    if (target.code !== release.code) {
+      throw new Error(
+        `Supersedes target ${target.identity} must use the same document code as ${release.identity}`,
+      );
+    }
+    if (target.status !== "superseded") {
+      throw new Error(`Supersedes target ${target.identity} must have status superseded`);
+    }
+    const existingSuccessor = incomingSupersedes.get(target.identity);
+    if (existingSuccessor) {
+      throw new Error(
+        `Multiple releases supersede ${target.identity}: ${existingSuccessor} and ${release.identity}`,
+      );
+    }
+    incomingSupersedes.set(target.identity, release.identity);
+  }
+
+  for (const release of releases) {
+    if (release.status === "superseded" && !incomingSupersedes.has(release.identity)) {
+      throw new Error(
+        `Superseded release ${release.identity} must be referenced by exactly one successor`,
+      );
+    }
+  }
+
+  const visited = new Set<string>();
+  const visiting = new Set<string>();
+  const visit = (release: LegalDocumentRelease): void => {
+    if (visited.has(release.identity)) return;
+    if (visiting.has(release.identity)) {
+      throw new Error(`Legal supersedes graph contains a cycle at ${release.identity}`);
+    }
+    visiting.add(release.identity);
+    if (release.status !== "draft" && release.supersedes) {
+      const target = byIdentity.get(release.supersedes);
+      if (target) visit(target);
+    }
+    visiting.delete(release.identity);
+    visited.add(release.identity);
+  };
+  releases.forEach(visit);
+
+  return CODES.map((code) => {
+    const releasesForCode = releases.filter((release) => release.code === code);
+    const active = releasesForCode.filter((release) => release.status === "active");
+    const drafts = releasesForCode.filter((release) => release.status === "draft");
+    if (active.length > 1) throw new Error(`Multiple active releases for ${code}`);
+    if (drafts.length > 1) throw new Error(`Multiple draft releases for ${code}`);
+    const current = active[0] ?? drafts[0];
+    if (!current) throw new Error(`No current active or draft legal release for ${code}`);
+    return current;
+  });
+}
 
 function assertLocaleRoutes(release: LegalDocumentRelease): void {
   const routes = release.routes as Partial<Record<LegalLocale, string>>;
@@ -266,6 +327,9 @@ export function validateLegalRegistry(
       if (raw.revision !== null || raw.effectiveDate !== null) {
         throw new Error(`Draft ${release.code} cannot have a public revision or effective date`);
       }
+      if (raw.supersedes !== undefined) {
+        throw new Error(`Draft ${release.identity} cannot supersede another release`);
+      }
     } else {
       if (!isValidLegalRevision(raw.revision)) {
         throw new Error(`Published release ${release.code} must have a valid YYYY.MM/NN revision`);
@@ -321,7 +385,20 @@ export function validateLegalRegistry(
   ) {
     throw new Error("Legal content and release identities mismatch");
   }
+
+  deriveCurrentLegalReleases(releases);
 }
+
+validateLegalRegistry(LEGAL_RELEASES, LEGAL_DOCUMENTS);
+
+const CURRENT_RELEASES = deriveCurrentLegalReleases(LEGAL_RELEASES);
+const CURRENT_CONTACT_CONSENT_CANDIDATE = CURRENT_RELEASES.find(
+  ({ code }) => code === "VBT-PD-02",
+);
+if (!CURRENT_CONTACT_CONSENT_CANDIDATE) {
+  throw new Error("Current contact consent candidate is missing");
+}
+export const CURRENT_CONTACT_CONSENT_ID = CURRENT_CONTACT_CONSENT_CANDIDATE.identity;
 
 function viewFor(release: LegalDocumentRelease, locale: LegalLocale): LegalDocumentView {
   const source = LEGAL_DOCUMENTS.find(({ releaseIdentity }) => releaseIdentity === release.identity);
@@ -375,5 +452,3 @@ export function assertContactConsentPublishable(
     throw new Error(`Consent ${consentIdentity} is not an active publishable consent`);
   }
 }
-
-validateLegalRegistry(LEGAL_RELEASES, LEGAL_DOCUMENTS);
