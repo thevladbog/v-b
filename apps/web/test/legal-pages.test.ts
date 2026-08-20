@@ -170,7 +170,10 @@ describe("draft legal pages", () => {
     const files = await listTextOutputFiles(new URL("../dist/", import.meta.url));
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
-      expect(containsDeveloperHomePath(await readFile(file, "utf8")), file.pathname).toBe(false);
+      expect(containsDeveloperHomePath(
+        await readFile(file, "utf8"),
+        "generated-artifact",
+      ), file.pathname).toBe(false);
     }
   });
 

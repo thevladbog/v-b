@@ -236,3 +236,75 @@ Tests        146 passed (146)
 - Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
 - `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
 - Enabled submission remains blocked by the draft consent guard; no publication, deployment, or activation occurred.
+
+## Provenance fix round 2/5 — contextual path detection
+
+### Commit contract and scope
+
+- Base SHA: `fef8491bc655e6eeb3416ace06c1d56bdc2609e4`.
+- Exact commit subject: `test: make provenance scans context aware`.
+- Final commit SHA is supplied in the controller handoff because the commit cannot contain its own stable SHA.
+- This remains a test-only correction. Production provenance, legal copy, lifecycle/current derivation, browser tests, backend, deployment, and form behavior were not changed.
+
+### Contextual design and tradeoff
+
+The path detector now requires an explicit scan context instead of extending a single undifferentiated regex:
+
+- `strict-provenance` is used for serialized `LEGAL_SOURCE_REVIEW`. After bounded normalization it rejects raw Windows homes, `/Users/<user>`, `/home/<user>`, and matching `file://` homes. Hosted HTTP(S) URLs and query-only route values are removed or excluded before the POSIX check.
+- `generated-artifact` is used for built text/client artifacts. It rejects Windows homes, `file:///Users/...`, `file:///home/...`, raw `/Users/...`, and `/home/...` only when an explicit filesystem-value label such as `source`, `path`, `file`, `cwd`, `workdir`, `checkout`, or `directory` supplies context.
+
+The exact ambiguity is intentional and tested: bare `/home/docs/page` is invalid under strict provenance because it could be an absolute Linux home, but is allowed in generated artifacts because it is indistinguishable from a root-relative web route. A Linux artifact leak must therefore appear as a `file://` URL or in an explicit filesystem-value context. Windows and `/Users` remain sufficiently platform-specific to reject directly. Hosted URLs, root-relative routes, query values, and ordinary prose/URL content are negative fixtures.
+
+Before detection, escaped separators are normalized for at most eight passes, which covers slash-escaped POSIX JSON and Windows paths after two JSON serialization layers. Inputs are capped at 4 MiB; oversize or excessive escape-depth inputs throw rather than silently pass the scan.
+
+### Fixtures
+
+Positive fixtures cover raw and once/twice JSON-serialized Windows paths, raw macOS/Linux homes under strict provenance, slash-escaped `\/Users\/alice\/...` and `\/home\/alice\/...` JSON, `file:///Users/alice/...`, `file:///home/alice/...`, raw `/Users/...`, and a context-labeled Linux path under generated artifacts.
+
+Negative fixtures cover `https://example.test/home/docs/page`, bare `/home/docs/page` in generated-artifact mode, `?next=/home/docs/page`, and ordinary prose containing root-relative and hosted URL paths. The same helper scans real serialized legal metadata in strict mode and every generated text/client artifact in generated-artifact mode.
+
+### TDD evidence
+
+The initial expanded table produced 10 failures. Two generated-mode slash-escaped fixtures were then added before the helper implementation; the required complete mutation check restored the prior detector and recorded the full RED:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  1 failed | 1 passed (2)
+Tests       12 failed | 46 passed (58)
+Failures    twice-serialized Windows; slash-escaped POSIX; file URLs; root/query/prose context
+Exit status 1
+```
+
+After restoring the contextual detector and adding the explicit ambiguity assertion:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  2 passed (2)
+Tests       59 passed (59)
+
+CI=true corepack pnpm --filter @vbtech/web test -- legal-pages.test.ts
+Build        9 static pages
+Test Files   11 passed (11)
+Tests        146 passed (146)
+```
+
+### Verification gates
+
+| Gate | Result |
+| --- | --- |
+| Legal tests | PASS — 2 files, 59 tests |
+| Legal typecheck | PASS |
+| Web legal regression/full package test | PASS — 11 files, 146 tests |
+| Web typecheck | PASS — 39 files, 0 errors, 0 warnings, 0 hints |
+| Default web build | PASS — 9 static pages plus text/XML endpoints |
+| Strict legal metadata scan | PASS |
+| Contextual generated-output scan | PASS across every text/client artifact |
+| `PUBLIC_CONTACT_SUBMISSION_ENABLED=true` web build | EXPECTED FAIL — exit 1, `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled` |
+| Normal build after deliberate failure | PASS — complete 9-page output restored |
+| `git diff --check` | PASS |
+
+### Legal and activation boundary
+
+- Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
+- `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
+- Enabled submission remains blocked; no publication, deployment, backend change, or activation occurred.

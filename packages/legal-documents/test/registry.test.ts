@@ -92,17 +92,56 @@ const retainedPolicyHistory = () => {
 };
 
 describe("draft legal document registry", () => {
+  const rawWindowsHome = String.raw`C:\Users\alice\source\operator.ts`;
+
   it.each([
-    ["raw Windows", String.raw`C:\Users\alice\source\operator.ts`],
-    ["JSON-escaped Windows", JSON.stringify({ source: String.raw`C:\Users\alice\source\operator.ts` })],
+    ["raw Windows", rawWindowsHome],
+    ["JSON-escaped Windows", JSON.stringify({ source: rawWindowsHome })],
+    ["twice JSON-serialized Windows", JSON.stringify(JSON.stringify({ source: rawWindowsHome }))],
     ["macOS", "/Users/alice/source/operator.ts"],
     ["Linux", "/home/alice/source/operator.ts"],
-  ])("detects a %s developer-home path", (_label, value) => {
-    expect(containsDeveloperHomePath(value)).toBe(true);
+    ["slash-escaped macOS JSON", String.raw`{"source":"\/Users\/alice\/source\/operator.ts"}`],
+    ["slash-escaped Linux JSON", String.raw`{"source":"\/home\/alice\/source\/operator.ts"}`],
+  ])("strict provenance detects a %s developer-home path", (_label, value) => {
+    expect(containsDeveloperHomePath(value, "strict-provenance")).toBe(true);
   });
 
-  it("does not classify an ordinary URL path as a developer home", () => {
-    expect(containsDeveloperHomePath("https://example.test/home/docs/page")).toBe(false);
+  it.each([
+    ["raw Windows", rawWindowsHome],
+    ["twice JSON-serialized Windows", JSON.stringify(JSON.stringify({ source: rawWindowsHome }))],
+    ["raw macOS", "/Users/alice/source/operator.ts"],
+    ["macOS file URL", "file:///Users/alice/source/operator.ts"],
+    ["Linux file URL", "file:///home/alice/source/operator.ts"],
+    ["slash-escaped macOS JSON", String.raw`{"source":"\/Users\/alice\/source\/operator.ts"}`],
+    ["slash-escaped Linux JSON", String.raw`{"source":"\/home\/alice\/source\/operator.ts"}`],
+    ["contextual Linux path", "source path: /home/alice/source/operator.ts"],
+  ])("generated artifacts detect a %s developer-home path", (_label, value) => {
+    expect(containsDeveloperHomePath(value, "generated-artifact")).toBe(true);
+  });
+
+  it.each([
+    ["hosted URL", "https://example.test/home/docs/page"],
+    ["root-relative href-like path", "/home/docs/page"],
+    ["query path", "?next=/home/docs/page"],
+    [
+      "ordinary prose and URLs",
+      "Read the home docs at /home/docs/page or https://example.test/Users/guide.",
+    ],
+  ])("generated artifacts do not classify a %s as a developer home", (_label, value) => {
+    expect(containsDeveloperHomePath(value, "generated-artifact")).toBe(false);
+  });
+
+  it.each([
+    ["hosted URL", "https://example.test/home/docs/page"],
+    ["query path", "?next=/home/docs/page"],
+  ])("strict provenance does not classify a %s as a developer home", (_label, value) => {
+    expect(containsDeveloperHomePath(value, "strict-provenance")).toBe(false);
+  });
+
+  it("applies different strict and generated policies to an ambiguous root path", () => {
+    const ambiguousPath = "/home/docs/page";
+    expect(containsDeveloperHomePath(ambiguousPath, "strict-provenance")).toBe(true);
+    expect(containsDeveloperHomePath(ambiguousPath, "generated-artifact")).toBe(false);
   });
 
   it("pins exactly two paired current draft candidates", () => {
@@ -160,7 +199,10 @@ describe("draft legal document registry", () => {
     expect(LEGAL_SOURCE_REVIEW.operatorSource).toBe(
       "operator-snapshot:operator-vbtech-2026-08-20",
     );
-    expect(containsDeveloperHomePath(JSON.stringify(LEGAL_SOURCE_REVIEW))).toBe(false);
+    expect(containsDeveloperHomePath(
+      JSON.stringify(LEGAL_SOURCE_REVIEW),
+      "strict-provenance",
+    )).toBe(false);
     expect(LEGAL_SOURCE_REVIEW.sources).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ url: expect.stringContaining("ips.pravo.gov.ru") }),
