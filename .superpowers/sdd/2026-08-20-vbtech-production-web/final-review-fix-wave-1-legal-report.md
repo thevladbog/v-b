@@ -383,3 +383,77 @@ Tests        146 passed (146)
 - Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
 - `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
 - Enabled submission remains blocked; no publication, deployment, backend change, or activation occurred.
+
+## Provenance fix round 4/5 — bounded `sources` arrays and direct semicolon boundary
+
+### Commit contract and scope
+
+- Base SHA: `f8204471b692ddc81718c267f3b5b1f4bea84182`.
+- Exact commit subject: `test: bound provenance sources array scanning`.
+- Final commit SHA is supplied in the controller handoff because the commit cannot contain its own stable SHA.
+- This is test-only detector work. Production provenance, legal copy, lifecycle/current derivation, browser tests, backend, deployment, form behavior, and the lockfile were not changed.
+
+### P1 — bounded `sources` array parsing
+
+Generated source maps can contain several filesystem entries in a JSON `sources` array. The former context regex only inspected an immediately first `/home/...` member and therefore missed a developer path in a later member.
+
+The generated-artifact detector now gives exact JSON `"sources": [...]` fields a small linear parser. It inspects every string member, preserves string escape boundaries, and stops at that array's own closing bracket instead of matching across unrelated arrays. A single array is limited to 64 KiB and 1,024 members; malformed JSON-string member structure, a missing delimiter/closing bracket, a trailing comma, or either bound being exceeded throws and fails the scan closed. The overall existing 4 MiB input and eight-pass separator-normalization bounds remain unchanged. Linux scalar filesystem fields continue through the exact-token contextual detector, while `sources` was removed from that scalar regex.
+
+The positive fixture is the required later-entry case: `{"sources":["src/a.ts","/home/alice/project/app.ts"]}`. The negative fixture has several safe relative/vendor entries. Separate fixtures prove malformed syntax does not cross into a later unrelated array and that an oversized member is rejected by the array-specific limit.
+
+### P2 — semicolon is the actual hosted-URL boundary
+
+The semicolon fixture is now exactly `https://example.test/a;absolutePath:/Users/alice/project/app.css`; there is no preceding CSS `)` that could terminate the URL first. Temporarily removing semicolon from the hosted-URL terminators made exactly this fixture fail, proving semicolon itself preserves the adjacent developer path for scanning. Restoring the terminator returned the suite to GREEN.
+
+### TDD evidence
+
+With the new contract fixtures and the old detector, the focused RED was:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  1 failed | 1 passed (2)
+Tests       3 failed | 77 passed (80)
+Failures    later sources member; malformed sources array; sources size bound
+Exit status 1
+```
+
+After adding the bounded exact-array parser:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  2 passed (2)
+Tests       80 passed (80)
+```
+
+The required hosted-URL mutation then allowed semicolons inside the URL token:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  1 failed | 1 passed (2)
+Tests       1 failed | 79 passed (80)
+Failure     preserves a developer path after a hosted URL semicolon delimiter
+Exit status 1
+```
+
+After restoring semicolon termination, the focused suite returned to 80/80 PASS.
+
+### Verification gates
+
+| Gate | Result |
+| --- | --- |
+| Legal tests | PASS — 2 files, 80 tests |
+| Legal typecheck | PASS |
+| Web legal regression/full package test | PASS — build completed; 11 files, 146 tests |
+| Web typecheck | PASS — 39 files, 0 errors, 0 warnings, 0 hints |
+| Default web build | PASS — 9 static pages plus text/XML endpoints |
+| Strict legal metadata scan | PASS |
+| Contextual generated-output scan | PASS across every text/client artifact |
+| `PUBLIC_CONTACT_SUBMISSION_ENABLED=true` web build | EXPECTED FAIL — exit 1, `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled` |
+| Normal build after deliberate failure | PASS — complete 9-page output restored |
+| `git diff --check` | PASS |
+
+### Legal and activation boundary
+
+- Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
+- `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
+- Enabled submission remains blocked; no publication, deployment, backend change, or activation occurred.

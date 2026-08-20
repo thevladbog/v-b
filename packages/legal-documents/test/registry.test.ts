@@ -122,7 +122,10 @@ describe("draft legal document registry", () => {
     ["sourceMap field", "{sourceMap:'/home/alice/project/app.css.map'}"],
     ["absolutePath field", "{absolutePath:'/home/alice/project/app.css'}"],
     ["sourceRoot field", "{sourceRoot:'/home/alice/project'}"],
-    ["sources array field", "{sources:['/home/alice/project/app.ts']}"],
+    [
+      "later sources array field entry",
+      '{"sources":["src/a.ts","/home/alice/project/app.ts"]}',
+    ],
     [
       "CSS sourceMappingURL field",
       "/*# sourceMappingURL=/home/alice/project/app.css.map */",
@@ -138,7 +141,7 @@ describe("draft legal document registry", () => {
     ],
     [
       "semicolon delimiter",
-      "background:url(https://example.test/a);absolutePath:/Users/alice/project/app.css",
+      "https://example.test/a;absolutePath:/Users/alice/project/app.css",
     ],
     ["list delimiter", "https://example.test/a,/Users/alice/project/app.css"],
     [
@@ -162,8 +165,28 @@ describe("draft legal document registry", () => {
     ["resource field", "{resource:'/home/docs/page'}"],
     ["arbitrary source suffix", "DataSource: /home/docs/page"],
     ["extended field token", "{fileNameExtra:'/home/docs/page'}"],
+    [
+      "multiple safe sources entries",
+      '{"sources":["src/a.ts","../shared/b.ts","/vendor/cache/c.ts"]}',
+    ],
   ])("generated artifacts do not classify a %s as a developer home", (_label, value) => {
     expect(containsDeveloperHomePath(value, "generated-artifact")).toBe(false);
+  });
+
+  it("fails closed without crossing a malformed sources array into another array", () => {
+    expect(() =>
+      containsDeveloperHomePath(
+        '{"sources":["src/a.ts" "src/b.ts"],"other":["/home/alice/project/app.ts"]}',
+        "generated-artifact",
+      ),
+    ).toThrow(/malformed sources array/i);
+  });
+
+  it("bounds sources array scanning", () => {
+    const oversizedSources = JSON.stringify({ sources: ["a".repeat(65 * 1024)] });
+    expect(() => containsDeveloperHomePath(oversizedSources, "generated-artifact")).toThrow(
+      /sources array.*limit/i,
+    );
   });
 
   it.each([
