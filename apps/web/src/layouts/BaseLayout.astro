@@ -46,6 +46,20 @@ const themeBootstrap = `(() => {
 <html lang={locale}>
   <head>
     <script is:inline set:html={themeBootstrap} />
+    <link
+      rel="preload"
+      href="/fonts/ibm-plex-sans-latin1-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="preload"
+      href="/fonts/ibm-plex-sans-cyrillic-400.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin="anonymous"
+    />
     <SeoHead
       locale={locale}
       title={title}
@@ -55,7 +69,7 @@ const themeBootstrap = `(() => {
     />
   </head>
   <body>
-    <a href="#main-content">{skip}</a>
+    <a class="skip-link" href="#main-content">{skip}</a>
     <SiteHeader locale={locale} />
     <main id="main-content"><slot /></main>
     <SiteFooter locale={locale} />

@@ -1,0 +1,59 @@
+---
+import type { SiteContent } from "@vbtech/content";
+
+interface Props {
+  content: SiteContent["hero"];
+  availability: string;
+}
+
+const { content, availability } = Astro.props;
+const title = content.title.match(/^([^<>]*)<em>([^<>]+)<\/em>([^<>]*)$/);
+
+if (!title) {
+  throw new Error("The approved hero title must contain one plain <em> fragment");
+}
+---
+
+<section class="hero" data-section="hero" aria-labelledby="hero-title">
+  <div class="shell hero-grid">
+    <div class="hero-copy">
+      <p class="availability"><span aria-hidden="true"></span>{availability}</p>
+      <p class="eyebrow">{content.kicker}</p>
+      <h1 id="hero-title">{title[1]}<em>{title[2]}</em>{title[3]}</h1>
+      <p class="hero-lead">{content.lead}</p>
+      <p class="hero-speciality">{content.speciality}</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href="#contact">
+          <span>{content.discuss}</span><span aria-hidden="true">↘</span>
+        </a>
+        <a class="button button-secondary" href="#work">
+          <span>{content.viewWork}</span><span aria-hidden="true">↓</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="signal-field" aria-hidden="true">
+      <div class="signal-meta"><span>VB / PRODUCT ENGINEERING</span><span>55.75°N · 37.62°E</span></div>
+      <i class="signal-orbit signal-orbit--outer"></i>
+      <i class="signal-orbit signal-orbit--inner"></i>
+      <i class="signal-axis signal-axis--x"></i>
+      <i class="signal-axis signal-axis--y"></i>
+      <div class="signal-core"><span>v</span><i></i><span>b</span></div>
+      <div class="signal-dashes">
+        {Array.from({ length: 12 }, (_, index) => <i data-dash={index}></i>)}
+      </div>
+      <div class="signal-status"><b>PRODUCT / ONLINE</b><span>systems with recovery paths</span></div>
+    </div>
+  </div>
+
+  <div class="hero-ticker" aria-hidden="true">
+    <div>
+      {Array.from({ length: 2 }, () => (
+        <>
+          <span>product logic</span><i></i><span>interface</span><i></i>
+          <span>architecture</span><i></i><span>launch</span><i></i><span>operations</span><i></i>
+        </>
+      ))}
+    </div>
+  </div>
+</section>

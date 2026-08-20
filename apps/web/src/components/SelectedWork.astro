@@ -1,0 +1,49 @@
+---
+import type { Locale, SiteContent } from "@vbtech/content";
+import CaseStudy from "./CaseStudy.astro";
+
+interface Props {
+  locale: Locale;
+  page: SiteContent;
+}
+
+const { locale, page } = Astro.props;
+const openProject = locale === "ru" ? "Открыть проект" : "Open project";
+---
+
+<section class="section work" id="work" data-section="work" aria-labelledby="work-title">
+  <div class="shell">
+    <header class="section-heading">
+      <p class="eyebrow">{page.work.eyebrow}</p>
+      <h2 id="work-title">{page.work.title}</h2>
+      <p>{page.work.lead}</p>
+    </header>
+
+    <div class="case-list">
+      {page.cases.map((caseStudy, index) => (
+        <CaseStudy caseStudy={caseStudy} index={index} locale={locale} />
+      ))}
+    </div>
+
+    <aside class="work-cta">
+      <p>{page.work.cta}</p>
+      <a class="button button-primary" href="#contact">
+        <span>{page.hero.discuss}</span><span aria-hidden="true">↘</span>
+      </a>
+    </aside>
+
+    <section class="more-projects" data-section="manifest" aria-labelledby="more-projects-title">
+      <h3 class="eyebrow" id="more-projects-title">{page.moreProjects.eyebrow}</h3>
+      <div class="project-manifest">
+        {page.moreProjects.items.map((project) => (
+          <a href={project.href} target="_blank" rel="noopener noreferrer" aria-label={`${openProject}: ${project.name}`}>
+            <span class="manifest-id">{project.id}</span>
+            <strong>{project.name}</strong>
+            <span>{project.description}</span>
+            <i>{project.status} <span aria-hidden="true">↗</span></i>
+          </a>
+        ))}
+      </div>
+    </section>
+  </div>
+</section>

@@ -10,4 +10,6 @@ interface Props {
 const { locale, label } = Astro.props;
 ---
 
-<a href={localizedPath(locale, "home")} aria-label={label}>v-b.tech</a>
+<a class="wordmark" href={localizedPath(locale, "home")} aria-label={label}>
+  <span>v</span><i aria-hidden="true"></i><span>b</span><small>.tech</small>
+</a>

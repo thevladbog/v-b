@@ -25,18 +25,24 @@ const legalLabels =
       };
 ---
 
-<footer>
-  <Wordmark locale={locale} label={page.navigation.homeLabel} />
-  <p>{page.footerLine}</p>
-  <nav aria-label={locale === "ru" ? "Правовые документы" : "Legal documents"}>
-    <a href={localizedPath(locale, "legal-register")}>{legalLabels.register}</a>
-    <a href={localizedPath(locale, "privacy-policy")}>{legalLabels.privacy}</a>
-    <a href={localizedPath(locale, "personal-data-consent")}>{legalLabels.consent}</a>
-  </nav>
-  <LocaleLinks locale={locale} label={page.navigation.languageLabel} />
-  <ThemeControl locale={locale} />
-  <p>
-    <a href="https://github.com/thevladbog">GitHub</a>
-    <a href="mailto:hello@v-b.tech">Email</a>
-  </p>
+<footer class="site-footer">
+  <div class="shell footer-grid">
+    <div>
+      <Wordmark locale={locale} label={page.navigation.homeLabel} />
+      <p>{page.footerLine}</p>
+    </div>
+    <nav class="footer-legal" aria-label={locale === "ru" ? "Правовые документы" : "Legal documents"}>
+      <a href={localizedPath(locale, "legal-register")}>{legalLabels.register}</a>
+      <a href={localizedPath(locale, "privacy-policy")}>{legalLabels.privacy}</a>
+      <a href={localizedPath(locale, "personal-data-consent")}>{legalLabels.consent}</a>
+    </nav>
+    <div class="footer-actions">
+      <LocaleLinks locale={locale} label={page.navigation.languageLabel} />
+      <ThemeControl locale={locale} />
+      <p><a href="https://github.com/thevladbog">GitHub</a><a href="mailto:hello@v-b.tech">Email</a></p>
+    </div>
+  </div>
+  <div class="footer-bars" aria-hidden="true">
+    {Array.from({ length: 18 }, (_, index) => <i data-bar={index}></i>)}
+  </div>
 </footer>

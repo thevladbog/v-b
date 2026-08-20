@@ -1,0 +1,22 @@
+---
+import type { SiteContent } from "@vbtech/content";
+
+interface Props {
+  content: SiteContent["approach"];
+}
+
+const { content } = Astro.props;
+---
+
+<section class="section approach" id="approach" data-section="approach" aria-labelledby="approach-title">
+  <div class="shell">
+    <header class="section-heading">
+      <p class="eyebrow">{content.eyebrow}</p><h2 id="approach-title">{content.title}</h2><p>{content.lead}</p>
+    </header>
+    <ol class="approach-list">
+      {content.items.map((item) => (
+        <li class="approach-step"><span>{item.number}</span><h3>{item.title}</h3><p>{item.description}</p></li>
+      ))}
+    </ol>
+  </div>
+</section>

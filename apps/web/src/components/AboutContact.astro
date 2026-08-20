@@ -1,0 +1,40 @@
+---
+import type { Locale, SiteContent } from "@vbtech/content";
+
+interface Props {
+  locale: Locale;
+  about: SiteContent["about"];
+  contact: SiteContent["contact"];
+}
+
+const { locale, about, contact } = Astro.props;
+const telegramLabel = locale === "ru" ? "Написать Владу в Telegram (откроется в новой вкладке)" : "Message Vlad on Telegram (opens in a new tab)";
+---
+
+<div class="section about-contact">
+  <div class="shell about-grid">
+    <section class="about-copy" id="about" data-section="about" aria-labelledby="about-title">
+      <p class="eyebrow">{about.eyebrow}</p>
+      <h2 id="about-title">{about.title}</h2>
+      <p>{about.body}</p>
+      <p>{about.bodyTwo}</p>
+      <div class="about-signature" aria-label="Vlad Bogatyrev, product engineering operations">
+        <span>Vlad Bogatyrev</span><i aria-hidden="true"></i><small>product / engineering / operations</small>
+      </div>
+    </section>
+
+    <section class="contact-panel" id="contact" data-section="contact" aria-labelledby="contact-title">
+      <p class="eyebrow">{contact.eyebrow}</p>
+      <h2 id="contact-title">{contact.title}</h2>
+      <p class="contact-lead">{contact.lead}</p>
+      <div class="contact-links">
+        <a href="https://t.me/thevladbog" target="_blank" rel="noopener noreferrer" aria-label={telegramLabel}>
+          <span>{contact.telegram}</span><b>@thevladbog <i aria-hidden="true">↗</i></b>
+        </a>
+        <a href="mailto:hello@v-b.tech">
+          <span>{contact.email}</span><b>hello@v-b.tech <i aria-hidden="true">↗</i></b>
+        </a>
+      </div>
+    </section>
+  </div>
+</div>
