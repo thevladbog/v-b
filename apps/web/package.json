@@ -1,0 +1,19 @@
+{
+  "name": "@vbtech/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build",
+    "test": "vitest run",
+    "typecheck": "astro check",
+    "lint": "astro check"
+  },
+  "dependencies": {
+    "astro": "7.1.6"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.4",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
