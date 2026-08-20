@@ -5,11 +5,13 @@ import { describe, expect, it } from "vitest";
 interface HtmlAttribute {
   name: string;
   value: string;
+  prefix?: string;
 }
 
 interface HtmlNode {
   nodeName: string;
   tagName?: string;
+  namespaceURI?: string;
   attrs?: HtmlAttribute[];
   childNodes?: HtmlNode[];
 }
@@ -19,16 +21,18 @@ const pages = [
     file: "dist/index.html",
     locale: "ru",
     signature: "Влад Богатырев — продуктовая инженерия и эксплуатация",
-    illustration: "иллюстрация / концепция, не снимок продукта",
-    newTab: /откроется в новой вкладке/i,
+    newTabDisclosure: "откроется в новой вкладке",
+    newTabLabel: "Написать Владу в Telegram (откроется в новой вкладке)",
+    pathname: "/",
     cyrillicPreload: true,
   },
   {
     file: "dist/en/index.html",
     locale: "en",
     signature: "Vlad Bogatyrev — product engineering and operations",
-    illustration: "illustration / concept, not a product capture",
-    newTab: /opens in a new tab/i,
+    newTabDisclosure: "opens in a new tab",
+    newTabLabel: "Message Vlad on Telegram (opens in a new tab)",
+    pathname: "/en/",
     cyrillicPreload: false,
   },
 ] as const;
@@ -83,13 +87,25 @@ const elements = (
 const descendants = (root: HtmlNode, tagName?: string) =>
   elements(root, (node) => !tagName || node.tagName === tagName);
 
-const attr = (node: HtmlNode, name: string) =>
-  node.attrs?.find((attribute) => attribute.name === name)?.value;
+const attr = (node: HtmlNode, name: string) => {
+  const [prefix, localName] = name.includes(":") ? name.split(":", 2) : [];
+  return node.attrs?.find((attribute) =>
+    attribute.name === name ||
+    (prefix && attribute.prefix === prefix && attribute.name === localName)
+  )?.value;
+};
 
 const text = (node: HtmlNode): string =>
   node.nodeName === "#text"
     ? (node as HtmlNode & { value?: string }).value ?? ""
     : (node.childNodes ?? []).map(text).join("").replace(/\s+/g, " ").trim();
+
+const accessibleText = (node: HtmlNode): string =>
+  attr(node, "aria-hidden") === "true"
+    ? ""
+    : node.nodeName === "#text"
+      ? (node as HtmlNode & { value?: string }).value ?? ""
+      : (node.childNodes ?? []).map(accessibleText).join(" ").replace(/\s+/g, " ").trim();
 
 const elementById = (document: HtmlNode, id: string) =>
   elements(document, (node) => attr(node, "id") === id)[0];
@@ -142,53 +158,280 @@ const rootTokenSets = (css: string) => {
   return sets;
 };
 
+const cssAssetUrls = (css: string) => {
+  const urls = [...css.matchAll(/url\(\s*["']?([^"')\s]+)["']?\s*\)/gi)]
+    .map((match) => match[1]);
+  urls.push(
+    ...[...css.matchAll(/@import\s+(["'])([^"']+)\1/gi)]
+      .map((match) => match[2]),
+  );
+  return urls;
+};
+
 const assetUrls = (document: HtmlNode) => {
   const urls: string[] = [];
   const srcElements = new Set([
     "audio", "embed", "iframe", "img", "input", "script", "source", "track", "video",
   ]);
   const assetLinkRels = new Set([
-    "apple-touch-icon", "icon", "manifest", "modulepreload", "preload", "stylesheet",
+    "apple-touch-icon", "dns-prefetch", "icon", "manifest", "mask-icon", "modulepreload",
+    "preconnect", "prefetch", "preload", "prerender", "stylesheet",
   ]);
 
   for (const node of elements(document)) {
-    if (srcElements.has(node.tagName ?? "")) {
+    const tagName = node.tagName?.toLowerCase() ?? "";
+    if (srcElements.has(tagName)) {
       const source = attr(node, "src");
       if (source) urls.push(source);
-      const srcset = attr(node, "srcset");
-      if (srcset) urls.push(...srcset.split(",").map((item) => item.trim().split(/\s+/)[0]));
     }
-    if (node.tagName === "video") {
+    for (const responsiveSource of [attr(node, "srcset"), attr(node, "imagesrcset")]) {
+      if (responsiveSource) {
+        urls.push(...responsiveSource.split(",").map((item) => item.trim().split(/\s+/)[0]));
+      }
+    }
+    if (tagName === "video") {
       const poster = attr(node, "poster");
       if (poster) urls.push(poster);
     }
-    if (node.tagName === "object") {
+    if (tagName === "object") {
       const data = attr(node, "data");
       if (data) urls.push(data);
     }
-    if (node.tagName === "link") {
+    if (tagName === "link") {
       const relations = new Set((attr(node, "rel") ?? "").toLowerCase().split(/\s+/));
       const href = attr(node, "href");
       if (href && [...relations].some((relation) => assetLinkRels.has(relation))) urls.push(href);
     }
-    if (node.tagName === "use" || node.tagName === "image") {
+    if (node.namespaceURI === "http://www.w3.org/2000/svg" && tagName !== "a") {
       const href = attr(node, "href") ?? attr(node, "xlink:href");
       if (href) urls.push(href);
     }
     const style = attr(node, "style");
-    if (style) {
-      urls.push(...[...style.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map((match) => match[1]));
-    }
+    if (style) urls.push(...cssAssetUrls(style));
   }
 
   for (const style of elements(document, (node) => node.tagName === "style")) {
-    urls.push(...[...text(style).matchAll(/url\(["']?([^"')]+)["']?\)/g)].map((match) => match[1]));
+    urls.push(...cssAssetUrls(text(style)));
   }
   return urls;
 };
 
+type PageLocale = (typeof pages)[number]["locale"];
+
+const sameDocumentFragmentProblems = (document: HtmlNode, pathname: string) => {
+  const baseUrl = new URL(pathname, "https://v-b.tech");
+  const targets = new Map<string, number>();
+  for (const node of elements(document)) {
+    const id = attr(node, "id");
+    if (id !== undefined) targets.set(id, (targets.get(id) ?? 0) + 1);
+  }
+
+  const problems: string[] = [];
+  for (const anchor of elements(document, (node) => node.tagName === "a")) {
+    const href = attr(anchor, "href");
+    if (!href?.includes("#")) continue;
+
+    let destination: URL;
+    try {
+      destination = new URL(href, baseUrl);
+    } catch {
+      problems.push(`${href}: invalid same-document URL`);
+      continue;
+    }
+    if (
+      destination.origin !== baseUrl.origin ||
+      destination.pathname !== baseUrl.pathname ||
+      destination.search !== baseUrl.search
+    ) continue;
+
+    const rawFragment = href.slice(href.indexOf("#"));
+    let id: string;
+    try {
+      id = decodeURIComponent(rawFragment.slice(1));
+    } catch {
+      problems.push(`${rawFragment}: invalid fragment encoding`);
+      continue;
+    }
+    const matches = targets.get(id) ?? 0;
+    if (matches === 0) problems.push(`${rawFragment}: missing target`);
+    if (matches > 1) problems.push(`${rawFragment}: ambiguous target (${matches} matches)`);
+  }
+  return problems;
+};
+
+const figureContracts = {
+  ru: {
+    markiro: {
+      label: "Markiro — иллюстрация концепции продуктового интерфейса",
+      disclosure: "иллюстрация / концепция, не снимок продукта",
+    },
+    idento: {
+      label: "Idento — иллюстрация концепции продуктового интерфейса",
+      disclosure: "иллюстрация / концепция, не снимок продукта",
+    },
+    quokkaq: {
+      label: "QuokkaQ — иллюстрация концепции продуктового интерфейса",
+      disclosure: "иллюстрация / концепция, не снимок продукта",
+    },
+  },
+  en: {
+    markiro: {
+      label: "Markiro — product interface concept illustration",
+      disclosure: "illustration / concept, not a product capture",
+    },
+    idento: {
+      label: "Idento — product interface concept illustration",
+      disclosure: "illustration / concept, not a product capture",
+    },
+    quokkaq: {
+      label: "QuokkaQ — product interface concept illustration",
+      disclosure: "illustration / concept, not a product capture",
+    },
+  },
+} as const;
+
+const figureContractProblems = (document: HtmlNode, locale: PageLocale) => {
+  const problems: string[] = [];
+  const articles = elements(document, (node) =>
+    node.tagName === "article" && Boolean(attr(node, "data-case"))
+  );
+  for (const article of articles) {
+    const caseId = attr(article, "data-case") as keyof typeof figureContracts[PageLocale];
+    const expected = figureContracts[locale][caseId];
+    if (!expected) continue;
+    const figure = descendants(article, "figure")[0];
+    if (!figure || attr(figure, "aria-label") !== expected.label) {
+      problems.push(`${caseId}: accessible figure label is not exact`);
+    }
+    const caption = figure && descendants(figure, "figcaption")[0];
+    const captionSpans = caption ? descendants(caption, "span") : [];
+    const disclosureNode = captionSpans.at(-1) ?? caption;
+    if (
+      !disclosureNode ||
+      attr(disclosureNode, "aria-hidden") === "true" ||
+      attr(disclosureNode, "hidden") !== undefined ||
+      text(disclosureNode) !== expected.disclosure
+    ) {
+      problems.push(`${caseId}: visible disclosure is not exact`);
+    }
+  }
+  return problems;
+};
+
+const browsingContextProblems = (document: HtmlNode, locale: PageLocale) => {
+  const disclosure = pages.find((page) => page.locale === locale)?.newTabDisclosure ?? "";
+  const problems: string[] = [];
+  for (const link of elements(document, (node) => node.tagName === "a" && attr(node, "target") !== undefined)) {
+    const target = attr(link, "target") ?? "";
+    const targetKeyword = target.toLowerCase();
+    const visiblePurpose = accessibleText(link);
+    const identifier = visiblePurpose || attr(link, "href") || "unnamed link";
+    if (targetKeyword === "_self") continue;
+    if (targetKeyword !== "_blank") {
+      problems.push(`${identifier}: target ${target || "(empty)"} opens an unsupported browsing context`);
+      continue;
+    }
+
+    const relTokens = (attr(link, "rel") ?? "").split(/\s+/).filter(Boolean).sort();
+    if (relTokens.join(" ") !== "noopener noreferrer") {
+      problems.push(`${identifier}: new-tab rel must be exactly noopener noreferrer`);
+    }
+    const label = (attr(link, "aria-label") || visiblePurpose).trim();
+    if (!label.toLocaleLowerCase(locale).includes(disclosure.toLocaleLowerCase(locale))) {
+      problems.push(`${identifier}: new-tab label lacks localized disclosure`);
+      continue;
+    }
+    const purpose = label.toLocaleLowerCase(locale)
+      .replace(disclosure.toLocaleLowerCase(locale), "")
+      .replace(/[\s()[\].,:;—–-]+/g, "")
+      .trim();
+    const visibleTokens = visiblePurpose.toLocaleLowerCase(locale)
+      .match(/[\p{L}\p{N}]+/gu)
+      ?.filter((token) => token.length >= 3) ?? [];
+    const normalizedLabel = label.toLocaleLowerCase(locale);
+    if (!purpose || (visibleTokens.length > 0 && !visibleTokens.some((token) => normalizedLabel.includes(token)))) {
+      problems.push(`${identifier}: new-tab label does not include its purpose`);
+    }
+  }
+  return problems;
+};
+
+describe("negative structural guard fixtures", () => {
+  it("catches unresolved and ambiguous fragments outside the header", () => {
+    const document = documentFor(`
+      <header><a href="#work">Work</a></header>
+      <main><a href="#missing">Missing CTA</a><a href="#duplicate">Ambiguous CTA</a></main>
+      <section id="work"></section><div id="duplicate"></div><div id="duplicate"></div>
+    `);
+
+    expect(sameDocumentFragmentProblems(document, "/")).toEqual([
+      "#missing: missing target",
+      "#duplicate: ambiguous target (2 matches)",
+    ]);
+  });
+
+  it("catches a wrong case name and an extended disclosure substring", () => {
+    const document = documentFor(`
+      <article data-case="markiro">
+        <figure aria-label="Wrong product — product interface concept illustration">
+          <figcaption><span>markiro · v-b.tech</span><span>illustration / concept, not a product capture eventually</span></figcaption>
+        </figure>
+      </article>
+    `);
+
+    expect(figureContractProblems(document, "en")).toEqual([
+      "markiro: accessible figure label is not exact",
+      "markiro: visible disclosure is not exact",
+    ]);
+  });
+
+  it("catches named targets and disclosure-only blank-link labels", () => {
+    const document = documentFor(`
+      <a href="/report" target="report-window">Download report</a>
+      <a href="https://example.com/contact" target="_blank" rel="noopener noreferrer" aria-label="opens in a new tab">Contact team</a>
+    `);
+
+    expect(browsingContextProblems(document, "en")).toEqual([
+      "Download report: target report-window opens an unsupported browsing context",
+      "Contact team: new-tab label does not include its purpose",
+    ]);
+  });
+
+  it("finds fetch-like link relations, CSS imports, and SVG filter/image loads", () => {
+    const document = documentFor(`
+      <link rel="preconnect" href="https://cdn.example.com">
+      <link rel="dns-prefetch" href="//dns.example.com">
+      <link rel="prefetch" href="https://cdn.example.com/future.js">
+      <link rel="preload" as="image" imagesrcset="https://cdn.example.com/hero.png 1x, https://cdn.example.com/hero@2x.png 2x">
+      <svg>
+        <feImage href="https://cdn.example.com/filter.png"></feImage>
+        <image xlink:href="https://cdn.example.com/image.png"></image>
+        <script xlink:href="https://cdn.example.com/graphic.js"></script>
+      </svg>
+    `);
+
+    expect(assetUrls(document)).toEqual([
+      "https://cdn.example.com",
+      "//dns.example.com",
+      "https://cdn.example.com/future.js",
+      "https://cdn.example.com/hero.png",
+      "https://cdn.example.com/hero@2x.png",
+      "https://cdn.example.com/filter.png",
+      "https://cdn.example.com/image.png",
+      "https://cdn.example.com/graphic.js",
+    ]);
+    expect(cssAssetUrls(`
+      @import "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans";
+      .remote { background-image: url(https://cdn.example.com/background.png); }
+    `)).toEqual([
+      "https://cdn.example.com/background.png",
+      "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans",
+    ]);
+  });
+});
+
 describe("production landing structure", () => {
-  it.each(pages)("renders semantic cases and localized illustration disclosure in $locale", async ({ file, locale, illustration }) => {
+  it.each(pages)("renders semantic cases and exact localized illustration disclosure in $locale", async ({ file, locale }) => {
     const document = documentFor(await readBuilt(file));
     const main = descendants(document, "main");
     const h1 = descendants(document, "h1");
@@ -205,25 +448,20 @@ describe("production landing structure", () => {
       expect(text(elements(article, (node) => attr(node, "class") === "case-meta")[0])).toContain(caseNumbers[index]);
 
       const figure = descendants(article, "figure")[0];
-      const figureLabel = attr(figure, "aria-label");
-      const caption = descendants(figure, "figcaption")[0];
+      expect(figure).toBeDefined();
+      if (!figure) return;
       expect(attr(figure, "data-illustration")).toBe(caseIds[index]);
-      expect(figureLabel).toMatch(locale === "ru" ? /иллюстрация концепции продуктового интерфейса/ : /product interface concept illustration/);
-      expect(text(caption)).toContain(illustration);
     });
+    expect(figureContractProblems(document, locale)).toEqual([]);
   });
 
-  it.each(pages)("resolves header fragments and keeps a logical heading hierarchy in $locale", async ({ file }) => {
+  it.each(pages)("resolves every same-document fragment and keeps a logical heading hierarchy in $locale", async ({ file, pathname }) => {
     const document = documentFor(await readBuilt(file));
     const ids = elements(document).map((node) => attr(node, "id")).filter(Boolean) as string[];
-    const header = descendants(document, "header")[0];
-    const fragments = descendants(header, "a")
-      .map((node) => attr(node, "href"))
-      .filter((href): href is string => Boolean(href?.startsWith("#")));
 
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of sectionIds) expect(elementById(document, id)?.tagName).toBe("section");
-    for (const fragment of fragments) expect(elementById(document, fragment.slice(1))).toBeDefined();
+    expect(sameDocumentFragmentProblems(document, pathname)).toEqual([]);
 
     const main = descendants(document, "main")[0];
     const levels = elements(main, (node) => /^h[1-6]$/.test(node.tagName ?? ""))
@@ -241,25 +479,24 @@ describe("production landing structure", () => {
   });
 
   it.each(pages)("rejects remote URL-bearing assets without confusing metadata or navigation in $locale", async ({ file }) => {
-    const document = documentFor(await readBuilt(file));
-    const urls = assetUrls(document);
+    const html = await readBuilt(file);
+    const document = documentFor(html);
+    const css = await readBuiltCss();
+    const urls = [...assetUrls(document), ...cssAssetUrls(css)];
 
     expect(urls.filter((url) => /^(?:https?:)?\/\//i.test(url))).toEqual([]);
+    expect(`${html}\n${css}`).not.toMatch(/fonts\.(?:googleapis|gstatic)\.com/i);
     for (const asset of urls.filter((url) => url.startsWith("/assets/") && url.endsWith(".svg"))) {
       await expect(access(new URL(`../dist${asset}`, import.meta.url))).resolves.toBeUndefined();
     }
   });
 
-  it.each(pages)("pairs every new-tab link with safe rel tokens and localized disclosure in $locale", async ({ file, newTab }) => {
+  it.each(pages)("guards every browsing context and requires a complete safe new-tab label in $locale", async ({ file, locale, newTabLabel }) => {
     const document = documentFor(await readBuilt(file));
     const blankLinks = elements(document, (node) => node.tagName === "a" && attr(node, "target") === "_blank");
 
-    expect(blankLinks.length).toBeGreaterThan(0);
-    for (const link of blankLinks) {
-      const rel = new Set((attr(link, "rel") ?? "").split(/\s+/));
-      expect(rel).toEqual(new Set(["noopener", "noreferrer"]));
-      expect(attr(link, "aria-label")).toMatch(newTab);
-    }
+    expect(browsingContextProblems(document, locale)).toEqual([]);
+    expect(blankLinks.map((link) => attr(link, "aria-label"))).toEqual([newTabLabel]);
 
     const casesAndManifest = elements(document, (node) =>
       node.tagName === "a" && Boolean(attr(node, "href")?.startsWith("https://")) && !attr(node, "href")?.includes("t.me/"),
