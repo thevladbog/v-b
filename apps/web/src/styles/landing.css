@@ -224,10 +224,15 @@ body {
 .site-navigation .header-contact:focus-visible { border-color: var(--color-signal); background: var(--landing-signal-wash); }
 
 .locale-links { gap: 0.35rem; color: var(--color-muted); font: 500 0.7rem var(--font-mono); }
+.locale-links a {
+  min-width: 2.75rem;
+  justify-content: center;
+}
 .locale-links a[aria-current="page"] { color: var(--color-focus); }
 
 .theme-control { gap: 0.2rem; }
 .theme-control button {
+  min-width: 2.75rem;
   min-height: 2.75rem;
   padding: 0.35rem 0.5rem;
   border: 1px solid transparent;
