@@ -87,6 +87,28 @@ const cssDeclaration = (css: string, selector: string, property: string) => {
   return undefined;
 };
 
+const cssBlocks = (css: string, opening: RegExp) => {
+  const matcher = new RegExp(opening.source, opening.flags.includes("g") ? opening.flags : `${opening.flags}g`);
+  const blocks: string[] = [];
+
+  for (const match of css.matchAll(matcher)) {
+    const openBrace = css.indexOf("{", match.index);
+    if (openBrace === -1) continue;
+
+    let depth = 0;
+    for (let index = openBrace; index < css.length; index += 1) {
+      if (css[index] === "{") depth += 1;
+      if (css[index] !== "}") continue;
+      depth -= 1;
+      if (depth !== 0) continue;
+      blocks.push(css.slice(openBrace + 1, index));
+      break;
+    }
+  }
+
+  return blocks;
+};
+
 describe("disabled contact shell", () => {
   it.each(pages)("renders the bounded accessible form in $file", async (page) => {
     const html = await readBuilt(page.file);
@@ -145,6 +167,21 @@ describe("disabled contact shell", () => {
 
     const legalLinks = elements(form, (node) => node.tagName === "a").map((node) => attr(node, "href"));
     expect(legalLinks).toEqual([page.policyHref, page.consentHref]);
+    const consentLinks = elements(form, (node) =>
+      node.tagName === "a" && attr(node, "data-contact-consent-link") !== undefined,
+    );
+    expect(consentLinks.map((node) => attr(node, "data-contact-consent-link"))).toEqual([
+      "policy",
+      "consent",
+    ]);
+    expect(consentLinks.map((node) => attr(node, "href"))).toEqual([
+      page.policyHref,
+      page.consentHref,
+    ]);
+    for (const link of consentLinks) {
+      expect(attr(link, "class")?.split(/\s+/)).toContain("contact-consent-action");
+      expect(attr(link, "role")).toBeUndefined();
+    }
     const consentIdentity = elements(form, (node) =>
       attr(node, "data-contact-consent-identity") !== undefined,
     );
@@ -214,5 +251,21 @@ describe("progressive site navigation shell", () => {
     expect(attr(navigation, "data-site-navigation")).toBe("");
     expect(attr(navigation, "hidden")).toBeUndefined();
     expect(elements(navigation, (node) => node.tagName === "a")).toHaveLength(5);
+  });
+});
+
+describe("contact consent touch targets", () => {
+  it("gives each mobile legal link an authored 44px text-link action", async () => {
+    const css = await readBuiltCss();
+    const mobileCss = cssBlocks(
+      css,
+      /@media\s*\((?:max-width:\s*40rem|width\s*<=\s*40rem)\)/,
+    ).find((block) => block.includes(".contact-consent-action"));
+
+    expect(mobileCss).toBeDefined();
+    expect(cssDeclaration(mobileCss!, ".contact-consent-action", "display")).toBe("inline-flex");
+    expect(cssDeclaration(mobileCss!, ".contact-consent-action", "align-items")).toBe("center");
+    expect(cssDeclaration(mobileCss!, ".contact-consent-action", "min-height")).toBe("2.75rem");
+    expect(cssDeclaration(mobileCss!, ".contact-consent-action", "vertical-align")).toBe("middle");
   });
 });

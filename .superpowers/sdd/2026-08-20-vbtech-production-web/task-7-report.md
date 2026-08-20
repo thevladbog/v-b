@@ -123,3 +123,31 @@ This appendix supersedes the earlier statement that valid submitted DOM values a
 - `git diff --check`: exit 0 before report staging.
 
 Task 8 manual browser, screen-reader, axe, zoom, high-contrast, and viewport acceptance remains unrun and unchanged.
+
+## Final whole-branch review fix wave 2 — 2026-08-21
+
+### Finding addressed
+
+- The two consent/policy anchors now have the shared `contact-consent-action` class plus distinct `data-contact-consent-link="policy"` and `"consent"` markers. They remain native anchors with separate localized targets and no button role.
+- Inside the existing `max-width: 40rem` landing breakpoint, each action is `inline-flex`, vertically centered, and has `min-height: 2.75rem` (44px at the root 16px size). The mobile-only rule preserves ordinary inline text-link layout and wrapping on wider screens; it adds no button chrome or misleading widget semantics.
+- The explicit Astro whitespace nodes around both anchors remain in place. Generated RU/EN tests still compare the complete contiguous consent sentence, so link styling cannot silently concatenate adjacent words.
+- The disabled fieldset and submit button, active legal links, direct Telegram/email contacts, draft wording, separate localized URLs, and no-contact-network boundary are unchanged.
+
+### TDD evidence
+
+- RED: `CI=true corepack pnpm --filter @vbtech/web test -- contact-shell.test.ts` exited 1 with 3 failures while 142 tests passed. Both localized generated pages returned no `data-contact-consent-link` nodes (`[]` versus `["policy", "consent"]`), and generated CSS had no `.contact-consent-action` `display` declaration (`undefined` versus `inline-flex`).
+- GREEN: after the markup and mobile CSS change, the same command exited 0 with 11 files / 145 tests.
+- The generated-CSS assertion was then tightened to inspect the `40rem` media block specifically. Its first run exposed that the helper selected the first of several generated mobile blocks (1 failure / 144 passing), not a product defect; the helper now enumerates matching media blocks and selects the block containing the contact selector. The final focused run again passed 11 files / 145 tests.
+
+### Final-wave gates and emitted-artifact inspection
+
+- Content unit: `CI=true corepack pnpm --filter @vbtech/content test` — exit 0; 1 file / 5 tests.
+- Web unit/generated output: `CI=true corepack pnpm --filter @vbtech/web test -- contact-shell.test.ts` — exit 0; 11 files / 145 tests (the package script builds and runs the complete web Vitest suite).
+- Content typecheck: `CI=true corepack pnpm --filter @vbtech/content typecheck` — exit 0.
+- Web typecheck: `CI=true corepack pnpm --filter @vbtech/web typecheck` — exit 0; 39 files, 0 errors, 0 warnings, 0 hints.
+- Default web build: `CI=true corepack pnpm --filter @vbtech/web build` — exit 0; 9 page outputs reported.
+- Expected enabled-submission build: `CI=true PUBLIC_CONTACT_SUBMISSION_ENABLED=true corepack pnpm --filter @vbtech/web build` — expected exit 1 with `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled`. A fresh default build immediately afterward exited 0.
+- Generated RU HTML contains policy `/privacy/` and consent `/personal-data-consent/`; generated EN HTML contains `/en/privacy/` and `/en/personal-data-consent/`. Each anchor has its distinct data marker and the shared action class; unit inspection confirms no `role` override and exact contiguous localized sentences.
+- Generated CSS inspection found `.contact-consent-action{...min-height:2.75rem;display:inline-flex}` inside the emitted `width<=40rem` block.
+- Generated HTML/JavaScript search found no `fetch(`, `XMLHttpRequest`, `sendBeacon(`, SmartCaptcha, Yandex captcha, or reCAPTCHA identifier (expected `rg` exit 1/no matches).
+- `git diff --check` — exit 0 before report staging. No file under `tools/browser` was edited, and browser measurement remains assigned to Task 8 as requested.

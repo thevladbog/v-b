@@ -93,9 +93,17 @@ const disabled = !readiness.submissionEnabled;
           />
           <span>
             {content.consentBeforePolicy}{" "}
-            <a href={localizedPath(locale, "privacy-policy")}>{content.policyLinkLabel}</a>
+            <a
+              class="contact-consent-action"
+              data-contact-consent-link="policy"
+              href={localizedPath(locale, "privacy-policy")}
+            >{content.policyLinkLabel}</a>
             {" "}{content.consentBetweenLinks}{" "}
-            <a href={localizedPath(locale, "personal-data-consent")}>{content.consentLinkLabel}</a>{content.consentAfterLinks}
+            <a
+              class="contact-consent-action"
+              data-contact-consent-link="consent"
+              href={localizedPath(locale, "personal-data-consent")}
+            >{content.consentLinkLabel}</a>{content.consentAfterLinks}
           </span>
         </label>
         <p id="contact-consent-instruction">

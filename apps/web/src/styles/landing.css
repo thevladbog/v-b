@@ -440,6 +440,12 @@
   .contact-links { grid-template-columns: 1fr; }
   .contact-links a { border-right: 0; border-bottom: 1px solid var(--color-border); }
   .contact-links a:last-child { border-bottom: 0; }
+  .contact-consent-action {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    vertical-align: middle;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
