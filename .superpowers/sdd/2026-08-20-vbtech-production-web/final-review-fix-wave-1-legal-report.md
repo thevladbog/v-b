@@ -102,3 +102,69 @@ The generated legal output was restored with a normal build after the deliberate
 - There is no active legal document. `CURRENT_CONTACT_CONSENT_ID` remains `VBT-PD-02/DRAFT` and enabled submission still fails the build.
 - All six legal routes remain visibly labeled drafts and emit `noindex,nofollow`.
 - No legal approval, effective date, publication, deployment, or form activation is claimed. Owner/legal/provider review and production-flow verification remain required before activation.
+
+## Final whole-branch review fix wave 2/5 — Task 6 provenance portability
+
+### Commit contract and scope
+
+- Base SHA: `c9aea4af13e31ee38771f40006e5756dc9d8d325`.
+- Exact commit subject: `fix: make legal provenance portable`.
+- Final commit SHA is supplied in the controller handoff because the commit cannot contain its own stable SHA.
+- Scope is limited to Task 6 source-review provenance and its legal/generated-output contracts. Legal copy, release lifecycle/current derivation, browser tests, backend, deployment, and form enablement were not changed.
+
+### Finding and correction
+
+`LEGAL_SOURCE_REVIEW.operatorSource` embedded the original developer checkout path, `/Users/thevladbog/PRSOME/q/packages/legal-documents/src/operator.ts`. That path was machine-specific and exposed a home-directory prefix through exported production metadata.
+
+It is replaced by the neutral, stable evidence identifier `operator-snapshot:operator-vbtech-2026-08-20`. This retains traceability to the exact approved operator snapshot without claiming a local filesystem location or exposing a developer identity/path.
+
+The legal registry contract now pins that evidence identifier and rejects macOS, Linux, or Windows developer-home prefixes anywhere in the serialized source-review metadata. The web generated-output contract recursively reads every text/client artifact in `dist` (`css`, `html`, `js`, `json`, `mjs`, `svg`, `txt`, and `xml`) and rejects the same prefixes. A separate production-source/output scan covers `packages/legal-documents/src`, `apps/web/src`, and `apps/web/dist` while excluding tests and source maps.
+
+### TDD evidence
+
+RED, before changing production metadata:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  1 failed | 1 passed (2)
+Tests       1 failed | 36 passed (37)
+Expected    operator-snapshot:operator-vbtech-2026-08-20
+Received    /Users/thevladbog/PRSOME/q/packages/legal-documents/src/operator.ts
+Exit status 1
+```
+
+GREEN, after the one-line metadata correction:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  2 passed (2)
+Tests       37 passed (37)
+
+CI=true corepack pnpm --filter @vbtech/web test -- legal-pages.test.ts
+Build        9 static pages
+Test Files   11 passed (11)
+Tests        146 passed (146)
+```
+
+The web package test script builds first and runs the full web unit suite even with the focused filename argument.
+
+### Verification gates
+
+| Gate | Result |
+| --- | --- |
+| Legal tests | PASS — 2 files, 37 tests |
+| Legal typecheck | PASS |
+| Web legal regression/full package test | PASS — 11 files, 146 tests |
+| Web typecheck | PASS — 39 files, 0 errors, 0 warnings, 0 hints |
+| Default web build | PASS — 9 static pages plus text/XML endpoints |
+| Production legal/client path scan | PASS — no macOS, Linux, or Windows developer-home prefix |
+| `PUBLIC_CONTACT_SUBMISSION_ENABLED=true` web build | EXPECTED FAIL — exit 1, `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled` |
+| Normal build after deliberate failure | PASS — complete 9-page output restored |
+| `git diff --check` | PASS |
+
+### Legal and activation boundary
+
+- `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with `revision: null` and `effectiveDate: null`.
+- There is still no active legal document; `VBT-PD-02/DRAFT` remains unpublishable and unacceptable for enabled submission.
+- All six legal routes remain draft-only and `noindex,nofollow` under their existing generated-page contract.
+- No legal wording, approval, publication, deployment, backend behavior, browser test, or form activation changed in this fix.

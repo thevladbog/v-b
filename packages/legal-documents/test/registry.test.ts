@@ -49,6 +49,8 @@ type MutableLegalDocumentSource = Mutable<LegalDocumentSource>;
 const cloneDocuments = (): MutableLegalDocumentSource[] =>
   structuredClone(LEGAL_DOCUMENTS) as unknown as MutableLegalDocumentSource[];
 
+const DEVELOPER_HOME_PATH = /(?:\/Users\/[^/]+|\/home\/[^/]+|[A-Z]:\\Users\\[^\\]+)/i;
+
 const retainedPolicyHistory = () => {
   const superseded: LegalDocumentRelease = {
     code: "VBT-PD-01",
@@ -143,6 +145,10 @@ describe("draft legal document registry", () => {
 
   it("records repeatable source review and owner-confirmation gates", () => {
     expect(LEGAL_SOURCE_REVIEW.reviewedOn).toBe("2026-08-20");
+    expect(LEGAL_SOURCE_REVIEW.operatorSource).toBe(
+      "operator-snapshot:operator-vbtech-2026-08-20",
+    );
+    expect(JSON.stringify(LEGAL_SOURCE_REVIEW)).not.toMatch(DEVELOPER_HOME_PATH);
     expect(LEGAL_SOURCE_REVIEW.sources).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ url: expect.stringContaining("ips.pravo.gov.ru") }),

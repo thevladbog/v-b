@@ -14,7 +14,7 @@ import type {
 
 export const LEGAL_SOURCE_REVIEW = {
   reviewedOn: "2026-08-20",
-  operatorSource: "/Users/thevladbog/PRSOME/q/packages/legal-documents/src/operator.ts",
+  operatorSource: "operator-snapshot:operator-vbtech-2026-08-20",
   sources: [
     {
       label: "Official legal-information system, Federal Law No. 152-FZ",

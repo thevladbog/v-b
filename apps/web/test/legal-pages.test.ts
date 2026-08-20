@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { parse } from "parse5";
 import { describe, expect, it } from "vitest";
 import {
@@ -114,6 +114,20 @@ const linkedStyles = async (html: string) => {
   };
 };
 
+const DEVELOPER_HOME_PATH = /(?:\/Users\/[^/]+|\/home\/[^/]+|[A-Z]:\\Users\\[^\\]+)/i;
+const TEXT_OUTPUT_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".mjs", ".svg", ".txt", ".xml"]);
+
+const listTextOutputFiles = async (directory: URL): Promise<URL[]> => {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(entries.map(async (entry) => {
+    const target = new URL(entry.name + (entry.isDirectory() ? "/" : ""), directory);
+    if (entry.isDirectory()) return listTextOutputFiles(target);
+    const extension = entry.name.slice(entry.name.lastIndexOf("."));
+    return TEXT_OUTPUT_EXTENSIONS.has(extension) ? [target] : [];
+  }));
+  return files.flat();
+};
+
 const fixtureContract: LegalPageContract = {
   locale: "ru",
   route: "/legal/",
@@ -150,6 +164,14 @@ describe("draft legal pages", () => {
     expect(generatedRoutes).toEqual(pages.map(({ route }) => route).sort());
     expect(generatedRoutes).not.toContain("/");
     expect(generatedRoutes).not.toContain("/en/");
+  });
+
+  it("keeps generated text and client output free of developer-home absolute paths", async () => {
+    const files = await listTextOutputFiles(new URL("../dist/", import.meta.url));
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      expect(await readFile(file, "utf8"), file.pathname).not.toMatch(DEVELOPER_HOME_PATH);
+    }
   });
 
   it.each(pages)("renders metadata and draft boundary for $route", async (page) => {
