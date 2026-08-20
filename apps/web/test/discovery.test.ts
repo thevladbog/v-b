@@ -4,10 +4,26 @@ import { describe, expect, it } from "vitest";
 import {
   DRAFT_LEGAL_ROUTES,
   PUBLIC_ROUTES,
+  REACHABLE_HTML_ROUTES,
 } from "../src/lib/route-inventory.js";
 import { serializeLlmsText } from "../src/lib/llms.js";
 
 const readText = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
+const readBytes = (path: string) => readFile(new URL(`../${path}`, import.meta.url));
+const charsetDeclaration = Buffer.from('<meta charset="utf-8">', "utf8");
+
+const artifactPath = (route: string): string =>
+  route === "/404.html" ? "dist/404.html" : `dist${route}index.html`;
+
+const charsetDeclarationOffsets = (html: Buffer): number[] => {
+  const offsets: number[] = [];
+  let offset = html.indexOf(charsetDeclaration);
+  while (offset !== -1) {
+    offsets.push(offset);
+    offset = html.indexOf(charsetDeclaration, offset + charsetDeclaration.byteLength);
+  }
+  return offsets;
+};
 
 interface HtmlNode {
   nodeName: string;
@@ -101,6 +117,29 @@ describe("public route inventory", () => {
     expect(DRAFT_LEGAL_ROUTES).toEqual(expectedDraftLegalRoutes);
     expect(PUBLIC_ROUTES).not.toContain("/privacy/");
     expect(PUBLIC_ROUTES).not.toContain("/en/privacy/");
+  });
+});
+
+describe("generated HTML artifacts", () => {
+  it.each([...REACHABLE_HTML_ROUTES, "/404.html"])(
+    "declares one complete UTF-8 charset within the first 1024 bytes for %s",
+    async (route) => {
+      const html = await readBytes(artifactPath(route));
+      const offsets = charsetDeclarationOffsets(html);
+
+      expect(offsets).toHaveLength(1);
+      expect(offsets[0]! + charsetDeclaration.byteLength).toBeLessThanOrEqual(1024);
+    },
+  );
+
+  it("measures the charset boundary in UTF-8 bytes rather than JavaScript characters", () => {
+    const prefix = "я".repeat(510);
+    const fixture = Buffer.from(`${prefix}<meta charset="utf-8">`, "utf8");
+    const characterEnd = prefix.length + '<meta charset="utf-8">'.length;
+    const [byteOffset] = charsetDeclarationOffsets(fixture);
+
+    expect(characterEnd).toBeLessThanOrEqual(1024);
+    expect(byteOffset! + charsetDeclaration.byteLength).toBeGreaterThan(1024);
   });
 });
 

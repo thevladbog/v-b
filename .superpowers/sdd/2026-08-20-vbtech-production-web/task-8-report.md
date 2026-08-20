@@ -248,3 +248,32 @@ CI=true corepack pnpm --dir tools/browser test --project='Pixel 7' --grep 'suppo
 ```
 
 No dependency, manifest, lockfile, backend, captcha, deployment, DNS, form enablement, legal-copy, or lifecycle change is included. Manual screen-reader acceptance remains unrun and is not implied by the DOM-language checks or axe.
+
+## Wave 2 browser fix round 1/5 — early charset declaration
+
+Every generated HTML artifact now receives its sole UTF-8 charset declaration directly from `BaseLayout`, before theme color, the no-flash theme bootstrap, preload markup, and SEO content. `SeoHead` no longer emits a later duplicate. The one-theme-color contract, bootstrap-before-styles ordering, canonical/alternate behavior, and 404 metadata behavior remain unchanged.
+
+The generated regression contract covers `/`, `/en/`, all six reachable draft legal routes, and `/404.html`. It reads raw buffers, finds the exact declaration bytes, requires exactly one occurrence, and requires the complete declaration to end no later than byte 1024. A multibyte Cyrillic fixture proves the contract uses UTF-8 byte offsets rather than JavaScript character positions.
+
+Focused RED reproduced all nine failures: RU routes and 404 ended the declaration at byte 1148; EN routes ended it at byte 1029. Focused GREEN rebuilds all artifacts with exactly one declaration beginning at byte 37 and ending at byte 59 on every route.
+
+Final verification:
+
+| Gate | Result |
+| --- | --- |
+| Web generated/unit gate | PASS — 156/156 |
+| Focused theme/404 browser gate | PASS — 10/10 across Desktop Chrome and Pixel 7 |
+| Focused theme/404 `--repeat-each=3` | PASS — 30/30, zero retries |
+| `CI=true corepack pnpm lint` | PASS — 2 applicable tasks; 0 Astro diagnostics |
+| `CI=true corepack pnpm typecheck` | PASS — 4 workspace tasks |
+| `CI=true corepack pnpm test` | PASS — content 5/5, legal 88/88, web 156/156; Playwright 95 passed / 11 expected Desktop skips |
+| `CI=true corepack pnpm build` | PASS — 9 HTML pages plus three discovery artifacts |
+| `git diff --check` | PASS |
+
+The critical repeat command was:
+
+```text
+CI=true corepack pnpm --dir tools/browser test --grep 'supports light, dark|bootstraps and maintains|/404.html passes core browser acceptance' --repeat-each=3
+```
+
+No dependency, manifest, lockfile, backend, captcha, deployment, DNS, form-enablement, legal-copy, theme lifecycle, or canonical-policy change is included.

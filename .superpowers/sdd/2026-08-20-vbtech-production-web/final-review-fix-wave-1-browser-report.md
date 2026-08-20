@@ -136,3 +136,29 @@ CI=true corepack pnpm --dir tools/browser test --project='Pixel 7' --grep 'suppo
 ```
 
 No dependency, lockfile, backend, captcha, deployment, DNS, form-enablement, legal-copy, or lifecycle change is part of this wave. Manual screen-reader acceptance remains unrun.
+
+## Wave 2 browser follow-up — charset within the first 1024 UTF-8 bytes
+
+The expanded no-flash theme bootstrap had pushed the complete `<meta charset="utf-8">` declaration beyond HTML's first-1024-byte boundary. The source of the ordering was ownership: `SeoHead` emitted charset only after `BaseLayout`'s theme bootstrap and font preloads. Charset now belongs to the document layout and is the first element in `<head>`; the later SEO copy is removed.
+
+The all-nine generated-artifact contract operates on `Buffer` values and requires exactly one complete declaration ending within byte 1024. Its Cyrillic negative fixture demonstrates that a character-index implementation would incorrectly accept a declaration whose UTF-8 byte end is beyond the boundary.
+
+RED and GREEN evidence:
+
+- RED — 9/9 artifact cases failed: RU/404 byte end 1148, EN byte end 1029;
+- GREEN — all nine artifacts contain one declaration at byte range `[37, 59)`;
+- focused theme/404 browser coverage — 10/10;
+- affected Desktop Chrome and Pixel 7 repeat — 30/30 with `--repeat-each=3`.
+
+Final gates:
+
+| Gate | Result |
+| --- | --- |
+| Web generated/unit | PASS — 156/156 |
+| `CI=true corepack pnpm lint` | PASS — 2 applicable tasks; 0 Astro diagnostics |
+| `CI=true corepack pnpm typecheck` | PASS — 4 workspace tasks |
+| `CI=true corepack pnpm test` | PASS — content 5/5, legal 88/88, web 156/156; Playwright 95 passed / 11 expected Desktop skips |
+| `CI=true corepack pnpm build` | PASS — 9 HTML pages plus three discovery artifacts |
+| `git diff --check` | PASS |
+
+Theme-color remains singular and resolved by the existing bootstrap/runtime contract; SEO canonical/alternate and 404 omission behavior are unchanged. No dependency, lockfile, backend, deployment, DNS, form-enablement, legal-copy, or lifecycle change is included.
