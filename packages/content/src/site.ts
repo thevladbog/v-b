@@ -9,6 +9,8 @@ export const LOCALE_PATHS: Readonly<Record<Locale, "/" | "/en/">> = {
 
 type CaseId = CaseStudy["id"];
 type CaseEditorial = Omit<CaseStudy, "href" | "id" | "name" | "status" | "tags">;
+type ProjectId = Project["id"];
+type ProjectEditorial = Pick<Project, "description" | "status">;
 
 const CASE_FACTS: Readonly<
   Record<CaseId, Pick<CaseStudy, "href" | "id" | "name" | "status" | "tags">>
@@ -120,15 +122,50 @@ const EN_APPROACH: readonly ContentItem[] = [
   { number: "05", title: "Iterate", description: "Connect production signals back to the product model and priorities." },
 ];
 
-const RU_PROJECTS: readonly Project[] = [
-  { id: "sys-004", name: "Scanio", description: "Диагностика COM/HID-сканеров для Windows", status: "beta", href: "https://github.com/thevladbog/scanio" },
-  { id: "sys-005", name: "Mercadia.POS", description: "Store-edge POS и hardware-agent", status: "concept", href: "https://github.com/thevladbog/mercadia.pos" },
-];
+const PROJECT_FACTS: Readonly<
+  Record<ProjectId, Pick<Project, "href" | "id" | "name">>
+> = {
+  "sys-004": {
+    id: "sys-004",
+    name: "Scanio",
+    href: "https://github.com/thevladbog/scanio",
+  },
+  "sys-005": {
+    id: "sys-005",
+    name: "Mercadia.POS",
+    href: "https://github.com/thevladbog/mercadia.pos",
+  },
+};
 
-const EN_PROJECTS: readonly Project[] = [
-  { id: "sys-004", name: "Scanio", description: "COM/HID scanner diagnostics for Windows", status: "beta", href: "https://github.com/thevladbog/scanio" },
-  { id: "sys-005", name: "Mercadia.POS", description: "Store-edge POS and hardware agent", status: "concept", href: "https://github.com/thevladbog/mercadia.pos" },
-];
+const projectsFor = (
+  editorial: Readonly<Record<ProjectId, ProjectEditorial>>,
+): readonly Project[] =>
+  (["sys-004", "sys-005"] as const).map((id) => ({
+    ...PROJECT_FACTS[id],
+    ...editorial[id],
+  }));
+
+const RU_PROJECTS = projectsFor({
+  "sys-004": {
+    description: "Диагностика COM/HID-сканеров для Windows",
+    status: "beta",
+  },
+  "sys-005": {
+    description: "Store-edge POS и hardware-agent",
+    status: "concept",
+  },
+});
+
+const EN_PROJECTS = projectsFor({
+  "sys-004": {
+    description: "COM/HID scanner diagnostics for Windows",
+    status: "beta",
+  },
+  "sys-005": {
+    description: "Store-edge POS and hardware agent",
+    status: "concept",
+  },
+});
 
 export const SITE_CONTENT: Readonly<Record<Locale, SiteContent>> = {
   ru: {

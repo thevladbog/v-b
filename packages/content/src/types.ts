@@ -104,7 +104,7 @@ export interface ContentItem {
 }
 
 export interface Project {
-  id: string;
+  id: "sys-004" | "sys-005";
   name: string;
   description: string;
   status: string;
