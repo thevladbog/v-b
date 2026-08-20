@@ -17,8 +17,8 @@ interface Props {
   locale: Locale;
   title: string;
   description: string;
-  canonicalPath: string;
-  alternates: readonly Alternate[];
+  canonicalPath?: string;
+  alternates?: readonly Alternate[];
   localizedRoute?: LocalizedRoute;
   routeKind?: "home" | "secondary";
   noindex?: boolean;
@@ -29,7 +29,7 @@ const {
   title,
   description,
   canonicalPath,
-  alternates,
+  alternates = [],
   localizedRoute = "home",
   routeKind = localizedRoute === "home" ? "home" : "secondary",
   noindex = false,

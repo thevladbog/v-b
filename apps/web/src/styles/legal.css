@@ -116,6 +116,13 @@
   margin: 2rem 0 0;
 }
 
+.legal-back a,
+.legal-register-list h2 a {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+}
+
 .legal-register-list {
   display: grid;
   gap: 1rem;

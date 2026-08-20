@@ -34,4 +34,18 @@ describe("root acceptance gate contract", () => {
       "corepack pnpm run test:unit && corepack pnpm --dir tools/browser test",
     );
   });
+
+  it("keeps the browser core matrix on every HTML route, explicit theme, and WCAG 2.2", async () => {
+    const source = await readFile(
+      new URL("../../../tools/browser/tests/accessibility.spec.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain('const explicitThemes = ["light", "dark"] as const');
+    expect(source).toContain("for (const path of allHtmlRoutes)");
+    expect(source).toContain("for (const theme of explicitThemes)");
+    expect(source).toContain('"wcag22a", "wcag22aa"');
+    expect(source).toContain("assertSharedChromeStyles");
+    expect(source).toContain("assertLocalRequests");
+  });
 });

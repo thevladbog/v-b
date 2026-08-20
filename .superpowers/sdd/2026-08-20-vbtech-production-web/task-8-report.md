@@ -133,3 +133,39 @@ git diff --check
 Here `pnpm test` is the full unit/generated-plus-browser gate. The final explicit Playwright command is an affected-contract repeat, not a substitute for or duplicate full browser gate.
 
 Final review-fix results: lint passed both applicable tasks with 0 Astro diagnostics; typecheck passed all four workspace tasks; the canonical root test passed content 5/5, legal documents 34/34, web 131/131, then Playwright 84 passed with the four expected Desktop copies of Pixel-only checks skipped; build generated all 9 HTML pages and three discovery artifacts; the affected 404 contract repeat passed 6/6 across both projects with no retries; `git diff --check` was clean.
+
+## Final whole-branch review fix wave 1 — browser and 404
+
+The browser gate now parameterizes all nine generated HTML artifacts (`/`, `/en/`, the six draft legal routes, and `/404.html`). Each route runs once in Desktop Chrome and once in Pixel 7; within each independent route/project test, both explicit light and dark states exercise the same core acceptance assertions. This gives 36 route × project × theme executions without creating 36 separately maintained tests.
+
+Every core execution checks one main/H1, no horizontal overflow, visible header, legal primary/recovery, and 404 action targets at a minimum 44 × 44 CSS px, the intended index policy, continuous console/page-error capture, and axe with `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22a`, and `wcag22aa`. Axe has no disabled rules or excluded regions. Captured requests must remain on `http://127.0.0.1:43218` and match only the current document, compiled `/_astro/` assets, committed `/assets/` artwork, or self-hosted `/fonts/`; no external request was observed.
+
+On every legal route and in both themes, the same matrix also verifies computed IBM Plex Sans body typography plus styled sticky header, navigation border, flex locale/theme controls, and styled footer border/background. All six legal routes remain `noindex,nofollow`, while both landing routes remain indexable. Seven Pixel 7 tests cover all six legal routes plus 404 for keyboard skip-link focus, unobscured main focus, keyboard menu opening, Escape closing, and focus return to the toggle. Their Desktop copies are explicitly skipped because the responsive menu is a Pixel-only behavior; the full landing mobile lifecycle remains separately covered.
+
+The generated `404.html` remains bilingual and `noindex,nofollow`, with its RU/EN home and contact recovery actions intact. Because `/404.html` is a fallback artifact rather than a stable content URL, it now omits canonical, hreflang alternate, and `og:url` metadata instead of publishing the nonexistent `https://v-b.tech/404/` URL.
+
+Focused RED evidence:
+
+1. `build-contract.test.ts` failed because the committed browser source lacked the explicit theme matrix, WCAG 2.2 tags, computed legal-chrome assertion, and local-request assertion.
+2. `discovery.test.ts` failed because `dist/404.html` emitted `https://v-b.tech/404/` as canonical and `og:url`, plus RU/EN/x-default alternates.
+3. The first expanded browser matrix passed every legal route/theme/project combination but rejected the three same-origin landing SVGs until `/assets/` was made an explicit local allowlist entry. It also caught axe contrast during the CSS transition between explicit theme states; the test now uses the Web Animations completion promise for primary-button transitions before auditing the settled theme, with no arbitrary delay or rule suppression.
+4. Extending the visible-target assertion to the legal register document actions and document-page recovery action reproduced 28 px-high register links on Desktop Chrome. `legal.css` now gives both patterns an inline-flex 44 px minimum height; the full matrix passes in both themes and projects.
+
+Focused GREEN evidence:
+
+- generated browser-coverage contract: 4/4;
+- discovery artifact contract: 8/8;
+- nine-route, two-project, two-theme core matrix: 18/18 Playwright tests and 36 settled-theme axe executions;
+- legal/404 mobile keyboard focus gate: 7/7 Pixel 7 checks, with 7 expected Desktop responsive-menu skips;
+- critical legal/404 repeat: 21/21 Pixel 7 checks with `--repeat-each=3`, zero retries.
+
+Final gate results for this wave:
+
+- lint: 2/2 applicable workspace tasks, 0 Astro errors/warnings/hints;
+- typecheck: 4/4 workspace tasks;
+- canonical root test: content 5/5, legal documents 37/37, web 144/144, then Playwright 91 passed and 11 expected responsive-project skips;
+- build: 9 HTML pages plus `robots.txt`, `sitemap.xml`, and `llms.txt`;
+- critical repeat: 21/21;
+- `git diff --check`: clean.
+
+No dependency, manifest, or lockfile changed. After concurrent focused commands caused pnpm to recreate `node_modules`, the offline frozen install reported the exact missing store artifact `turbo-2.10.4.tgz`; the approved frozen install restored all 309 packages from the resolved store with 0 downloads and left tracked dependency files unchanged. No backend, captcha, deployment, DNS, form enablement, or legal copy was added or changed. Manual VoiceOver/NVDA/TalkBack acceptance remains unrun and is not implied by axe.

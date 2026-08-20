@@ -327,3 +327,58 @@ for (const localized of [
     expect(undersized, `Undersized important targets:\n${undersized.join("\n")}`).toEqual([]);
   });
 }
+
+for (const route of [
+  ...DRAFT_LEGAL_ROUTES.map((path) => ({
+    path,
+    locale: path.startsWith("/en/") ? "en" : "ru",
+  })),
+  { path: "/404.html", locale: "ru" },
+] as const) {
+  test(`${route.path} mobile chrome supports skip and escape focus recovery`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "Pixel 7", "Mobile keyboard chrome is accepted on Pixel 7");
+    const labels = route.locale === "ru"
+      ? {
+          skip: "Перейти к содержанию",
+          open: "Открыть меню",
+          close: "Закрыть меню",
+          navigation: "Основная навигация",
+        }
+      : {
+          skip: "Skip to content",
+          open: "Open menu",
+          close: "Close menu",
+          navigation: "Primary navigation",
+        };
+
+    await page.goto(route.path);
+    await page.keyboard.press("Tab");
+    const skip = page.getByRole("link", { name: labels.skip });
+    await expect(skip).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    const main = page.getByRole("main");
+    await expect(main).toBeFocused();
+    await expect
+      .poll(async () => {
+        const [mainBox, headerBox] = await Promise.all([
+          main.boundingBox(),
+          page.locator("[data-site-header]").boundingBox(),
+        ]);
+        return mainBox !== null && headerBox !== null && mainBox.y >= headerBox.y + headerBox.height - 1;
+      })
+      .toBe(true);
+
+    const open = page.getByRole("button", { name: labels.open });
+    await open.focus();
+    await page.keyboard.press("Enter");
+    const close = page.getByRole("button", { name: labels.close });
+    const navigation = page.getByRole("navigation", { name: labels.navigation });
+    await expect(close).toHaveAttribute("aria-expanded", "true");
+    await expect(navigation).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(navigation).toBeHidden();
+    await expect(open).toBeFocused();
+  });
+}

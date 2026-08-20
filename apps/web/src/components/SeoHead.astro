@@ -10,15 +10,15 @@ interface Props {
   locale: Locale;
   title: string;
   description: string;
-  canonicalPath: string;
-  alternates: readonly Alternate[];
+  canonicalPath?: string;
+  alternates?: readonly Alternate[];
   noindex?: boolean;
 }
 
 const productionOrigin = "https://v-b.tech";
-const { locale, title, description, canonicalPath, alternates, noindex = false } = Astro.props;
+const { locale, title, description, canonicalPath, alternates = [], noindex = false } = Astro.props;
 const absoluteUrl = (path: string) => new URL(path, productionOrigin).toString();
-const canonicalUrl = absoluteUrl(canonicalPath);
+const canonicalUrl = canonicalPath ? absoluteUrl(canonicalPath) : undefined;
 const person = {
   "@context": "https://schema.org",
   "@type": "Person",
@@ -35,12 +35,12 @@ const alternateOgLocale = locale === "ru" ? "en_US" : "ru_RU";
 <meta name="viewport" content="width=device-width" />
 <meta name="description" content={description} />
 {noindex && <meta name="robots" content="noindex,nofollow" />}
-<link rel="canonical" href={canonicalUrl} />
+{canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
 {alternates.map((alternate) => (
   <link rel="alternate" hreflang={alternate.locale} href={absoluteUrl(alternate.path)} />
 ))}
 <meta property="og:type" content="website" />
-<meta property="og:url" content={canonicalUrl} />
+{canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:locale" content={ogLocale} />

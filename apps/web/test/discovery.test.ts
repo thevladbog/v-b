@@ -130,6 +130,9 @@ Bounded description.
     const html = await readText("dist/404.html");
 
     expect(html).toContain('<meta name="robots" content="noindex,nofollow">');
+    expect(html).not.toContain('<link rel="canonical"');
+    expect(html).not.toContain('<link rel="alternate"');
+    expect(html).not.toContain('<meta property="og:url"');
     expect(html).toContain('href="/"');
     expect(html).toContain('href="/en/"');
     expect(html).toContain('href="/#contact"');
