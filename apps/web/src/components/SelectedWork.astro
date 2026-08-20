@@ -36,7 +36,7 @@ const openProject = locale === "ru" ? "Открыть проект" : "Open proj
       <h3 class="eyebrow" id="more-projects-title">{page.moreProjects.eyebrow}</h3>
       <div class="project-manifest">
         {page.moreProjects.items.map((project) => (
-          <a href={project.href} target="_blank" rel="noopener noreferrer" aria-label={`${openProject}: ${project.name}`}>
+          <a href={project.href} aria-label={`${openProject}: ${project.name}`}>
             <span class="manifest-id">{project.id}</span>
             <strong>{project.name}</strong>
             <span>{project.description}</span>

@@ -45,7 +45,7 @@ button {
 button[aria-pressed="true"] {
   border-color: var(--color-signal);
   background: var(--color-signal);
-  color: var(--color-background);
+  color: var(--color-on-signal);
 }
 
 :focus-visible {
@@ -55,7 +55,7 @@ button[aria-pressed="true"] {
 
 ::selection {
   background: var(--color-signal);
-  color: var(--color-background);
+  color: var(--color-on-signal);
 }
 
 @media (prefers-reduced-motion: reduce) {

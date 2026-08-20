@@ -9,6 +9,9 @@ interface Props {
 
 const { locale, about, contact } = Astro.props;
 const telegramLabel = locale === "ru" ? "Написать Владу в Telegram (откроется в новой вкладке)" : "Message Vlad on Telegram (opens in a new tab)";
+const signatureLabel = locale === "ru"
+  ? "Влад Богатырев — продуктовая инженерия и эксплуатация"
+  : "Vlad Bogatyrev — product engineering and operations";
 ---
 
 <div class="section about-contact">
@@ -18,7 +21,7 @@ const telegramLabel = locale === "ru" ? "Написать Владу в Telegram
       <h2 id="about-title">{about.title}</h2>
       <p>{about.body}</p>
       <p>{about.bodyTwo}</p>
-      <div class="about-signature" aria-label="Vlad Bogatyrev, product engineering operations">
+      <div class="about-signature" aria-label={signatureLabel}>
         <span>Vlad Bogatyrev</span><i aria-hidden="true"></i><small>product / engineering / operations</small>
       </div>
     </section>

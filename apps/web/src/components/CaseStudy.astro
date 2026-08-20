@@ -32,7 +32,7 @@ const assetByCase: Record<CaseStudyContent["id"], string> = {
   idento: "/assets/idento-logo.svg",
   quokkaq: "/assets/quokkaq-mark.svg",
 };
-const caseNumber = String(index + 1).padStart(2, "0");
+const caseNumber = String(index + 1).padStart(3, "0");
 ---
 
 <article class={`case case--${caseStudy.id}`} data-case={caseStudy.id}>
@@ -51,7 +51,7 @@ const caseNumber = String(index + 1).padStart(2, "0");
     <ul class="case-tags" aria-label={locale === "ru" ? "Технологии" : "Technologies"}>
       {caseStudy.tags.map((tag) => <li>{tag}</li>)}
     </ul>
-    <a class="text-link" href={caseStudy.href} target="_blank" rel="noopener noreferrer">
+    <a class="text-link" href={caseStudy.href}>
       {labels.open} <span aria-hidden="true">↗</span>
     </a>
   </div>

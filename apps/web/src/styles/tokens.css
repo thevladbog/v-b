@@ -7,6 +7,7 @@
   --color-border: #cbc5b8;
   --color-focus: #a94f08;
   --color-signal: #d88a14;
+  --color-on-signal: #20201d;
   --color-success: #26734d;
   --color-error: #b6372d;
 }
@@ -20,6 +21,7 @@
   --color-border: #4b5157;
   --color-focus: #f0ae3f;
   --color-signal: #efaa32;
+  --color-on-signal: #20201d;
   --color-success: #67c98c;
   --color-error: #f0857b;
 }
