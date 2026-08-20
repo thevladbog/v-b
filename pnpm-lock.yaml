@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      pnpm:
+        specifier: 11.10.0
+        version: 11.10.0
       turbo:
         specifier: 2.10.4
         version: 2.10.4
@@ -1447,6 +1450,11 @@ packages:
   playwright@1.62.0:
     resolution: {integrity: sha512-Z14dG305dgaLu6foB1TXQagFiW8JfSUIUaUuPaKQ6NtBPKF1P/qXcqfh6c6K/icPqdy37JmjbiBXf6JNg6Sylw==}
     engines: {node: '>=20'}
+    hasBin: true
+
+  pnpm@11.10.0:
+    resolution: {integrity: sha512-C3+LmAYAMZBMAX46QesYehbUDuuCm5XE+MsDaBdh/Eq1PdIZEVubRH9NzhoFohR2RGHn03AzkqnzL5URzoyGyA==}
+    engines: {node: '>=22.13'}
     hasBin: true
 
   postcss@8.5.26:
@@ -3273,6 +3281,8 @@ snapshots:
       playwright-core: 1.62.0
     optionalDependencies:
       fsevents: 2.3.2
+
+  pnpm@11.10.0: {}
 
   postcss@8.5.26:
     dependencies:

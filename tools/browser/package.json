@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "playwright test --config playwright.config.ts",
+    "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit"
   },

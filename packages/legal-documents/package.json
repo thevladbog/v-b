@@ -7,6 +7,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

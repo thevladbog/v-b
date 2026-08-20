@@ -5,6 +5,7 @@
   "scripts": {
     "build": "astro build",
     "test": "astro build && vitest run",
+    "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "astro check",
     "lint": "astro check"
   },
