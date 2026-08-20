@@ -182,6 +182,66 @@ describe("draft legal document registry", () => {
     ).toThrow(/malformed sources array/i);
   });
 
+  it.each([
+    ["invalid escape", String.raw`{"sources":["src/\q.ts"]}`],
+    ["short unicode escape", String.raw`{"sources":["src/\u12.ts"]}`],
+    [
+      "raw newline in a string",
+      `{"sources":["src/a.ts
+line.ts"]}`,
+    ],
+  ])("fails closed on a sources array with %s", (_label, value) => {
+    expect(() => containsDeveloperHomePath(value, "generated-artifact")).toThrow(
+      /malformed sources array.*invalid json/i,
+    );
+  });
+
+  it("decodes escaped sources before scanning for a developer home", () => {
+    expect(
+      containsDeveloperHomePath(
+        String.raw`{"sources":["src/a.ts","\u002fhome\u002falice/project/app.ts"]}`,
+        "generated-artifact",
+      ),
+    ).toBe(true);
+  });
+
+  it("accepts 1024 safe sources and detects a developer home in the last member", () => {
+    const sources = Array.from({ length: 1024 }, (_unused, index) => `src/${index}.ts`);
+    expect(
+      containsDeveloperHomePath(JSON.stringify({ sources }), "generated-artifact"),
+    ).toBe(false);
+
+    sources[1023] = "/home/alice/project/app.ts";
+    expect(
+      containsDeveloperHomePath(JSON.stringify({ sources }), "generated-artifact"),
+    ).toBe(true);
+  });
+
+  it("rejects a 1025-member sources array", () => {
+    const sources = Array.from({ length: 1025 }, (_unused, index) => `src/${index}.ts`);
+    expect(() =>
+      containsDeveloperHomePath(JSON.stringify({ sources }), "generated-artifact"),
+    ).toThrow(/sources array.*1024 members/i);
+  });
+
+  it("rejects non-string sources members", () => {
+    expect(() =>
+      containsDeveloperHomePath('{"sources":["src/a.ts",42]}', "generated-artifact"),
+    ).toThrow(/sources array.*string/i);
+  });
+
+  it("keeps multiple safe sources arrays isolated from unrelated arrays", () => {
+    const artifact = [
+      JSON.stringify({ sources: ['src/"quoted]name.ts', "src/b.ts"] }),
+      JSON.stringify({
+        note: 'embedded "sources":["/home/alice/project/app.ts"] text',
+        other: ["/home/alice/project/app.ts"],
+      }),
+      JSON.stringify({ sources: ["src/c.ts", "https://example.test/home/docs.ts"] }),
+    ].join("\n");
+    expect(containsDeveloperHomePath(artifact, "generated-artifact")).toBe(false);
+  });
+
   it("bounds sources array scanning", () => {
     const oversizedSources = JSON.stringify({ sources: ["a".repeat(65 * 1024)] });
     expect(() => containsDeveloperHomePath(oversizedSources, "generated-artifact")).toThrow(

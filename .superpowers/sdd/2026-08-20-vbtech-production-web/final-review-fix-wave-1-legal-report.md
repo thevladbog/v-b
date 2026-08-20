@@ -457,3 +457,90 @@ After restoring semicolon termination, the focused suite returned to 80/80 PASS.
 - Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
 - `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
 - Enabled submission remains blocked; no publication, deployment, backend change, or activation occurred.
+
+## Provenance fix round 5/5 — native JSON validation and decoded source boundaries
+
+### Commit contract and scope
+
+- Base SHA: `3355a1a66ff9534536213b7bc10e7c3251986634`.
+- Exact commit subject: `test: validate provenance sources arrays`.
+- Final commit SHA is supplied in the controller handoff because the commit cannot contain its own stable SHA.
+- This remains test-only detector work. Production provenance, legal copy, lifecycle/current derivation, browser tests, backend, deployment, form behavior, and the lockfile were not changed.
+
+### Bounded scanner and native validation
+
+The permissive member parser has been removed. The generated-artifact detector now performs only the bounded structural work needed to locate an exact JSON `"sources"` key and its matching array span:
+
+- the existing 4 MiB whole-input cap bounds key discovery;
+- quoted strings are skipped with escape-aware boundaries, so brackets and `"sources"` text inside a JSON string cannot terminate or start an array scan;
+- nested array brackets are tracked only while locating the matching closing bracket;
+- the 64 KiB span cap is enforced while traversing ordinary and quoted content, before any substring or parse operation.
+
+The bounded array substring is then passed to native `JSON.parse`. This rejects invalid `\q` escapes, short `\u12` escapes, raw newlines/control characters, missing commas, trailing commas, and other malformed JSON. Parsed arrays over 1,024 members throw, and every parsed member must be a string. Every decoded string is scanned, so `\u002fhome\u002falice/project/app.ts` is detected after Unicode decoding. Hosted HTTP(S) URLs inside a valid sources array remain excluded before path detection.
+
+This policy is intentionally scoped to exact JSON filesystem `sources` arrays. Scalar build metadata remains covered by the exact contextual field detector, and unrelated arrays are neither parsed as sources nor crossed by the span locator.
+
+### Fixtures and mutation evidence
+
+The new fixtures prove:
+
+- invalid `\q`, short `\u12`, and a raw newline fail closed through native JSON validation;
+- a Unicode-escaped Linux developer home is detected after decoding;
+- exactly 1,024 safe members pass, and a leak in member 1,024 is detected;
+- 1,025 members fail closed;
+- non-string members fail closed;
+- multiple safe `sources` arrays remain isolated from an unrelated array and embedded fake `"sources"` text containing root-like `/home/...` values; an escaped quote followed by `]` inside a valid member proves string boundaries are respected;
+- the direct semicolon fixture `https://example.test/a;absolutePath:/Users/alice/project/app.css` remains in the passing suite.
+
+Against the prior hand parser, the expanded focused suite produced the expected RED:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  1 failed | 1 passed (2)
+Tests       4 failed | 84 passed (88)
+Failures    invalid q; short unicode; raw newline; Unicode-escaped developer home
+Exit status 1
+```
+
+After the bounded span locator and native JSON parsing change:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents test -- registry.test.ts
+Test Files  2 passed (2)
+Tests       88 passed (88)
+```
+
+The required member-cap mutation temporarily deleted the 1,024-member guard. Its isolated result was:
+
+```text
+CI=true corepack pnpm --filter @vbtech/legal-documents exec vitest run test/registry.test.ts -t "rejects a 1025-member sources array"
+Test Files  1 failed (1)
+Tests       1 failed | 80 skipped (81)
+Failure     expected the 1025-member scan to throw
+Exit status 1
+```
+
+Restoring the cap returned the focused package suite to 88/88 PASS.
+
+A second focused mutation removed escape handling from the span locator. The isolated multiple-array/string-boundary fixture then failed with `Malformed sources array: invalid JSON` (1 failed, 80 skipped), proving an escaped quote and following `]` cannot be treated as structural delimiters. Restoring escape handling returned that isolated fixture to PASS.
+
+### Verification gates
+
+| Gate | Result |
+| --- | --- |
+| Legal tests | PASS — 2 files, 88 tests |
+| Legal typecheck | PASS |
+| Web legal regression/full package test | PASS — build completed; 11 files, 146 tests |
+| Web typecheck | PASS — 39 files, 0 errors, 0 warnings, 0 hints |
+| Default web build | PASS — 9 static pages plus text/XML endpoints |
+| Strict legal metadata scan | PASS |
+| Contextual generated-output scan | PASS across every text/client artifact |
+| `PUBLIC_CONTACT_SUBMISSION_ENABLED=true` web build | EXPECTED FAIL — exit 1, `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled` |
+| Normal build after deliberate failure | PASS — complete 9-page output restored |
+| `git diff --check` | PASS |
+
+### Final legal and activation boundary
+
+- Production `LEGAL_SOURCE_REVIEW.operatorSource` remains `operator-snapshot:operator-vbtech-2026-08-20`.
+- `VBT-PD-01/DRAFT` and `VBT-PD-02/DRAFT` remain unchanged drafts with no revision, effective date, or active release.
+- Enabled submission remains blocked; no publication, deployment, backend change, form activation, or external request occurred.
