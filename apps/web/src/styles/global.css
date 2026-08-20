@@ -51,6 +51,12 @@ button[aria-pressed="true"] {
 :focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 3px;
+  scroll-margin-top: 7rem;
+  scroll-margin-bottom: 4rem;
+}
+
+#main-content {
+  scroll-margin-top: 7rem;
 }
 
 ::selection {

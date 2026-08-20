@@ -85,12 +85,16 @@ const themeBootstrap = `(() => {
   <body>
     <a class="skip-link" href="#main-content">{skip}</a>
     <SiteHeader locale={locale} route={localizedRoute} />
-    <main id="main-content"><slot /></main>
+    <main id="main-content" tabindex="-1"><slot /></main>
     <SiteFooter locale={locale} route={localizedRoute} />
     <script>
       import { initializeThemeControls } from "../scripts/theme";
+      import { initializeContactForms } from "../scripts/contact-form";
+      import { initializeNavigation } from "../scripts/navigation";
 
       initializeThemeControls();
+      initializeNavigation();
+      initializeContactForms();
     </script>
   </body>
 </html>

@@ -86,13 +86,35 @@ export interface SiteContent {
     title: string;
     lead: string;
     telegram: string;
+    telegramNewTabLabel: string;
     email: string;
+    directContactContext: string;
+    formTitle: string;
     formName: string;
+    formNameInstruction: string;
     formContact: string;
+    formContactInstruction: string;
     formMessage: string;
+    formMessageInstruction: string;
+    formConsentInstruction: string;
     formSubmit: string;
     formNote: string;
     formSuccess: string;
+    formWarning: string;
+    formDisabled: string;
+    consentBeforePolicy: string;
+    policyLinkLabel: string;
+    consentBetweenLinks: string;
+    consentLinkLabel: string;
+    consentAfterLinks: string;
+    consentDraftContext: string;
+    errorSummary: string;
+    errors: {
+      name: string;
+      contact: string;
+      message: string;
+      consent: string;
+    };
   };
   footerLine: string;
 }

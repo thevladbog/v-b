@@ -1,5 +1,6 @@
 ---
 import type { Locale, SiteContent } from "@vbtech/content";
+import ContactForm from "./ContactForm.astro";
 
 interface Props {
   locale: Locale;
@@ -8,7 +9,6 @@ interface Props {
 }
 
 const { locale, about, contact } = Astro.props;
-const telegramLabel = locale === "ru" ? "Написать Владу в Telegram (откроется в новой вкладке)" : "Message Vlad on Telegram (opens in a new tab)";
 const signatureLabel = locale === "ru"
   ? "Влад Богатырев — продуктовая инженерия и эксплуатация"
   : "Vlad Bogatyrev — product engineering and operations";
@@ -30,14 +30,16 @@ const signatureLabel = locale === "ru"
       <p class="eyebrow">{contact.eyebrow}</p>
       <h2 id="contact-title">{contact.title}</h2>
       <p class="contact-lead">{contact.lead}</p>
+      <p class="contact-direct-context">{contact.directContactContext}</p>
       <div class="contact-links">
-        <a href="https://t.me/thevladbog" target="_blank" rel="noopener noreferrer" aria-label={telegramLabel}>
+        <a href="https://t.me/thevladbog" target="_blank" rel="noopener noreferrer" aria-label={contact.telegramNewTabLabel}>
           <span>{contact.telegram}</span><b>@thevladbog <i aria-hidden="true">↗</i></b>
         </a>
         <a href="mailto:hello@v-b.tech">
           <span>{contact.email}</span><b>hello@v-b.tech <i aria-hidden="true">↗</i></b>
         </a>
       </div>
+      <ContactForm locale={locale} content={contact} />
     </section>
   </div>
 </div>

@@ -16,10 +16,24 @@ const sectionHref = (fragment: string) =>
   route === "home" ? `#${fragment}` : `${localizedPath(locale, "home")}#${fragment}`;
 ---
 
-<header class="site-header">
+<header class="site-header" data-site-header>
   <div class="shell header-inner">
     <Wordmark locale={locale} label={page.navigation.homeLabel} />
-    <nav class="site-navigation" aria-label={page.navigation.primaryLabel}>
+    <button
+      class="navigation-toggle"
+      id="site-navigation-toggle"
+      type="button"
+      hidden
+      aria-controls="site-navigation"
+      aria-expanded="false"
+      aria-label={page.navigation.menuOpen}
+      data-navigation-toggle
+      data-open-label={page.navigation.menuOpen}
+      data-close-label={page.navigation.menuClose}
+    >
+      <span aria-hidden="true"></span>
+    </button>
+    <nav id="site-navigation" class="site-navigation" aria-label={page.navigation.primaryLabel} data-site-navigation>
       <a href={sectionHref("work")}>{page.navigation.work}</a>
       <a href={sectionHref("expertise")}>{page.navigation.expertise}</a>
       <a href={sectionHref("approach")}>{page.navigation.approach}</a>

@@ -10,6 +10,13 @@ const firstHeadInlineScript = (html: string): string | undefined => {
   return head?.match(/<script>[\s\S]*?<\/script>/)?.[0];
 };
 
+const generatedRuntime = async (html: string): Promise<string> => {
+  const script = html.match(/<script type="module"(?: src="([^"]+)")?>([\s\S]*?)<\/script>/);
+  const src = script?.[1];
+  if (!src) return script?.[2] ?? "";
+  return readFile(new URL(`../dist${src}`, import.meta.url), "utf8");
+};
+
 type ChangeListener = () => void;
 
 const createButton = (mode: "system" | "light" | "dark") => {
@@ -132,7 +139,7 @@ describe("generated theme controls", () => {
 
   it("keeps the runtime local, static, and on the same storage key", async () => {
     const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
-    const runtime = html.match(/<script type="module">([\s\S]*?)<\/script>/)?.[1] ?? "";
+    const runtime = await generatedRuntime(html);
 
     expect(runtime).toContain(THEME_STORAGE_KEY);
     expect(runtime).not.toMatch(/\b(?:eval|fetch)\s*\(/);

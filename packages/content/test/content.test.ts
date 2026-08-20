@@ -15,6 +15,14 @@ describe("site content", () => {
     expect(new Set(page.cases.map((item) => item.id))).toEqual(
       new Set(["markiro", "idento", "quokkaq"]),
     );
+    expect(Object.keys(page.contact.errors)).toEqual([
+      "name",
+      "contact",
+      "message",
+      "consent",
+    ]);
+    expect(page.contact.directContactContext).toBeTruthy();
+    expect(page.contact.consentDraftContext).toContain("VBT-PD-02/DRAFT");
   });
 
   it("rejects a blank nested translation", () => {
