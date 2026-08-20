@@ -304,28 +304,6 @@ for (const localized of [
     await expect(navigation).toBeVisible();
   });
 
-  test(`${localized.path} important Pixel 7 controls meet the 44 CSS pixel target`, async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== "Pixel 7", "Touch target acceptance applies to Pixel 7");
-    await page.goto(localized.path);
-    await page.getByRole("button", { name: localized.open }).click();
-
-    const targets = page.locator(
-      "[data-site-header] a, [data-site-header] button, .hero-actions a, .contact-links a",
-    );
-    await expect(targets.first()).toBeVisible();
-    const undersized = await targets.evaluateAll((elements) =>
-      elements
-        .filter((element) => {
-          const box = element.getBoundingClientRect();
-          return box.width < 44 || box.height < 44;
-        })
-        .map((element) => {
-          const box = element.getBoundingClientRect();
-          return `${element.tagName.toLowerCase()}[${element.getAttribute("aria-label") ?? element.textContent?.trim() ?? ""}] ${box.width}x${box.height}`;
-        }),
-    );
-    expect(undersized, `Undersized important targets:\n${undersized.join("\n")}`).toEqual([]);
-  });
 }
 
 for (const route of [

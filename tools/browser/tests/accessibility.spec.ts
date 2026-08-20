@@ -18,13 +18,30 @@ const themeLabels = {
     group: "Тема оформления",
     light: "Тема: светлая",
     dark: "Тема: тёмная",
+    menuOpen: "Открыть меню",
+    menuClose: "Закрыть меню",
+    navigation: "Основная навигация",
   },
   en: {
     group: "Color theme",
     light: "Theme: light",
     dark: "Theme: dark",
+    menuOpen: "Open menu",
+    menuClose: "Close menu",
+    navigation: "Primary navigation",
   },
 } as const;
+
+const interactiveSelector = [
+  "a[href]",
+  "button",
+  "input:not([type='hidden'])",
+  "select",
+  "textarea",
+  "summary",
+  "[role='button']",
+  "[role='link']",
+].join(", ");
 
 async function assertSharedChromeStyles(page: Page): Promise<void> {
   const header = page.locator("[data-site-header]");
@@ -47,15 +64,33 @@ async function assertSharedChromeStyles(page: Page): Promise<void> {
 }
 
 async function assertVisibleTargets(page: Page): Promise<void> {
-  const targets = page.locator(
-    "[data-site-header] a, [data-site-header] button, .legal-register-list h2 a, .legal-back a, .not-found-actions a",
-  );
+  const targets = page.locator(interactiveSelector);
   const undersized = await targets.evaluateAll((elements) =>
     elements
       .filter((element) => {
         const style = getComputedStyle(element);
         const box = element.getBoundingClientRect();
-        return style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0;
+        const isDisabledFormControl =
+          (element instanceof HTMLButtonElement ||
+            element instanceof HTMLInputElement ||
+            element instanceof HTMLSelectElement ||
+            element instanceof HTMLTextAreaElement) &&
+          element.matches(":disabled");
+        const isDormantSkipLink = element.matches(".skip-link:not(:focus-visible)");
+        // Inline links embedded in prose are not primary/chrome controls. They remain covered by axe;
+        // the project's stricter 44 CSS px gate applies to every other visible, enabled action.
+        const isInlineProseLink = element instanceof HTMLAnchorElement && style.display === "inline";
+
+        return (
+          !isDisabledFormControl &&
+          !isDormantSkipLink &&
+          !isInlineProseLink &&
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          style.opacity !== "0" &&
+          box.width > 0 &&
+          box.height > 0
+        );
       })
       .filter((element) => {
         const box = element.getBoundingClientRect();
@@ -68,6 +103,15 @@ async function assertVisibleTargets(page: Page): Promise<void> {
   );
 
   expect(undersized, `Undersized visible targets:\n${undersized.join("\n")}`).toEqual([]);
+}
+
+async function assertFooterActionsRemainInline(page: Page): Promise<void> {
+  const actions = page.locator(".footer-actions > p > a");
+  await expect(actions).toHaveCount(2);
+  const tops = await actions.evaluateAll((elements) =>
+    elements.map((element) => element.getBoundingClientRect().top),
+  );
+  expect(Math.abs(tops[0] - tops[1]), "Footer actions wrapped onto separate rows").toBeLessThan(1);
 }
 
 async function waitForThemeTransitions(page: Page): Promise<void> {
@@ -93,7 +137,7 @@ function assertLocalRequests(requestUrls: readonly string[], pagePath: string): 
 }
 
 for (const path of allHtmlRoutes) {
-  test(`${path} passes core browser acceptance in explicit light and dark themes`, async ({ page }) => {
+  test(`${path} passes core browser acceptance in explicit light and dark themes`, async ({ page }, testInfo) => {
     const requestUrls: string[] = [];
     page.on("request", (request) => requestUrls.push(request.url()));
     await page.goto(path);
@@ -114,7 +158,24 @@ for (const path of allHtmlRoutes) {
       await expect
         .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
         .toBe(true);
-      await assertVisibleTargets(page);
+
+      if (testInfo.project.name === "Pixel 7") {
+        const menuOpen = page.getByRole("button", { name: themeLabels[locale].menuOpen });
+        const navigation = page.getByRole("navigation", { name: themeLabels[locale].navigation });
+        await menuOpen.click();
+        await expect(page.getByRole("button", { name: themeLabels[locale].menuClose })).toHaveAttribute(
+          "aria-expanded",
+          "true",
+        );
+        await expect(navigation).toBeVisible();
+        await assertVisibleTargets(page);
+        await page.keyboard.press("Escape");
+        await expect(navigation).toBeHidden();
+        await expect(menuOpen).toBeFocused();
+      } else {
+        await assertVisibleTargets(page);
+      }
+      await assertFooterActionsRemainInline(page);
       if (draftLegalRoutes.has(path)) await assertSharedChromeStyles(page);
 
       if (publicRoutes.has(path)) {

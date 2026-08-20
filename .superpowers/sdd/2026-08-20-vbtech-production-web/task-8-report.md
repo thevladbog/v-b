@@ -169,3 +169,42 @@ Final gate results for this wave:
 - `git diff --check`: clean.
 
 No dependency, manifest, or lockfile changed. After concurrent focused commands caused pnpm to recreate `node_modules`, the offline frozen install reported the exact missing store artifact `turbo-2.10.4.tgz`; the approved frozen install restored all 309 packages from the resolved store with 0 downloads and left tracked dependency files unchanged. No backend, captcha, deployment, DNS, form enablement, or legal copy was added or changed. Manual VoiceOver/NVDA/TalkBack acceptance remains unrun and is not implied by axe.
+
+## Browser/404 review fix round 1/5 — comprehensive interactive targets
+
+The 44 CSS px gate now starts from the generic enabled interactive surface (`a[href]`, `button`, visible form controls, `summary`, and explicit button/link roles) instead of a hand-maintained list of selected header/content classes. It runs for every one of the nine HTML routes, in light and dark themes, on Desktop Chrome and Pixel 7, so footer legal links, locale/theme controls, GitHub, Email, header actions, primary content actions, legal recovery actions, and 404 recovery actions share one acceptance contract.
+
+The classification has three explicit boundaries. Native controls matching `:disabled` are excluded, including controls disabled by an ancestor fieldset. A dormant off-canvas skip link is excluded while it is not focus-visible; its focused keyboard behavior remains covered by the dedicated skip-link tests. Anchors whose computed display is exactly `inline` are classified as prose links: axe still covers them, while the project's stricter 44 px rule applies to primary and chrome actions. Every styled action (`inline-flex`, `flex`, `grid`, or block) remains in the size gate.
+
+On Pixel 7 the core matrix now opens the mobile menu before measuring, asserts the expanded state and visible semantic navigation, runs the same generic target audit, closes with Escape, and proves focus returns to the menu toggle. This is performed on all nine routes (and therefore all six legal routes plus 404), in both themes, with restored state before the next theme. The obsolete landing-only selector audit was removed so there is no second, weaker target definition.
+
+Focused RED reproduced the review finding in both projects on `/404.html`:
+
+```text
+Undersized visible targets:
+a[Email] 37.734375x44
+2 failed (Desktop Chrome, Pixel 7)
+```
+
+The full first matrix then identified the disabled contact checkbox as `20x20`; this was a test-classification issue because its ancestor fieldset, rather than its own attribute, supplies the disabled state. Switching the native-control check to `:disabled` retained the gate without changing the intentionally unavailable form.
+
+The shared footer rule now gives footer action links a `2.75rem` minimum width and centers their labels. A geometry assertion on all route/theme/project combinations proves GitHub and Email remain on the same row, preventing undesired wrapping while preserving the existing visual layout.
+
+Final evidence:
+
+- focused `/404.html` GREEN: 2/2 across Desktop Chrome and Pixel 7;
+- complete core matrix: 18/18 tests and 36 route/project/theme executions;
+- lint: 2/2 applicable tasks, 0 Astro diagnostics;
+- typecheck: 4/4 workspace tasks;
+- canonical root test: content 5/5, legal documents 37/37, web 144/144, then Playwright 89 passed and 9 expected Desktop responsive-menu skips;
+- build: 9 HTML pages plus `robots.txt`, `sitemap.xml`, and `llms.txt`;
+- affected Pixel legal/404 core repeat: 21/21 with `--repeat-each=3`, zero retries;
+- `git diff --check`: clean.
+
+The critical repeat command was:
+
+```text
+CI=true corepack pnpm --dir tools/browser test tests/accessibility.spec.ts --project='Pixel 7' --grep '(legal/|privacy/|personal-data-consent/|404\.html) passes core browser acceptance' --repeat-each=3
+```
+
+No dependency, manifest, lockfile, backend, captcha, deployment, DNS, form-enablement, or legal-copy change is included.

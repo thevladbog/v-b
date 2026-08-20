@@ -69,3 +69,32 @@ Critical Pixel 7 repeat: 21/21 with --repeat-each=3; retries disabled
 Dependency installation did not change tracked inputs. The offline frozen restore identified `turbo-2.10.4.tgz` as missing; the approved frozen install restored 309 packages with 0 downloads and left the lockfile unchanged.
 
 Manual screen-reader acceptance remains unrun. No deployment or external production behavior is claimed.
+
+## Review follow-up — comprehensive 44 px action gate
+
+The previous selector list did not include footer actions. Its focused RED on `/404.html` failed in both required projects with `a[Email] 37.734375x44`. The replacement gate locates the generic interactive surface (`a[href]`, buttons, visible form controls, `summary`, and explicit button/link roles) on all nine routes, both explicit themes, and both projects.
+
+The gate explicitly excludes native controls matching `:disabled` (including controls disabled by an ancestor fieldset), the dormant off-canvas skip link while it is not focus-visible, and computed-inline prose anchors. The latter remain axe-covered; the project-specific 44 px rule is defined for primary/chrome actions. All styled actions remain measurable. This exact classification prevented the disabled 20 px contact checkbox from being misreported while retaining footer, header, landing, legal, and recovery actions.
+
+Pixel 7 opens its menu before each theme's measurement, proves navigation is visible and expanded, then closes with Escape and verifies focus restoration. This runs on every route, including all six legal artifacts and 404. The earlier landing-only partial selector test was removed. Footer action links now have a shared `2.75rem` minimum width with centered labels, and a cross-matrix geometry assertion proves GitHub and Email do not wrap onto separate rows.
+
+Final verification:
+
+| Gate | Result |
+| --- | --- |
+| Focused `/404.html` target test | PASS — 2/2 after exact 37.734375 × 44 RED |
+| Nine-route core browser matrix | PASS — 18/18; 36 theme executions |
+| `CI=true corepack pnpm lint` | PASS — 2 applicable tasks; 0 Astro diagnostics |
+| `CI=true corepack pnpm typecheck` | PASS — 4 workspace tasks |
+| `CI=true corepack pnpm test` | PASS — content 5, legal 37, web 144; Playwright 89 passed / 9 expected skips |
+| `CI=true corepack pnpm build` | PASS — 9 HTML pages plus three discovery artifacts |
+| Pixel legal/404 core `--repeat-each=3` | PASS — 21/21, zero retries |
+| `git diff --check` | PASS |
+
+The repeat used the verified seven-test selection:
+
+```text
+CI=true corepack pnpm --dir tools/browser test tests/accessibility.spec.ts --project='Pixel 7' --grep '(legal/|privacy/|personal-data-consent/|404\.html) passes core browser acceptance' --repeat-each=3
+```
+
+No dependency, manifest, lockfile, backend, captcha, deployment, DNS, form enablement, or legal copy changed. Manual screen-reader acceptance remains unrun.
