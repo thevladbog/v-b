@@ -51,12 +51,7 @@ function mergeRule(value: unknown): DnsMergeRule {
     currentValues: array(source.currentValues).map(string),
     ...(source.currentRecords === undefined ? {} : { currentRecords: currentOwnerRecords(source.currentRecords) }),
   };
-  if (kind === "replace-cname-owner-records") return { id, kind, name, type, currentRecords: array(source.currentRecords).map((item) => {
-    const current = object(item);
-    const currentType = string(current.type) as DnsRecordType;
-    if (!recordTypes.has(currentType)) fail("invalid_input");
-    return { type: currentType, value: string(current.value), ttl: integer(current.ttl) };
-  }) };
+  if (kind === "replace-cname-owner-records") return { id, kind, name, type, currentRecords: currentOwnerRecords(source.currentRecords) };
   if (kind === "append-spf-mechanism" && type === "TXT") return { id, kind, name, type, currentValue: string(source.currentValue), providerValue: string(source.providerValue) };
   fail("invalid_input");
 }

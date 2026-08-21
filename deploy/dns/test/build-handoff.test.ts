@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { buildDnsHandoff, renderMarkdownHandoff, type DnsHandoffInput, type DnsMergeRule } from "../build-handoff.js";
@@ -230,7 +231,7 @@ describe("external DNS handoff builder", () => {
   it.each([
     ["invalid sheet date", handoffInput({ asOf: "2026-99-99" })],
     ["missing current zone", handoffInput({ currentZone: undefined })],
-    ["unresolved edge IPv4", handoffInput({ edge: { evidence: { id: "edge", capturedAt: "2026-08-21T12:00:00.000Z", ipv4: "not-an-ip" }, ipv4: "not-an-ip" } })],
+    ["unresolved edge IPv4", handoffInput({ edge: { evidence: { id: "edge", capturedAt: "2026-08-21T12:00:00.000Z", ipv4: "not-an-ip", migrationTtl: 300, normalTtl: 3_600 }, ipv4: "not-an-ip" } })],
   ])("fails closed for %s", (_label, input) => {
     expect(() => buildDnsHandoff(input)).toThrow(/dns_handoff_/);
   });
@@ -360,7 +361,9 @@ describe("external DNS handoff builder", () => {
       edge: { ipv4: "198.51.100.24", evidence: { id: "edge-ttl", capturedAt: "2026-08-21T12:00:00.000Z", ipv4: "198.51.100.24", migrationTtl: 120, normalTtl: 3_600 } },
       currentZone: [...currentZone, { name: "v-b.tech", type: "A", value: "198.51.100.24", ttl: 900 }],
     } as unknown as DnsHandoffInput);
-    const row = buildDnsHandoff(input).records.find((record) => record.name === "v-b.tech" && record.type === "A");
+    const matchingRows = buildDnsHandoff(input).records.filter((record) => record.name === "v-b.tech" && record.type === "A");
+    expect(matchingRows).toHaveLength(1);
+    const [row] = matchingRows;
     expect(row).toMatchObject({ action: "update", ttl: 120, currentTtl: 900, rollbackTtl: 900, normalTtl: 3_600 });
   });
 
@@ -369,7 +372,9 @@ describe("external DNS handoff builder", () => {
   it("emits a Postbox TTL update with distinct current, target, normal, and rollback TTLs", () => {
     const currentDkim = { name: postboxRecords[1].name, type: "CNAME" as const, value: postboxRecords[1].value, ttl: 3_600 };
     const handoff = buildDnsHandoff(handoffInput({ currentZone: [...currentZone, currentDkim] }));
-    const row = handoff.records.find((record) => record.name === currentDkim.name && record.type === "CNAME");
+    const matchingRows = handoff.records.filter((record) => record.name === currentDkim.name && record.type === "CNAME");
+    expect(matchingRows).toHaveLength(1);
+    const [row] = matchingRows;
     expect(row).toMatchObject({ action: "update", ttl: 300, currentTtl: 3_600, normalTtl: 300, rollbackTtl: 3_600 });
     expect(renderMarkdownHandoff(handoff)).toContain("Target / apply TTL");
   });
@@ -379,7 +384,7 @@ describe("external DNS handoff builder", () => {
   it.each([
     ["blank rule ID", [{ ...handoffInput().mergeRules![0], id: "" }]],
     ["duplicate rule ID", [handoffInput().mergeRules![0], { id: "merge-existing-spf-with-postbox", kind: "replace-record", name: "www.v-b.tech", type: "CNAME", currentValues: [] }]],
-    ["unused rule", [...handoffInput().mergeRules!, { id: "unused", kind: "replace-record", name: "www.v-b.tech", type: "CNAME", currentValues: [] }]],
+    ["unused rule", [...handoffInput().mergeRules!, { id: "unused", kind: "replace-record", name: "unused.v-b.tech", type: "CNAME", currentValues: ["old-target.example.test."] }]],
   ])("rejects %s", (_label, mergeRules) => {
     expect(() => buildDnsHandoff(handoffInput({ mergeRules } as Partial<DnsHandoffInput>))).toThrow(/dns_handoff_(invalid|duplicate|unused)_merge_rule/);
   });
@@ -451,7 +456,7 @@ describe("external DNS handoff builder", () => {
     const inputPath = join(directory, "input.json");
     const outputPath = join(directory, "2026-08-21-vbtech-dns-handoff.md");
     const bundlePath = join(directory, "vbtech-dns-handoff.cjs");
-    const repositoryRoot = join(process.cwd(), "..", "..");
+    const repositoryRoot = fileURLToPath(new URL("../../..", import.meta.url));
     try {
       await writeFile(inputPath, JSON.stringify(handoffInput()), "utf8");
       await execFileAsync("corepack", ["pnpm", "exec", "esbuild", "deploy/dns/cli.ts", "--bundle", "--platform=node", "--format=cjs", `--outfile=${bundlePath}`], { cwd: repositoryRoot });
@@ -461,7 +466,7 @@ describe("external DNS handoff builder", () => {
     } finally {
       await rm(directory, { force: true, recursive: true });
     }
-  });
+  }, 120_000);
 
   // Catches prefix-recognition of malformed policies and unsafe owners/Markdown data.
   it.each([

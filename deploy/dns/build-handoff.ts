@@ -164,7 +164,7 @@ function recordFor(desired: DnsRecord, purpose: string, verification: string, cu
   }
   if (exact) {
     const actual = rrset[0]!;
-    return { record: row(desired, purpose, actual.value, "update", `${verification}; apply evidence-backed TTL`, "restore the rollback TTL", null, actual.value, actual.ttl, normalTtl, actual.ttl, rrset, rrset), replacedCurrent: [] };
+    return { record: row(desired, purpose, actual.value, "update", `${verification}; apply evidence-backed TTL`, "restore the rollback TTL", null, actual.value, actual.ttl, normalTtl, actual.ttl, rrset, rrset), replacedCurrent: rrset };
   }
   if (!rrset.length) return { record: row(desired, purpose, null, "add", verification, "remove the added record", null, null, null, normalTtl, null), replacedCurrent: [] };
   if (desired.type === "TXT" && !requireTxtReplacement) return { record: row(desired, purpose, currentValue, "add", verification, "remove the added record", null, null, rrset.length === 1 ? rrset[0]!.ttl : null, normalTtl, null), replacedCurrent: [] };
