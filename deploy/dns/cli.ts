@@ -17,6 +17,7 @@ function string(value: unknown): string { if (typeof value !== "string") fail("i
 function integer(value: unknown): number { if (!Number.isInteger(value)) fail("invalid_input"); return value as number; }
 function array(value: unknown): unknown[] { if (!Array.isArray(value)) fail("invalid_input"); return value; }
 function optionalString(value: unknown): string | undefined { if (value === undefined) return undefined; return string(value); }
+function optionalNonEmptyString(value: unknown): string | undefined { const parsed = optionalString(value); if (parsed === "") fail("invalid_input"); return parsed; }
 function record(value: unknown): DnsRecord {
   const source = object(value);
   const type = string(source.type) as DnsRecordType;
@@ -73,8 +74,8 @@ export function parseDnsHandoffInput(value: unknown): DnsHandoffInput {
     currentZone: array(source.currentZone).map(record),
     edge: {
       ipv4: string(edge.ipv4),
-      ipv6: optionalString(edge.ipv6),
-      evidence: { id: string(edgeEvidence.id), capturedAt: string(edgeEvidence.capturedAt), ipv4: string(edgeEvidence.ipv4), ipv6: optionalString(edgeEvidence.ipv6), migrationTtl: integer(edgeEvidence.migrationTtl), normalTtl: integer(edgeEvidence.normalTtl) },
+      ipv6: optionalNonEmptyString(edge.ipv6),
+      evidence: { id: string(edgeEvidence.id), capturedAt: string(edgeEvidence.capturedAt), ipv4: string(edgeEvidence.ipv4), ipv6: optionalNonEmptyString(edgeEvidence.ipv6), migrationTtl: integer(edgeEvidence.migrationTtl), normalTtl: integer(edgeEvidence.normalTtl) },
     },
     postbox: {
       customMailFrom: string(postbox.customMailFrom) as "configured" | "not-configured",

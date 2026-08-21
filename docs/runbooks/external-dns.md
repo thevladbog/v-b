@@ -17,7 +17,7 @@ Never substitute an example, a remembered provider value, a lookup result, or a 
 
 Export the whole zone from the external provider without changing any records. Preserve the original export with its capture time. Its typed `currentZone` input must include every relevant A, AAAA, CNAME, MX, and TXT record, including unrelated TXT records and every existing SPF/DMARC policy.
 
-Record the approved edge inventory as `edge.evidence`; it must have a stable evidence ID, capture timestamp, exact `ipv4` (plus optional `ipv6`), and evidence-backed positive `migrationTtl` and `normalTtl` values. Copy only those same addresses into `edge.ipv4` and `edge.ipv6`; IPv6 must be absent from both places or match exactly. The builder rejects an address or TTL plan that is not backed by the supplied inventory evidence.
+Record the approved edge inventory as `edge.evidence`; it must have a stable evidence ID, capture timestamp, exact `ipv4` (plus optional `ipv6`), and evidence-backed positive `migrationTtl` and `normalTtl` values. Copy only those same addresses into `edge.ipv4` and `edge.ipv6`; IPv6 must be absent from both places or match exactly, and an empty string is invalid. The builder rejects an address or TTL plan that is not backed by the supplied inventory evidence.
 
 Copy every Postbox value directly from the supplied verification output into both `postbox.records` and `postbox.evidence.records`, preserving owner, type, value, TTL, purpose, and multiplicity exactly. Mark the evidence `verified` only after the supplied output reports that status. Set `postbox.customMailFrom` and `postbox.evidence.customMailFrom` to the same explicit state: `configured` requires the exact custom MAIL FROM record(s); `not-configured` permits none. Associate each required record with one of these purposes:
 
@@ -51,7 +51,7 @@ corepack pnpm exec esbuild deploy/dns/cli.ts --bundle --platform=node --format=c
 node /tmp/vbtech-dns-handoff.cjs /absolute/path/to/current-release-evidence.json /absolute/path/to/docs/reviews/YYYY-MM-DD-vbtech-dns-handoff.md
 ```
 
-The output path is created with exclusive-write semantics: choose a new dated artifact rather than overwriting an existing approval sheet. The rendered table contains name, type, value, migration TTL, normal TTL, purpose, current value/TTL and exact current RRset, action, explicit replacement/merge rule, verification, shell-quoted read-only verification command, rollback instruction, rollback value/TTL, and exact rollback RRset. The generated `dig` command quotes each DNS argument and never interpolates a record value into a shell command.
+The output path is created with exclusive-write semantics: choose a new dated artifact rather than overwriting an existing approval sheet. The rendered table distinguishes `Current TTL`, `Target / apply TTL`, `Normal / restore TTL`, and `Rollback TTL`, alongside exact current/rollback RRsets. For edge records, target is the evidence-backed migration TTL and normal is the evidence-backed post-propagation TTL. For a Postbox record, its verified TTL is both the target and normal TTL; a different current TTL produces an `update` row rather than a false `keep`. The generated `dig` command quotes each DNS argument and never interpolates a record value into a shell command.
 
 Before requesting DNS approval, confirm all of these in the generated table:
 
@@ -61,7 +61,7 @@ Before requesting DNS approval, confirm all of these in the generated table:
 4. At the Postbox-specified SPF owner there is exactly one Postbox SPF action, either an evidence-backed add or an explicit merge; each DNS owner has at most one SPF policy. Preserved SPF rows at other owners remain visible.
 5. Existing MX and unrelated TXT rows have action `keep`.
 6. Existing DMARC has action `review` and no proposed replacement.
-7. Every `replace` or `merge` row has an explicit rule ID, row-specific read-only verification command, and concrete rollback value/TTL/RRset.
+7. Every `replace` or `merge` row has an explicit rule ID, row-specific read-only verification command, and concrete rollback value/TTL/RRset; every `update` row has distinct target/current/normal/rollback TTLs where applicable.
 
 Run the local contract check before presenting the sheet:
 
@@ -73,9 +73,9 @@ The root package currently does not own a Vitest binary, so the command intentio
 
 ## 4. Apply only after separate approval
 
-After the owner approves the exact dated sheet, an authorized DNS operator applies only its `add`, `replace`, and `merge` rows at the external provider. The operator must not remove `keep` rows or alter a `review` row.
+After the owner approves the exact dated sheet, an authorized DNS operator applies only its `add`, `update`, `replace`, and `merge` rows at the external provider. The operator must not remove `keep` rows or alter a `review` row.
 
-Use the provider's shortest safe migration TTL for changed records as shown in the approved sheet. Do not alter unrelated records to make the sheet easier to apply. Record the provider change time and retain the pre-change export with the approved handoff.
+Use the table's evidence-backed `Target / apply TTL` for each changed row. Do not alter unrelated records to make the sheet easier to apply. Record the provider change time and retain the pre-change export with the approved handoff.
 
 ## 5. Verify propagation and TLS
 
@@ -83,7 +83,7 @@ After the provider change, run the approved row-specific read-only verification 
 
 Then verify Caddy TLS against the public canonical host: the certificate chain must be valid for `v-b.tech`, `www` must follow the reviewed canonical behavior, and the expected release header/routes must resolve. This is a verification step only; it does not authorize public-form activation.
 
-Once propagation is stable, restore the normal approved TTL using another explicit provider change and record that action separately.
+Once propagation is stable, restore the evidence-backed `Normal / restore TTL` where it differs from the target TTL using another explicit provider change and record that action separately.
 
 ## 6. Roll back a failed DNS change
 

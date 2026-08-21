@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { buildDnsHandoff, renderMarkdownHandoff, type DnsHandoffInput, type DnsMergeRule } from "../build-handoff.js";
+import { parseDnsHandoffInput } from "../cli.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -115,7 +116,7 @@ describe("external DNS handoff builder", () => {
       expect.objectContaining({ name: "v-b.tech", type: "AAAA", value: "2001:db8::24", action: "add" }),
       expect.objectContaining({ name: "www.v-b.tech", type: "CNAME", value: "v-b.tech.", action: "add" }),
     ]));
-    expect(renderMarkdownHandoff(handoff)).toContain("| Name | Type | Value | TTL | Normal TTL | Purpose | Current value | Current TTL | Current RRset (value + TTL) | Action | Replacement or merge rule | Verification | Verification command | Rollback | Rollback value | Rollback TTL | Rollback RRset (value + TTL) |");
+    expect(renderMarkdownHandoff(handoff)).toContain("| Name | Type | Value | Target / apply TTL | Normal / restore TTL | Purpose | Current value | Current TTL | Current RRset (value + TTL) | Action | Replacement or merge rule | Verification | Verification command | Rollback | Rollback value | Rollback TTL | Rollback RRset (value + TTL) |");
   });
 
   // Catches a provider handoff that drops a verified Postbox requirement or emits it without
@@ -352,15 +353,25 @@ describe("external DNS handoff builder", () => {
     ]));
   });
 
-  // Catches treating a matching A value as a migration-TTL rewrite or hiding the current TTL
-  // needed for an exact rollback.
-  it("uses approved edge TTL evidence and preserves the actual TTL on an unchanged A record", () => {
+  // Catches treating a matching A value as an unchanged record when its current TTL differs from
+  // evidence-backed migration TTL, or hiding the current TTL needed for exact rollback.
+  it("uses approved edge TTL evidence and preserves the actual TTL on an A TTL update", () => {
     const input = handoffInput({
       edge: { ipv4: "198.51.100.24", evidence: { id: "edge-ttl", capturedAt: "2026-08-21T12:00:00.000Z", ipv4: "198.51.100.24", migrationTtl: 120, normalTtl: 3_600 } },
       currentZone: [...currentZone, { name: "v-b.tech", type: "A", value: "198.51.100.24", ttl: 900 }],
     } as unknown as DnsHandoffInput);
     const row = buildDnsHandoff(input).records.find((record) => record.name === "v-b.tech" && record.type === "A");
-    expect(row).toMatchObject({ action: "keep", ttl: 900, currentTtl: 900, rollbackTtl: 900, normalTtl: 3_600 });
+    expect(row).toMatchObject({ action: "update", ttl: 120, currentTtl: 900, rollbackTtl: 900, normalTtl: 3_600 });
+  });
+
+  // Catches treating an equal provider value as unchanged when its current TTL differs from the
+  // verified Postbox target TTL, which previously discarded the evidence-backed 300-second TTL.
+  it("emits a Postbox TTL update with distinct current, target, normal, and rollback TTLs", () => {
+    const currentDkim = { name: postboxRecords[1].name, type: "CNAME" as const, value: postboxRecords[1].value, ttl: 3_600 };
+    const handoff = buildDnsHandoff(handoffInput({ currentZone: [...currentZone, currentDkim] }));
+    const row = handoff.records.find((record) => record.name === currentDkim.name && record.type === "CNAME");
+    expect(row).toMatchObject({ action: "update", ttl: 300, currentTtl: 3_600, normalTtl: 300, rollbackTtl: 3_600 });
+    expect(renderMarkdownHandoff(handoff)).toContain("Target / apply TTL");
   });
 
   // Catches weak rule bookkeeping and delimiter-concatenated equality that can accept a different
@@ -396,6 +407,14 @@ describe("external DNS handoff builder", () => {
     ["evidence has unselected IPv6", { ipv4: "198.51.100.24", ipv6: undefined, evidence: handoffInput().edge!.evidence }],
   ])("rejects %s", (_label, edge) => {
     expect(() => buildDnsHandoff(handoffInput({ edge }))).toThrow("dns_handoff_unverified_edge_ip");
+  });
+
+  // Catches empty-string IPv6 values bypassing optional-value truthiness checks in both the pure
+  // builder and local JSON entry point.
+  it("rejects empty IPv6 in builder input and CLI JSON", () => {
+    const input = handoffInput({ edge: { ipv4: "198.51.100.24", ipv6: "", evidence: { ...handoffInput().edge!.evidence, ipv6: "" } } } as unknown as DnsHandoffInput);
+    expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_unresolved_edge_ip");
+    expect(() => parseDnsHandoffInput(input)).toThrow("dns_handoff_invalid_input");
   });
 
   // Catches treating a provider record with an unverified TTL as equivalent to the evidence.
@@ -451,5 +470,22 @@ describe("external DNS handoff builder", () => {
     ["unsafe owner", { name: "bad owner.v-b.tech", type: "TXT", value: "safe", ttl: 300 }],
   ] as const)("rejects %s", (_label, record) => {
     expect(() => buildDnsHandoff(handoffInput({ currentZone: [...currentZone, record] }))).toThrow(/dns_handoff_invalid_record/);
+  });
+
+  // Catches syntactically in-zone names that exceed DNS label limits or contain an empty label.
+  it.each([
+    ["64-character owner label", `${"a".repeat(64)}.v-b.tech`],
+    ["empty owner label", "bad..v-b.tech"],
+  ])("rejects %s", (_label, name) => {
+    expect(() => buildDnsHandoff(handoffInput({ currentZone: [...currentZone, { name, type: "TXT", value: "safe", ttl: 300 }] }))).toThrow("dns_handoff_invalid_record");
+  });
+
+  // Catches raw HTML-like record content being interpreted by the rendered operator sheet.
+  it("renders HTML-like record content literally", () => {
+    const markdown = renderMarkdownHandoff(buildDnsHandoff(handoffInput({
+      currentZone: [...currentZone, { name: "v-b.tech", type: "TXT", value: "literal <br> & safe", ttl: 3_600 }],
+    })));
+    expect(markdown).toContain("literal &lt;br&gt; &amp; safe");
+    expect(markdown).not.toContain("literal <br> & safe");
   });
 });

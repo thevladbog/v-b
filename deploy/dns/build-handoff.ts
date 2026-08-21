@@ -23,7 +23,12 @@ function rrsetId(record: Pick<DnsRecord, "name" | "type">): string { return `${r
 function compareText(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }
 function isSpf(record: DnsRecord): boolean { return record.type === "TXT" && /^v=spf1(?:\s|$)/i.test(record.value.trim()); }
 function isDmarc(record: DnsRecord): boolean { return record.type === "TXT" && /^v=dmarc1(?:\s*;|$)/i.test(record.value.trim()); }
-function isOwnedByVbtech(name: string): boolean { return name === VBTECH_DOMAIN || /^(?:[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?\.)+v-b\.tech$/.test(name); }
+function isOwnedByVbtech(name: string): boolean {
+  if (name !== name.toLowerCase() || name.length > 253) return false;
+  const labels = name.split(".");
+  if (labels.some((label) => !label || label.length > 63 || !/^[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?$/.test(label))) return false;
+  return name === VBTECH_DOMAIN || name.endsWith(`.${VBTECH_DOMAIN}`);
+}
 
 function validateRecord(record: DnsRecord): void {
   if (!record.name || !isOwnedByVbtech(record.name) || !record.value || /[\r\n\0]/.test(record.value) || !DNS_RECORD_TYPES.has(record.type) || !Number.isInteger(record.ttl) || record.ttl <= 0) fail("invalid_record");
@@ -153,9 +158,13 @@ function recordFor(desired: DnsRecord, purpose: string, verification: string, cu
     const ownerValue = ownerValuesOf(owner);
     return { record: row(desired, purpose, ownerValue, "replace", `${verification}; explicit replacement rule ${rule.id}`, "restore the rollback value", rule.id, ownerValue, null, normalTtl, null, owner, owner), replacedCurrent: owner };
   }
+  if (exact && rrset[0]?.ttl === desired.ttl) {
+    const actual = rrset[0]!;
+    return { record: row(desired, purpose, actual.value, "keep", verification, "no DNS change", null, actual.value, actual.ttl, normalTtl, actual.ttl, rrset, rrset), replacedCurrent: [] };
+  }
   if (exact) {
     const actual = rrset[0]!;
-    return { record: row(actual, purpose, actual.value, "keep", verification, "no DNS change", null, actual.value, actual.ttl, normalTtl, actual.ttl, rrset, rrset), replacedCurrent: [] };
+    return { record: row(desired, purpose, actual.value, "update", `${verification}; apply evidence-backed TTL`, "restore the rollback TTL", null, actual.value, actual.ttl, normalTtl, actual.ttl, rrset, rrset), replacedCurrent: [] };
   }
   if (!rrset.length) return { record: row(desired, purpose, null, "add", verification, "remove the added record", null, null, null, normalTtl, null), replacedCurrent: [] };
   if (desired.type === "TXT" && !requireTxtReplacement) return { record: row(desired, purpose, currentValue, "add", verification, "remove the added record", null, null, rrset.length === 1 ? rrset[0]!.ttl : null, normalTtl, null), replacedCurrent: [] };
@@ -173,8 +182,9 @@ export function buildDnsHandoff(input: DnsHandoffInput): DnsHandoff {
   if (!isCalendarDate(input.asOf)) fail("invalid_date");
   if (!input.currentZone) fail("missing_current_zone");
   if (!input.edge || !input.postbox) fail("missing_required_evidence");
-  if (isIP(input.edge.ipv4) !== 4 || input.edge.ipv6 && isIP(input.edge.ipv6) !== 6) fail("unresolved_edge_ip");
+  if (isIP(input.edge.ipv4) !== 4 || input.edge.ipv6 !== undefined && (!input.edge.ipv6 || isIP(input.edge.ipv6) !== 6)) fail("unresolved_edge_ip");
   validateEvidence(input.edge.evidence.id, input.edge.evidence.capturedAt);
+  if (input.edge.evidence.ipv6 !== undefined && (!input.edge.evidence.ipv6 || isIP(input.edge.evidence.ipv6) !== 6)) fail("unverified_edge_ip");
   if (input.edge.evidence.ipv4 !== input.edge.ipv4 || (input.edge.evidence.ipv6 ?? null) !== (input.edge.ipv6 ?? null)) fail("unverified_edge_ip");
   if (!Number.isInteger(input.edge.evidence.migrationTtl) || input.edge.evidence.migrationTtl <= 0 || !Number.isInteger(input.edge.evidence.normalTtl) || input.edge.evidence.normalTtl <= 0) fail("invalid_evidence");
   input.currentZone.forEach(validateRecord);
@@ -185,20 +195,20 @@ export function buildDnsHandoff(input: DnsHandoffInput): DnsHandoff {
   if (input.edge.ipv6) edgeRecords.push({ name: VBTECH_DOMAIN, type: "AAAA", value: input.edge.ipv6, ttl: input.edge.evidence.migrationTtl });
   const providerRecords = input.postbox.records.filter((record) => record.purpose !== "spf");
   validateUniqueTargetRrsets([...edgeRecords, ...providerRecords]);
-  const plans = [...edgeRecords.map((record) => recordFor(record, record.type === "A" ? "v-b.tech edge IPv4" : record.type === "AAAA" ? "v-b.tech edge IPv6" : "www canonical alias", `approved edge inventory ${input.edge!.evidence.id}`, input.currentZone!, rules, input.edge!.evidence.normalTtl)), ...providerRecords.map((record) => recordFor(record, providerPurpose(record), `verified Postbox evidence ${input.postbox!.evidence.id}`, input.currentZone!, rules, null, record.purpose === "dkim" && record.type === "TXT"))];
+  const plans = [...edgeRecords.map((record) => recordFor(record, record.type === "A" ? "v-b.tech edge IPv4" : record.type === "AAAA" ? "v-b.tech edge IPv6" : "www canonical alias", `approved edge inventory ${input.edge!.evidence.id}`, input.currentZone!, rules, input.edge!.evidence.normalTtl)), ...providerRecords.map((record) => recordFor(record, providerPurpose(record), `verified Postbox evidence ${input.postbox!.evidence.id}`, input.currentZone!, rules, record.ttl, record.purpose === "dkim" && record.type === "TXT"))];
   const records = plans.map((plan) => plan.record);
   const handledCurrent = new Set(plans.flatMap((plan) => plan.replacedCurrent.map(exactRecordId)));
   const providerSpf = input.postbox.records.find((record) => record.purpose === "spf")!;
   const currentSpf = input.currentZone.filter((record) => record.name === providerSpf.name && isSpf(record));
   if (currentSpf.length > 1) fail("multiple_spf_records");
   if (!currentSpf.length) {
-    const plan = recordFor(providerSpf, providerPurpose(providerSpf), `verified Postbox evidence ${input.postbox.evidence.id}`, input.currentZone, rules);
+    const plan = recordFor(providerSpf, providerPurpose(providerSpf), `verified Postbox evidence ${input.postbox.evidence.id}`, input.currentZone, rules, providerSpf.ttl);
     records.push(plan.record);
     plan.replacedCurrent.forEach((record) => handledCurrent.add(exactRecordId(record)));
   } else {
     const rule = findRule(rules, providerSpf);
     if (!rule || rule.kind !== "append-spf-mechanism" || rule.currentValue !== currentSpf[0]?.value || rule.providerValue !== providerSpf.value) fail("spf_merge_rule_required");
-    records.push(row({ ...providerSpf, value: mergeSpf(rule.currentValue, rule.providerValue) }, "merged SPF authorization", currentSpf[0].value, "merge", `verified Postbox evidence ${input.postbox.evidence.id}; explicit merge rule ${rule.id}`, "restore the rollback value", rule.id, currentSpf[0].value, currentSpf[0].ttl, null, currentSpf[0].ttl, currentSpf, currentSpf));
+    records.push(row({ ...providerSpf, value: mergeSpf(rule.currentValue, rule.providerValue) }, "merged SPF authorization", currentSpf[0].value, "merge", `verified Postbox evidence ${input.postbox.evidence.id}; explicit merge rule ${rule.id}`, "restore the rollback value", rule.id, currentSpf[0].value, currentSpf[0].ttl, providerSpf.ttl, currentSpf[0].ttl, currentSpf, currentSpf));
     handledCurrent.add(exactRecordId(currentSpf[0]));
   }
   const usedRuleIds = new Set(records.map((record) => record.mergeRule).filter((id): id is string => id !== null));
@@ -212,10 +222,10 @@ export function buildDnsHandoff(input: DnsHandoffInput): DnsHandoff {
   }
   return Object.freeze({ asOf: input.asOf, records: Object.freeze(records.sort((left, right) => compareText(exactRecordId(left), exactRecordId(right)))) });
 }
-function markdownCell(value: string | number | null): string { return value === null ? "—" : String(value).replaceAll("\\", "\\\\").replaceAll("|", "\\|").replace(/[\r\n]/g, " "); }
+function markdownCell(value: string | number | null): string { return value === null ? "—" : String(value).replaceAll("\\", "\\\\").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("|", "\\|").replace(/[\r\n]/g, " "); }
 function recordsCell(records: readonly { type: DnsRecordType; value: string; ttl: number }[]): string { return records.length ? JSON.stringify(records) : "—"; }
 export function renderMarkdownHandoff(handoff: DnsHandoff): string {
-  const header = "| Name | Type | Value | TTL | Normal TTL | Purpose | Current value | Current TTL | Current RRset (value + TTL) | Action | Replacement or merge rule | Verification | Verification command | Rollback | Rollback value | Rollback TTL | Rollback RRset (value + TTL) |";
+  const header = "| Name | Type | Value | Target / apply TTL | Normal / restore TTL | Purpose | Current value | Current TTL | Current RRset (value + TTL) | Action | Replacement or merge rule | Verification | Verification command | Rollback | Rollback value | Rollback TTL | Rollback RRset (value + TTL) |";
   const divider = "| --- | --- | --- | ---: | ---: | --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- | ---: | --- |";
   const rows = handoff.records.map((record) => [record.name, record.type, record.value, record.ttl, record.normalTtl, record.purpose, record.currentValue, record.currentTtl, recordsCell(record.currentRecords), record.action, record.mergeRule, record.verification, record.verificationCommand, record.rollback, record.rollbackValue, record.rollbackTtl, recordsCell(record.rollbackRecords)].map(markdownCell).join(" | "));
   return [`# v-b.tech external DNS handoff — ${handoff.asOf}`, "", header, divider, ...rows.map((value) => `| ${value} |`), ""].join("\n");

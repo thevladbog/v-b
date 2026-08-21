@@ -23,6 +23,7 @@ export interface EvidenceReference {
 
 export interface EdgeInventoryEvidence extends EvidenceReference {
   readonly ipv4: string;
+  /** Omit when IPv6 is not selected; the empty string is invalid. */
   readonly ipv6?: string;
   readonly migrationTtl: number;
   readonly normalTtl: number;
@@ -30,6 +31,7 @@ export interface EdgeInventoryEvidence extends EvidenceReference {
 
 export interface EdgeInventory {
   readonly ipv4: string;
+  /** Omit when IPv6 is not selected; the empty string is invalid. */
   readonly ipv6?: string;
   readonly evidence: EdgeInventoryEvidence;
 }
@@ -88,7 +90,7 @@ export interface DnsHandoffInput {
   readonly mergeRules?: readonly DnsMergeRule[];
 }
 
-export type DnsHandoffAction = "add" | "keep" | "merge" | "replace" | "review";
+export type DnsHandoffAction = "add" | "keep" | "merge" | "replace" | "review" | "update";
 
 export interface DnsHandoffRecord extends DnsRecord {
   readonly purpose: string;
