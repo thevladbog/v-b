@@ -90,6 +90,22 @@ describe("contact request contract", () => {
   ] as const)("rejects a control character in %s", (field, value) => {
     expect(() => contactRequestSchema.parse({ ...validRequest, [field]: value })).toThrow();
   });
+
+  // Catches a production break that trims boundary CR/LF away before rejecting it.
+  it.each([
+    ["leading name", "name", "\r\nVlad"],
+    ["trailing name", "name", "Vlad\r\n"],
+    ["leading contact", "contact", "\r\nhello@example.com"],
+    ["trailing contact", "contact", "hello@example.com\r\n"],
+    ["leading message", "message", "\r\nA concrete product problem"],
+    ["trailing message", "message", "A concrete product problem\r\n"],
+    ["leading consent ID", "consentId", "\r\nVBT-PD-02/DRAFT"],
+    ["trailing consent ID", "consentId", "VBT-PD-02/DRAFT\r\n"],
+    ["leading captcha token", "captchaToken", "\r\nopaque-token"],
+    ["trailing captcha token", "captchaToken", "opaque-token\r\n"],
+  ] as const)("rejects %s CR/LF before normalization", (_label, field, value) => {
+    expect(() => contactRequestSchema.parse({ ...validRequest, [field]: value })).toThrow();
+  });
 });
 
 describe("email contact guard", () => {
@@ -102,11 +118,13 @@ describe("email contact guard", () => {
 });
 
 describe("public contact responses", () => {
-  // Catches a production break that changes the finite public error vocabulary consumed by browser clients.
-  it("exposes only the reviewed public error codes", () => {
+  // Catches a production break that exposes the obsolete consent error spelling to browser clients.
+  it("exposes consent_revision_changed and excludes the obsolete consent spelling", () => {
+    expect(CONTACT_ERROR_CODES).toContain("consent_revision_changed");
+    expect(CONTACT_ERROR_CODES).not.toContain("consent_changed");
     expect(CONTACT_ERROR_CODES).toEqual([
       "invalid_request",
-      "consent_changed",
+      "consent_revision_changed",
       "captcha_required",
       "captcha_rejected",
       "captcha_unavailable",

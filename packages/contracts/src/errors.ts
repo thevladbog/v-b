@@ -1,6 +1,6 @@
 export const CONTACT_ERROR_CODES = [
   "invalid_request",
-  "consent_changed",
+  "consent_revision_changed",
   "captcha_required",
   "captcha_rejected",
   "captcha_unavailable",

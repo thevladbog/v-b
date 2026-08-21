@@ -10,9 +10,12 @@ const TELEGRAM_CONTACT = /^@[A-Za-z0-9_]{5,32}$/;
 const hasNoControlCharacters = (value: string) => !CONTROL_CHARACTER.test(value);
 
 const boundedText = (maximum: number) =>
-  z.string().trim().min(1).max(maximum).refine(hasNoControlCharacters, {
-    message: "Control characters are not supported",
-  });
+  z
+    .string()
+    .refine(hasNoControlCharacters, { message: "Control characters are not supported" })
+    .trim()
+    .min(1)
+    .max(maximum);
 
 export const isEmailContact = (contact: string): boolean =>
   hasNoControlCharacters(contact) && EMAIL_CONTACT.test(contact);
