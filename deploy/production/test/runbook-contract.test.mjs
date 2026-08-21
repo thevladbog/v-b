@@ -239,29 +239,53 @@ test("enabled activation independently proves ACTIVE legal releases and direct c
   const command = commandBody(source, title);
   const parser = evidenceParser(command, title);
   const evidenceDir = await mkdtemp(join(tmpdir(), "vbtech-active-evidence-"));
+  const writeFixtures = (overrides = new Map()) => Promise.all(
+    [...fixtures].map(([file, body]) => writeFile(join(evidenceDir, file), overrides.get(file) ?? body)),
+  );
+  const executeParser = (policy = policyId, consent = consentId) => execFileAsync(
+    process.execPath,
+    ["--input-type=module", "-e", parser, evidenceDir],
+    {
+      encoding: "utf8",
+      env: {
+        VBTECH_ACTIVE_POLICY_EVIDENCE: policy,
+        VBTECH_ACTIVE_CONSENT_EVIDENCE: consent,
+      },
+    },
+  );
   try {
-    await Promise.all([...fixtures].map(([file, body]) => writeFile(join(evidenceDir, file), body)));
+    await writeFixtures();
     await assert.rejects(
-      execFileAsync(process.execPath, ["--input-type=module", "-e", parser, evidenceDir], {
-        encoding: "utf8",
-        env: {
-          VBTECH_ACTIVE_POLICY_EVIDENCE: "VBT-PD-01/../../unsafe",
-          VBTECH_ACTIVE_CONSENT_EVIDENCE: consentId,
-        },
-      }),
+      executeParser("VBT-PD-01/../../unsafe"),
       /invalid_active_legal_evidence/,
     );
-    const { stdout, stderr } = await execFileAsync(
-      process.execPath,
-      ["--input-type=module", "-e", parser, evidenceDir],
-      {
-        encoding: "utf8",
-        env: {
-          VBTECH_ACTIVE_POLICY_EVIDENCE: policyId,
-          VBTECH_ACTIVE_CONSENT_EVIDENCE: consentId,
-        },
-      },
+    await assert.rejects(
+      executeParser("VBT-PD-01/2026.08/03"),
+      /evidence_mismatch:ru-policy\.html:VBT-PD-01\/2026\.08\/03/,
     );
+    await assert.rejects(
+      executeParser(policyId, "VBT-PD-02/2026.08/03"),
+      /evidence_mismatch:ru-consent\.html:VBT-PD-02\/2026\.08\/03/,
+    );
+
+    await writeFixtures(new Map([
+      ["en-consent.html", "EN active-body-en-consent-without-approved-marker"],
+    ]));
+    await assert.rejects(
+      executeParser(),
+      /evidence_mismatch:en-consent\.html:VBT-PD-02\/2026\.08\/02/,
+    );
+
+    await writeFixtures(new Map([
+      ["ru-home.html", "RU mailto:hello@v-b.tech active-body-ru-home-without-telegram"],
+    ]));
+    await assert.rejects(
+      executeParser(),
+      /evidence_mismatch:ru-home\.html:https:\/\/t\.me\/thevladbog/,
+    );
+
+    await writeFixtures();
+    const { stdout, stderr } = await executeParser();
     const lines = stdout.trim().split("\n");
     assert.equal(lines.length, 1);
     const output = JSON.parse(lines[0]);
