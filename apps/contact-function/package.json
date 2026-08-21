@@ -6,8 +6,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run test/crypto.test.ts test/db-test-helper.test.ts",
-    "test:db": "vitest run test/outbox-repository.test.ts",
+    "test": "vitest run test/crypto.test.ts test/db-test-helper.test.ts test/config.test.ts test/submit.test.ts test/captcha.test.ts test/http-handler.test.ts test/rate-limit-unit.test.ts",
+    "test:db": "vitest run test/outbox-repository.test.ts test/rate-limit.test.ts",
     "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "tsc --noEmit"
   },
