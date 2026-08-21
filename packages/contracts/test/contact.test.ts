@@ -55,6 +55,16 @@ describe("contact request contract", () => {
     ).toThrow();
   });
 
+  // Catches a production break that lets equivalent UUID spellings select different locks or AAD.
+  it("canonicalizes an uppercase request ID to lowercase", () => {
+    const parsed = contactRequestSchema.parse({
+      ...validRequest,
+      requestId: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+    });
+
+    expect(parsed.requestId).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  });
+
   // Catches a production break that permits mixed-case email input to produce inconsistent delivery addresses.
   it("accepts a lower-case email contact and rejects mixed case", () => {
     expect(contactRequestSchema.parse({ ...validRequest, contact: "hello@example.com" }).contact).toBe(

@@ -25,7 +25,7 @@ const isValidContact = (contact: string) =>
 
 export const contactRequestSchema = z
   .object({
-    requestId: z.uuid(),
+    requestId: z.uuid().transform((value) => value.toLowerCase()),
     locale: z.enum(CONTACT_LOCALES),
     name: boundedText(100),
     contact: boundedText(254).refine(isValidContact, {

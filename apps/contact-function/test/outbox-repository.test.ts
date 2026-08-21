@@ -105,6 +105,70 @@ describe("transactional contact acceptance", () => {
     expect(jobs.rows).toEqual([{ kind: "confirmation" }, { kind: "notification" }]);
   });
 
+  // Catches a production break that gives equivalent uppercase/lowercase UUIDs different advisory locks.
+  it("serializes concurrent retries across equivalent UUID spellings", async () => {
+    const uppercase = {
+      ...telegramRequest,
+      requestId: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+    };
+    const lowercase = {
+      ...uppercase,
+      requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      captchaToken: "second-proof",
+    };
+
+    const results = await Promise.all([
+      repository.accept(uppercase),
+      repository.accept(lowercase),
+    ]);
+
+    expect(results.sort()).toEqual(["created", "existing"]);
+    const rows = await pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM contact_requests",
+    );
+    expect(rows.rows[0]?.count).toBe("1");
+  });
+
+  // Catches a production break that encrypts AAD with uppercase input while leases return canonical UUID text.
+  it("decrypts an uppercase-ID request with its leased canonical context", async () => {
+    await repository.accept({
+      ...telegramRequest,
+      requestId: "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB",
+    });
+    const [leased] = await repository.leaseDue(1, "worker-a");
+
+    expect(leased?.publicRequestId).toBe("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+    expect(
+      decryptPayload(leased!.encryptedPayload, encryptionKey, {
+        requestId: leased!.publicRequestId,
+        kind: leased!.kind,
+      }),
+    ).toEqual({
+      locale: "en",
+      name: "Vlad",
+      contact: "@thevladbog",
+      message: "A concrete product problem",
+      sourcePath: "/en/",
+      consentId: "VBT-PD-02/DRAFT",
+    });
+  });
+
+  // Catches a production break that enqueues a request for an obsolete or client-selected consent revision.
+  it("rejects a consent revision mismatch without storing rows", async () => {
+    await expect(
+      repository.accept({ ...telegramRequest, consentId: "VBT-PD-01" }),
+    ).rejects.toThrow("consent_revision_changed");
+
+    const requests = await pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM contact_requests",
+    );
+    const jobs = await pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM email_outbox",
+    );
+    expect(requests.rows[0]?.count).toBe("0");
+    expect(jobs.rows[0]?.count).toBe("0");
+  });
+
   // Catches a production break that queues a confirmation for Telegram or omits it for a valid email.
   it("queues confirmation only for a valid lower-case email contact", async () => {
     await expect(repository.accept(telegramRequest)).resolves.toBe("created");
@@ -260,17 +324,66 @@ describe("outbox leasing and terminal ownership", () => {
     );
     const [recovered] = await repository.leaseDue(1, "worker-b");
 
-    await expect(repository.markDelivered(recovered!.id, "worker-a")).resolves.toBe(
-      "lease_lost",
-    );
-    await expect(repository.markDelivered(recovered!.id, "worker-b")).resolves.toBe(
-      "updated",
-    );
+    await expect(
+      repository.markDelivered(recovered!.id, "worker-a", recovered!.attemptCount),
+    ).resolves.toBe("lease_lost");
+    await expect(
+      repository.markDelivered(recovered!.id, "worker-b", recovered!.attemptCount),
+    ).resolves.toBe("updated");
     const row = await pool.query<{ delivered: boolean }>(
       "SELECT delivered_at IS NOT NULL AS delivered FROM email_outbox WHERE id = $1",
       [recovered!.id],
     );
     expect(row.rows[0]?.delivered).toBe(true);
+  });
+
+  // Catches a production break that lets a stale same-owner attempt complete a newer lease generation.
+  it("fences stale same-owner delivery after expiry and re-lease", async () => {
+    await resetContactTables(pool);
+    await repository.accept(telegramRequest);
+    const [stale] = await repository.leaseDue(1, "worker-a");
+    await pool.query(
+      "UPDATE email_outbox SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1",
+      [stale?.id],
+    );
+    const [current] = await repository.leaseDue(1, "worker-a");
+
+    await expect(
+      repository.markDelivered(stale!.id, "worker-a", stale!.attemptCount),
+    ).resolves.toBe("lease_lost");
+    await expect(
+      repository.markDelivered(current!.id, "worker-a", current!.attemptCount),
+    ).resolves.toBe("updated");
+  });
+
+  // Catches a production break that lets a stale same-owner attempt reschedule a newer lease generation.
+  it("fences stale same-owner reschedule after expiry and re-lease", async () => {
+    await resetContactTables(pool);
+    await repository.accept(telegramRequest);
+    const [stale] = await repository.leaseDue(1, "worker-a");
+    await pool.query(
+      "UPDATE email_outbox SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1",
+      [stale?.id],
+    );
+    const [current] = await repository.leaseDue(1, "worker-a");
+    const nextAttemptAt = new Date(Date.now() + 60_000);
+
+    await expect(
+      repository.reschedule(
+        stale!.id,
+        "worker-a",
+        stale!.attemptCount,
+        nextAttemptAt,
+      ),
+    ).resolves.toBe("lease_lost");
+    await expect(
+      repository.reschedule(
+        current!.id,
+        "worker-a",
+        current!.attemptCount,
+        nextAttemptAt,
+      ),
+    ).resolves.toBe("updated");
   });
 
   // Catches a production break that makes retryable jobs immediately due or leaves their old lease attached.
@@ -279,7 +392,12 @@ describe("outbox leasing and terminal ownership", () => {
     const nextAttemptAt = new Date(Date.now() + 60_000);
 
     await expect(
-      repository.reschedule(leased!.id, "worker-a", nextAttemptAt),
+      repository.reschedule(
+        leased!.id,
+        "worker-a",
+        leased!.attemptCount,
+        nextAttemptAt,
+      ),
     ).resolves.toBe("updated");
     const row = await pool.query<{
       next_attempt_at: Date;
@@ -298,10 +416,12 @@ describe("outbox leasing and terminal ownership", () => {
   it("marks a leased job permanently failed only for its owner", async () => {
     const [leased] = await repository.leaseDue(1, "worker-a");
 
-    await expect(repository.markFailed(leased!.id, "worker-b")).resolves.toBe(
-      "lease_lost",
-    );
-    await expect(repository.markFailed(leased!.id, "worker-a")).resolves.toBe("updated");
+    await expect(
+      repository.markFailed(leased!.id, "worker-b", leased!.attemptCount),
+    ).resolves.toBe("lease_lost");
+    await expect(
+      repository.markFailed(leased!.id, "worker-a", leased!.attemptCount),
+    ).resolves.toBe("updated");
     const row = await pool.query<{ failed: boolean }>(
       "SELECT failed_at IS NOT NULL AS failed FROM email_outbox WHERE id = $1",
       [leased!.id],

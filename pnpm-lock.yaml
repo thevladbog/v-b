@@ -20,6 +20,9 @@ importers:
       '@vbtech/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@vbtech/legal-documents':
+        specifier: workspace:*
+        version: link:../../packages/legal-documents
       pg:
         specifier: 8.22.0
         version: 8.22.0

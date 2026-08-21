@@ -6,13 +6,14 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run test/crypto.test.ts",
+    "test": "vitest run test/crypto.test.ts test/db-test-helper.test.ts",
     "test:db": "vitest run test/outbox-repository.test.ts",
     "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@vbtech/contracts": "workspace:*",
+    "@vbtech/legal-documents": "workspace:*",
     "pg": "8.22.0"
   },
   "devDependencies": {

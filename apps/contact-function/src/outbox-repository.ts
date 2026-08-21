@@ -5,6 +5,7 @@ import {
   isEmailContact,
   type ContactRequest,
 } from "@vbtech/contracts";
+import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import type { PoolClient } from "pg";
 import {
   encryptPayload,
@@ -29,13 +30,22 @@ export interface LeasedOutboxJob {
 
 export interface OutboxLeaseRepository {
   leaseDue(limit: number, workerId: string): Promise<LeasedOutboxJob[]>;
-  markDelivered(jobId: string, workerId: string): Promise<StateUpdateResult>;
+  markDelivered(
+    jobId: string,
+    workerId: string,
+    attemptCount: number,
+  ): Promise<StateUpdateResult>;
   reschedule(
     jobId: string,
     workerId: string,
+    attemptCount: number,
     nextAttemptAt: Date,
   ): Promise<StateUpdateResult>;
-  markFailed(jobId: string, workerId: string): Promise<StateUpdateResult>;
+  markFailed(
+    jobId: string,
+    workerId: string,
+    attemptCount: number,
+  ): Promise<StateUpdateResult>;
 }
 
 interface DurableContactRequest {
@@ -120,6 +130,9 @@ export class OutboxRepository implements OutboxLeaseRepository {
 
   async accept(input: ContactRequest): Promise<AcceptResult> {
     const request = contactRequestSchema.parse(input);
+    if (request.consentId !== CURRENT_CONTACT_CONSENT_ID) {
+      throw new Error("consent_revision_changed");
+    }
     const durable = durableRequest(request);
     const contentHash = durableHash(durable);
     const client = await this.pool.connect();
@@ -246,10 +259,12 @@ export class OutboxRepository implements OutboxLeaseRepository {
   async markDelivered(
     jobId: string,
     workerId: string,
+    attemptCount: number,
   ): Promise<StateUpdateResult> {
     return this.updateOwnedLease(
       jobId,
       workerId,
+      attemptCount,
       `delivered_at = clock_timestamp(),
        lease_owner = NULL,
        lease_expires_at = NULL`,
@@ -259,6 +274,7 @@ export class OutboxRepository implements OutboxLeaseRepository {
   async reschedule(
     jobId: string,
     workerId: string,
+    attemptCount: number,
     nextAttemptAt: Date,
   ): Promise<StateUpdateResult> {
     if (Number.isNaN(nextAttemptAt.getTime())) {
@@ -267,17 +283,23 @@ export class OutboxRepository implements OutboxLeaseRepository {
     return this.updateOwnedLease(
       jobId,
       workerId,
-      `next_attempt_at = $3,
+      attemptCount,
+      `next_attempt_at = $4,
        lease_owner = NULL,
        lease_expires_at = NULL`,
       nextAttemptAt,
     );
   }
 
-  async markFailed(jobId: string, workerId: string): Promise<StateUpdateResult> {
+  async markFailed(
+    jobId: string,
+    workerId: string,
+    attemptCount: number,
+  ): Promise<StateUpdateResult> {
     return this.updateOwnedLease(
       jobId,
       workerId,
+      attemptCount,
       `failed_at = clock_timestamp(),
        lease_owner = NULL,
        lease_expires_at = NULL`,
@@ -287,10 +309,14 @@ export class OutboxRepository implements OutboxLeaseRepository {
   private async updateOwnedLease(
     jobId: string,
     workerId: string,
+    attemptCount: number,
     assignment: string,
     value?: Date,
   ): Promise<StateUpdateResult> {
     assertLeaseInput(1, workerId);
+    if (!Number.isInteger(attemptCount) || attemptCount < 1) {
+      throw new Error("invalid_lease_fence");
+    }
     const result = await this.pool.connect();
     try {
       const updated = await result.query(
@@ -298,10 +324,13 @@ export class OutboxRepository implements OutboxLeaseRepository {
          SET ${assignment}
          WHERE id = $1
            AND lease_owner = $2
+           AND attempt_count = $3
            AND lease_expires_at > clock_timestamp()
            AND delivered_at IS NULL
            AND failed_at IS NULL`,
-        value === undefined ? [jobId, workerId] : [jobId, workerId, value],
+        value === undefined
+          ? [jobId, workerId, attemptCount]
+          : [jobId, workerId, attemptCount, value],
       );
       return updated.rowCount === 1 ? "updated" : "lease_lost";
     } finally {
