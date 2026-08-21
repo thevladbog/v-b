@@ -207,6 +207,7 @@ test("form activation requires approved active legal releases and its own approv
     "form-activation-approval",
     "backend-enable",
     "web-enable",
+    "active-legal-contact-evidence",
     "public-form-smoke",
   ]);
   assert.match(source, /VBT-PD-01[^\n]*ACTIVE/i);
@@ -215,6 +216,72 @@ test("form activation requires approved active legal releases and its own approv
   assert.match(source, /DNS approval[^\n]*does not authorize[^\n]*form activation/i);
   assert.match(source, /controlled non-sensitive test data/i);
   commandCards(source, "form-activation");
+});
+
+test("enabled activation independently proves ACTIVE legal releases and direct contacts", async () => {
+  const source = await runbook("form-activation");
+  const title = "Verify enabled ACTIVE legal releases and direct contacts";
+  const policyId = "VBT-PD-01/2026.08/01";
+  const consentId = "VBT-PD-02/2026.08/02";
+  const fixtures = new Map([
+    ["ru-home.html", "RU mailto:hello@v-b.tech https://t.me/thevladbog active-body-ru-home"],
+    ["en-home.html", "EN mailto:hello@v-b.tech https://t.me/thevladbog active-body-en-home"],
+    ["ru-policy.html", `RU ${policyId} active-body-ru-policy`],
+    ["en-policy.html", `EN ${policyId} active-body-en-policy`],
+    ["ru-consent.html", `RU ${consentId} active-body-ru-consent`],
+    ["en-consent.html", `EN ${consentId} active-body-en-consent`],
+  ]);
+  const expectedResponses = [...fixtures].map(([file, body]) => ({
+    file,
+    sha256: createHash("sha256").update(body, "utf8").digest("hex"),
+  }));
+
+  const command = commandBody(source, title);
+  const parser = evidenceParser(command, title);
+  const evidenceDir = await mkdtemp(join(tmpdir(), "vbtech-active-evidence-"));
+  try {
+    await Promise.all([...fixtures].map(([file, body]) => writeFile(join(evidenceDir, file), body)));
+    await assert.rejects(
+      execFileAsync(process.execPath, ["--input-type=module", "-e", parser, evidenceDir], {
+        encoding: "utf8",
+        env: {
+          VBTECH_ACTIVE_POLICY_EVIDENCE: "VBT-PD-01/../../unsafe",
+          VBTECH_ACTIVE_CONSENT_EVIDENCE: consentId,
+        },
+      }),
+      /invalid_active_legal_evidence/,
+    );
+    const { stdout, stderr } = await execFileAsync(
+      process.execPath,
+      ["--input-type=module", "-e", parser, evidenceDir],
+      {
+        encoding: "utf8",
+        env: {
+          VBTECH_ACTIVE_POLICY_EVIDENCE: policyId,
+          VBTECH_ACTIVE_CONSENT_EVIDENCE: consentId,
+        },
+      },
+    );
+    const lines = stdout.trim().split("\n");
+    assert.equal(lines.length, 1);
+    const output = JSON.parse(lines[0]);
+
+    assert.equal(stderr, "");
+    assert.deepEqual(Object.keys(output), ["responses"]);
+    assert.equal(output.responses.length, 6);
+    assert.deepEqual(
+      output.responses.map((response) => Object.keys(response)),
+      Array.from({ length: 6 }, () => ["file", "sha256"]),
+    );
+    assert.deepEqual(output.responses, expectedResponses);
+    assert.ok(output.responses.every(({ sha256 }) => /^[0-9a-f]{64}$/.test(sha256)));
+    assert.doesNotMatch(stdout, /active-body/);
+  } finally {
+    await rm(evidenceDir, { recursive: true, force: true });
+  }
+
+  assert.match(source, /activation is accepted only when[^\n]*ACTIVE legal\/contact evidence/i);
+  assert.match(source, /tabletop[^\n]*ACTIVE legal\/contact evidence[^\n]*generic route smoke/i);
 });
 
 test("monthly retention evidence covers terminal payload, metadata, and mailbox lifecycle", async () => {

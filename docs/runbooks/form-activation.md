@@ -77,7 +77,40 @@ Only after the backend enable evidence passes, deploy the approved immutable ACT
 
 If the image digest, release header, legal IDs, form state, route, or CSP differs, immediately execute rollback action 1 from `rollback.md`: redeploy the pre-approved disabled web artifact while keeping legal pages and direct contacts. The current publication workflow cannot produce an immutable ACTIVE release, so this gate is presently blocked.
 
-## Gate A6 — Public form smoke
+## Gate A6 — Enabled ACTIVE legal and contact evidence
+
+Gate ID: `active-legal-contact-evidence`
+
+The enabled web deployment replaces the disabled/DRAFT public bytes. The generic route smoke does not inspect the policy page identity, consent page identity, or direct-contact links, so it cannot prove that the approved ACTIVE legal contour survived that replacement. Run this independent READ-ONLY evidence gate immediately after Gate A5 and before the generic enabled smoke.
+
+### Command: Verify enabled ACTIVE legal releases and direct contacts
+
+- Target/resource: six exact canonical HTTPS routes after enabled deployment: RU/EN landings, policy pages, and consent pages on `https://v-b.tech`
+- Classification: **READ-ONLY**
+- Expected output: marker validation succeeds and one JSON line contains only an ordered six-entry `responses` array with exact `file` and lowercase SHA-256 fields
+- Bounded failure branch: stop activation acceptance and the generic smoke, remove temporary HTML, retain only the failed route/marker name, and immediately restore the approved disabled web artifact
+
+```bash
+set -euo pipefail
+: "${VBTECH_ACTIVE_POLICY_EVIDENCE:?set to the exact approved ACTIVE VBT-PD-01 release identity from activation approval}"
+: "${VBTECH_ACTIVE_CONSENT_EVIDENCE:?set to the exact approved ACTIVE VBT-PD-02 release identity from activation approval}"
+[[ "$VBTECH_ACTIVE_POLICY_EVIDENCE" =~ ^VBT-PD-01/[0-9]{4}\.[0-9]{2}/[0-9]{2}$ ]]
+[[ "$VBTECH_ACTIVE_CONSENT_EVIDENCE" =~ ^VBT-PD-02/[0-9]{4}\.[0-9]{2}/[0-9]{2}$ ]]
+export VBTECH_ACTIVE_POLICY_EVIDENCE VBTECH_ACTIVE_CONSENT_EVIDENCE
+evidence_dir="$(mktemp -d)"
+trap 'rm -rf "$evidence_dir"' EXIT
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/" --output "$evidence_dir/ru-home.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/" --output "$evidence_dir/en-home.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/privacy/" --output "$evidence_dir/ru-policy.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/privacy/" --output "$evidence_dir/en-policy.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/personal-data-consent/" --output "$evidence_dir/ru-consent.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/personal-data-consent/" --output "$evidence_dir/en-consent.html"
+node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFile } from "node:fs/promises"; import { join } from "node:path"; const dir = process.argv[1]; const policy = process.env.VBTECH_ACTIVE_POLICY_EVIDENCE ?? ""; const consent = process.env.VBTECH_ACTIVE_CONSENT_EVIDENCE ?? ""; if (!/^VBT-PD-01\/[0-9]{4}\.[0-9]{2}\/[0-9]{2}$/.test(policy) || !/^VBT-PD-02\/[0-9]{4}\.[0-9]{2}\/[0-9]{2}$/.test(consent)) throw new Error("invalid_active_legal_evidence"); const checks = [["ru-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["en-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["ru-policy.html", [policy]], ["en-policy.html", [policy]], ["ru-consent.html", [consent]], ["en-consent.html", [consent]]]; const hashes = []; for (const [file, markers] of checks) { const body = await readFile(join(dir, file)); const html = body.toString("utf8"); for (const marker of markers) if (!html.includes(marker)) throw new Error(`evidence_mismatch:${file}:${marker}`); hashes.push({ file, sha256: createHash("sha256").update(body).digest("hex") }); } process.stdout.write(`${JSON.stringify({ responses: hashes })}\n`);' "$evidence_dir"
+```
+
+Record the exact approved policy and consent identities, the ordered six-entry `responses` array, enabled web digest/release SHA, operator, and UTC time. Do not store response bodies.
+
+## Gate A7 — Public form smoke
 
 Gate ID: `public-form-smoke`
 
@@ -100,4 +133,6 @@ export VBTECH_ACTIVE_RELEASE_SHA_EVIDENCE VBTECH_ACTIVE_CONSENT_EVIDENCE
 node --input-type=module -e 'import { runSmoke } from "./deploy/production/smoke.mjs"; const result = await runSmoke({ baseUrl: "https://v-b.tech", mode: "public", expected: { releaseSha: process.env.VBTECH_ACTIVE_RELEASE_SHA_EVIDENCE, submissionState: "enabled", consentId: process.env.VBTECH_ACTIVE_CONSENT_EVIDENCE } }); process.stdout.write(`${JSON.stringify(result)}\n`);'
 ```
 
-The activation is accepted only when the exact public release is visible, the controlled case is accepted once, the operator mailbox receives the expected notification, the visitor confirmation matches the approved channel behavior, and the timer/retention telemetry remains content-free. Otherwise perform `rollback.md` in order.
+The activation is accepted only when the post-deployment ACTIVE legal/contact evidence passes separately from the generic route smoke, the exact public release is visible, the controlled case is accepted once, the operator mailbox receives the expected notification, the visitor confirmation matches the approved channel behavior, and the timer/retention telemetry remains content-free. Otherwise perform `rollback.md` in order.
+
+The activation tabletop must cite the passing post-enabled-deployment ACTIVE legal/contact evidence separately from the generic route smoke and demonstrate that rollback action 1 disables the form without removing those legal pages or direct contacts.
