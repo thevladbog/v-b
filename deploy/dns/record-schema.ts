@@ -24,6 +24,8 @@ export interface EvidenceReference {
 export interface EdgeInventoryEvidence extends EvidenceReference {
   readonly ipv4: string;
   readonly ipv6?: string;
+  readonly migrationTtl: number;
+  readonly normalTtl: number;
 }
 
 export interface EdgeInventory {
@@ -34,10 +36,12 @@ export interface EdgeInventory {
 
 export interface PostboxVerificationEvidence extends EvidenceReference {
   readonly status: "verified" | "pending" | "failed";
-  readonly records: readonly DnsRecord[];
+  readonly customMailFrom: "configured" | "not-configured";
+  readonly records: readonly PostboxRecord[];
 }
 
 export interface PostboxHandoffInput {
+  readonly customMailFrom: "configured" | "not-configured";
   readonly evidence: PostboxVerificationEvidence;
   readonly records: readonly PostboxRecord[];
 }
@@ -48,11 +52,13 @@ export interface ReplaceRecordMergeRule {
   readonly name: string;
   readonly type: DnsRecordType;
   readonly currentValues: readonly string[];
+  readonly currentRecords?: readonly CurrentOwnerRecord[];
 }
 
 export interface CurrentOwnerRecord {
   readonly type: DnsRecordType;
   readonly value: string;
+  readonly ttl: number;
 }
 
 export interface ReplaceCnameOwnerRecordsRule {
@@ -87,12 +93,19 @@ export type DnsHandoffAction = "add" | "keep" | "merge" | "replace" | "review";
 export interface DnsHandoffRecord extends DnsRecord {
   readonly purpose: string;
   readonly currentValue: string | null;
+  readonly currentTtl: number | null;
+  readonly normalTtl: number | null;
   readonly action: DnsHandoffAction;
   readonly mergeRule: string | null;
   readonly verification: string;
   readonly verificationCommand: string;
   readonly rollback: string;
   readonly rollbackValue: string | null;
+  readonly rollbackTtl: number | null;
+  /** Exact supplied owner data when a row keeps, merges, or replaces an RRset. */
+  readonly currentRecords: readonly CurrentOwnerRecord[];
+  /** Exact local rollback data, including every value and TTL. */
+  readonly rollbackRecords: readonly CurrentOwnerRecord[];
 }
 
 export interface DnsHandoff {

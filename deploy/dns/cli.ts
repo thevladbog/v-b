@@ -36,12 +36,25 @@ function mergeRule(value: unknown): DnsMergeRule {
   const kind = string(source.kind);
   const type = string(source.type) as DnsRecordType;
   if (!recordTypes.has(type)) fail("invalid_input");
-  if (kind === "replace-record") return { id, kind, name, type, currentValues: array(source.currentValues).map(string) };
+  const currentOwnerRecords = (sourceValue: unknown) => array(sourceValue).map((item) => {
+    const current = object(item);
+    const currentType = string(current.type) as DnsRecordType;
+    if (!recordTypes.has(currentType)) fail("invalid_input");
+    return { type: currentType, value: string(current.value), ttl: integer(current.ttl) };
+  });
+  if (kind === "replace-record") return {
+    id,
+    kind,
+    name,
+    type,
+    currentValues: array(source.currentValues).map(string),
+    ...(source.currentRecords === undefined ? {} : { currentRecords: currentOwnerRecords(source.currentRecords) }),
+  };
   if (kind === "replace-cname-owner-records") return { id, kind, name, type, currentRecords: array(source.currentRecords).map((item) => {
     const current = object(item);
     const currentType = string(current.type) as DnsRecordType;
     if (!recordTypes.has(currentType)) fail("invalid_input");
-    return { type: currentType, value: string(current.value) };
+    return { type: currentType, value: string(current.value), ttl: integer(current.ttl) };
   }) };
   if (kind === "append-spf-mechanism" && type === "TXT") return { id, kind, name, type, currentValue: string(source.currentValue), providerValue: string(source.providerValue) };
   fail("invalid_input");
@@ -61,11 +74,12 @@ export function parseDnsHandoffInput(value: unknown): DnsHandoffInput {
     edge: {
       ipv4: string(edge.ipv4),
       ipv6: optionalString(edge.ipv6),
-      evidence: { id: string(edgeEvidence.id), capturedAt: string(edgeEvidence.capturedAt), ipv4: string(edgeEvidence.ipv4), ipv6: optionalString(edgeEvidence.ipv6) },
+      evidence: { id: string(edgeEvidence.id), capturedAt: string(edgeEvidence.capturedAt), ipv4: string(edgeEvidence.ipv4), ipv6: optionalString(edgeEvidence.ipv6), migrationTtl: integer(edgeEvidence.migrationTtl), normalTtl: integer(edgeEvidence.normalTtl) },
     },
     postbox: {
+      customMailFrom: string(postbox.customMailFrom) as "configured" | "not-configured",
       records: array(postbox.records).map(postboxRecord),
-      evidence: { id: string(postboxEvidence.id), capturedAt: string(postboxEvidence.capturedAt), status, records: array(postboxEvidence.records).map(record) },
+      evidence: { id: string(postboxEvidence.id), capturedAt: string(postboxEvidence.capturedAt), status, customMailFrom: string(postboxEvidence.customMailFrom) as "configured" | "not-configured", records: array(postboxEvidence.records).map(postboxRecord) },
     },
     mergeRules: source.mergeRules === undefined ? [] : array(source.mergeRules).map(mergeRule),
   };

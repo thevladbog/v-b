@@ -17,30 +17,32 @@ Never substitute an example, a remembered provider value, a lookup result, or a 
 
 Export the whole zone from the external provider without changing any records. Preserve the original export with its capture time. Its typed `currentZone` input must include every relevant A, AAAA, CNAME, MX, and TXT record, including unrelated TXT records and every existing SPF/DMARC policy.
 
-Record the approved edge inventory as `edge.evidence`; the inventory must have a stable evidence ID, capture timestamp, and exact `ipv4` (plus optional `ipv6`) values. Copy only those same addresses into `edge.ipv4` and `edge.ipv6`; the builder rejects an address that does not appear in its supplied inventory evidence.
+Record the approved edge inventory as `edge.evidence`; it must have a stable evidence ID, capture timestamp, exact `ipv4` (plus optional `ipv6`), and evidence-backed positive `migrationTtl` and `normalTtl` values. Copy only those same addresses into `edge.ipv4` and `edge.ipv6`; IPv6 must be absent from both places or match exactly. The builder rejects an address or TTL plan that is not backed by the supplied inventory evidence.
 
-Copy every Postbox value directly from the supplied verification output into both `postbox.records` and `postbox.evidence.records`. Mark the evidence `verified` only after the supplied output reports that status. Associate each required record with one of these purposes:
+Copy every Postbox value directly from the supplied verification output into both `postbox.records` and `postbox.evidence.records`, preserving owner, type, value, TTL, purpose, and multiplicity exactly. Mark the evidence `verified` only after the supplied output reports that status. Set `postbox.customMailFrom` and `postbox.evidence.customMailFrom` to the same explicit state: `configured` requires the exact custom MAIL FROM record(s); `not-configured` permits none. Associate each required record with one of these purposes:
 
 - `domain-verification`
 - `dkim`
 - `custom-mail-from`
 - `spf`
 
-The builder rejects pending/failed Postbox output and rejects any record value that does not appear exactly in the supplied verified evidence.
+The builder rejects pending/failed Postbox output, a subset of verified requirements (including a missing DKIM selector), a mismatched TTL, and any record value that does not appear exactly in the supplied verified evidence.
 
 ## 2. State every deliberate replacement or SPF merge
 
-The normal result is additive. If an existing A, AAAA, CNAME, or other non-TXT RRset would be replaced, add a `replace-record` merge rule that names the exact owner/type and every current value. The builder rejects the sheet when that rule does not match the current-zone export exactly.
+The normal result is additive. If an existing A, AAAA, CNAME, or other non-TXT RRset would be replaced, add a `replace-record` merge rule that names the exact owner/type and every current value. The builder rejects the sheet when that rule does not match the current-zone export exactly. Rule IDs must be nonblank and unique; every supplied rule must be used by exactly one unambiguous row.
 
-A CNAME is stricter: it cannot coexist with any other owner data. If a desired CNAME has any current record at the same owner, use a `replace-cname-owner-records` rule. Its `currentRecords` must list the exact type/value pair for every current record at that owner; a missing or extra record fails the build. The resulting row contains the rule ID and complete rollback value.
+A CNAME is stricter: it cannot coexist with any other owner data. If a desired CNAME has any current record at the same owner, use a `replace-cname-owner-records` rule. Its `currentRecords` must list the exact type/value/TTL tuple for every current record at that owner; a missing or extra record fails the build. The resulting row contains the rule ID and complete rollback RRset.
 
-If the zone already has one SPF TXT record at the same owner as the Postbox SPF record, add an `append-spf-mechanism` merge rule that repeats the exact current SPF value and the exact Postbox SPF value. The builder preserves the current terminal policy and adds only the provider mechanisms. It refuses two current SPF records at that owner; SPF records at other owners are preserved unchanged.
+For an occupied provider TXT DKIM selector, use `replace-record` with both `currentValues` and `currentRecords`. `currentRecords` must list the complete current TXT RRset as exact type/value/TTL tuples. A TXT DKIM record is never added beside an occupied selector; without this explicit destructive rule the build fails closed.
+
+If the zone already has one SPF TXT record at the same owner as the Postbox SPF record, add an `append-spf-mechanism` merge rule that repeats the exact current SPF value and the exact Postbox SPF value. The builder preserves the current terminal policy and adds only the provider mechanisms. It refuses two current SPF records at that owner; SPF records at other owners are preserved unchanged. The operator must confirm one SPF policy per owner and exactly one Postbox SPF action at the provider-specified SPF owner; preserved SPF rows at other owners are expected, not conflicts.
 
 Do not write a merge rule to "clean up" MX, unrelated TXT, or DMARC. The handoff preserves existing MX and unrelated TXT records. Existing DMARC is emitted only as a `review` row; no DMARC replacement is proposed.
 
 ## 3. Generate and review the local sheet
 
-Create a local JSON input with the `DnsHandoffInput` shape: `asOf`, complete `currentZone`, edge address plus matching `edge.evidence`, Postbox records plus exact `postbox.evidence`, and any explicit `mergeRules`. The CLI rejects malformed JSON/shape, unsafe provider records, absent evidence, and an existing output file. It never opens the network.
+Create a local JSON input with the `DnsHandoffInput` shape: `asOf`, complete `currentZone`, edge address plus matching `edge.evidence` (including `migrationTtl` and `normalTtl`), Postbox records plus exact `postbox.evidence` and explicit custom-MAIL-FROM state, and any explicit `mergeRules`. A replacement rule's `currentRecords` entries have `{ "type", "value", "ttl" }`. The CLI rejects malformed JSON/shape, unsafe owner/value data, absent evidence, and an existing output file. It never opens the network.
 
 Use only the repository-pinned compiler and this exact local generation sequence; replace the two path arguments with the release-time local evidence file and new dated review path:
 
@@ -49,17 +51,17 @@ corepack pnpm exec esbuild deploy/dns/cli.ts --bundle --platform=node --format=c
 node /tmp/vbtech-dns-handoff.cjs /absolute/path/to/current-release-evidence.json /absolute/path/to/docs/reviews/YYYY-MM-DD-vbtech-dns-handoff.md
 ```
 
-The output path is created with exclusive-write semantics: choose a new dated artifact rather than overwriting an existing approval sheet. The rendered table contains name, type, value, TTL, purpose, current value, action, explicit replacement/merge rule, verification, shell-quoted read-only verification command, rollback instruction, and rollback value. The generated `dig` command quotes each DNS argument and never interpolates a record value into a shell command.
+The output path is created with exclusive-write semantics: choose a new dated artifact rather than overwriting an existing approval sheet. The rendered table contains name, type, value, migration TTL, normal TTL, purpose, current value/TTL and exact current RRset, action, explicit replacement/merge rule, verification, shell-quoted read-only verification command, rollback instruction, rollback value/TTL, and exact rollback RRset. The generated `dig` command quotes each DNS argument and never interpolates a record value into a shell command.
 
 Before requesting DNS approval, confirm all of these in the generated table:
 
 1. `v-b.tech` has the approved IPv4 A record; AAAA appears only when the approved inventory contains IPv6.
 2. `www.v-b.tech` is a CNAME to `v-b.tech.`.
 3. Every Postbox verification, DKIM, custom MAIL FROM, and SPF value cites the supplied evidence ID.
-4. There is exactly one SPF row and it is either an evidence-backed add or an explicit merge.
+4. At the Postbox-specified SPF owner there is exactly one Postbox SPF action, either an evidence-backed add or an explicit merge; each DNS owner has at most one SPF policy. Preserved SPF rows at other owners remain visible.
 5. Existing MX and unrelated TXT rows have action `keep`.
 6. Existing DMARC has action `review` and no proposed replacement.
-7. Every `replace` or `merge` row has an explicit rule ID, row-specific read-only verification command, and concrete rollback value.
+7. Every `replace` or `merge` row has an explicit rule ID, row-specific read-only verification command, and concrete rollback value/TTL/RRset.
 
 Run the local contract check before presenting the sheet:
 
@@ -85,6 +87,6 @@ Once propagation is stable, restore the normal approved TTL using another explic
 
 ## 6. Roll back a failed DNS change
 
-If any approved record does not propagate as reviewed, restore the pre-change values from the sheet's `Rollback value` and `Rollback` columns. Remove only records whose approved action was `add`; restore the complete captured owner data for a CNAME replacement, the complete captured RRset for `replace`, and the original one SPF value for `merge`.
+If any approved record does not propagate as reviewed, restore the pre-change values and TTLs from the sheet's `Rollback value`, `Rollback TTL`, `Rollback RRset`, and `Rollback` columns. Remove only records whose approved action was `add`; restore the complete captured owner data for a CNAME replacement, the complete captured RRset for `replace`, and the original one SPF value and TTL for `merge`.
 
 Do not remove existing MX, unrelated TXT, or DMARC to roll back the website. Re-run authoritative read-only checks after rollback and record the result in the dated review artifact.

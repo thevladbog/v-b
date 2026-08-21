@@ -1,8 +1,12 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { buildDnsHandoff, renderMarkdownHandoff, type DnsHandoffInput, type DnsMergeRule } from "../build-handoff.js";
+
+const execFileAsync = promisify(execFile);
 
 const currentZone = [
   { name: "v-b.tech", type: "MX", value: "10 inbound.example.test.", ttl: 3_600 },
@@ -53,13 +57,17 @@ const handoffInput = (overrides: Partial<DnsHandoffInput> = {}): DnsHandoffInput
       capturedAt: "2026-08-21T12:00:00.000Z",
       ipv4: "198.51.100.24",
       ipv6: "2001:db8::24",
+      migrationTtl: 300,
+      normalTtl: 3_600,
     },
   },
   postbox: {
+    customMailFrom: "configured",
     evidence: {
       id: "postbox-verification-2026-08-21",
       capturedAt: "2026-08-21T12:01:00.000Z",
       status: "verified",
+      customMailFrom: "configured",
       records: postboxRecords,
     },
     records: postboxRecords,
@@ -75,6 +83,12 @@ const handoffInput = (overrides: Partial<DnsHandoffInput> = {}): DnsHandoffInput
     },
   ],
   ...overrides,
+});
+
+const configuredPostbox = (records: NonNullable<DnsHandoffInput["postbox"]>["records"], id: string, status: "verified" | "pending" | "failed" = "verified") => ({
+  customMailFrom: "configured" as const,
+  records,
+  evidence: { id, capturedAt: "2026-08-21T12:01:00.000Z", status, customMailFrom: "configured" as const, records },
 });
 
 describe("external DNS handoff builder", () => {
@@ -101,7 +115,7 @@ describe("external DNS handoff builder", () => {
       expect.objectContaining({ name: "v-b.tech", type: "AAAA", value: "2001:db8::24", action: "add" }),
       expect.objectContaining({ name: "www.v-b.tech", type: "CNAME", value: "v-b.tech.", action: "add" }),
     ]));
-    expect(renderMarkdownHandoff(handoff)).toContain("| Name | Type | Value | TTL | Purpose | Current value | Action | Replacement or merge rule | Verification | Verification command | Rollback | Rollback value |");
+    expect(renderMarkdownHandoff(handoff)).toContain("| Name | Type | Value | TTL | Normal TTL | Purpose | Current value | Current TTL | Current RRset (value + TTL) | Action | Replacement or merge rule | Verification | Verification command | Rollback | Rollback value | Rollback TTL | Rollback RRset (value + TTL) |");
   });
 
   // Catches a provider handoff that drops a verified Postbox requirement or emits it without
@@ -156,7 +170,7 @@ describe("external DNS handoff builder", () => {
           kind: "replace-cname-owner-records",
           name: "www.v-b.tech",
           type: "CNAME",
-          currentRecords: [{ type: "A", value: "198.51.100.88" }],
+          currentRecords: [{ type: "A", value: "198.51.100.88", ttl: 3_600 }],
         } satisfies DnsMergeRule,
       ],
     });
@@ -174,15 +188,7 @@ describe("external DNS handoff builder", () => {
     const bounceSpf = { ...postboxRecords[3], name: "bounce.v-b.tech" };
     const records = [...postboxRecords.slice(0, 3), bounceSpf];
     const handoff = buildDnsHandoff(handoffInput({
-      postbox: {
-        records,
-        evidence: {
-          id: "postbox-bounce-spf",
-          capturedAt: "2026-08-21T12:01:00.000Z",
-          status: "verified",
-          records,
-        },
-      },
+      postbox: configuredPostbox(records, "postbox-bounce-spf"),
       mergeRules: [],
     }));
 
@@ -200,7 +206,7 @@ describe("external DNS handoff builder", () => {
     const records = [...postboxRecords.slice(0, 3), bounceSpf];
     const input = handoffInput({
       currentZone: [...currentZone, { name: "bounce.v-b.tech", type: "TXT", value: "v=spf1 include:old-bounce.example.test -all", ttl: 3_600 }, { name: "bounce.v-b.tech", type: "TXT", value: "v=spf1 include:second-bounce.example.test -all", ttl: 3_600 }],
-      postbox: { records, evidence: { id: "postbox-bounce-spf", capturedAt: "2026-08-21T12:01:00.000Z", status: "verified", records } },
+      postbox: configuredPostbox(records, "postbox-bounce-spf"),
       mergeRules: [],
     });
     expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_multiple_spf_records");
@@ -249,15 +255,7 @@ describe("external DNS handoff builder", () => {
   // verification output, including a provider output that is merely pending.
   it("rejects unverified Postbox values", () => {
     const input = handoffInput({
-      postbox: {
-        records: postboxRecords,
-        evidence: {
-          id: "postbox-verification-pending",
-          capturedAt: "2026-08-21T12:01:00.000Z",
-          status: "pending",
-          records: postboxRecords,
-        },
-      },
+      postbox: configuredPostbox(postboxRecords, "postbox-verification-pending", "pending"),
     });
 
     expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_unverified_provider_value");
@@ -273,7 +271,7 @@ describe("external DNS handoff builder", () => {
   ] as const)("rejects Postbox purpose/type mismatch: %s", (_label, replacement) => {
     const records = postboxRecords.map((record) => record.purpose === replacement.purpose ? replacement : record);
     const input = handoffInput({
-      postbox: { records, evidence: { id: "invalid-postbox-shape", capturedAt: "2026-08-21T12:01:00.000Z", status: "verified", records } },
+      postbox: configuredPostbox(records, "invalid-postbox-shape"),
     });
     expect(() => buildDnsHandoff(input)).toThrow(/dns_handoff_invalid_postbox_record/);
   });
@@ -281,7 +279,7 @@ describe("external DNS handoff builder", () => {
   // Catches one unstable RRset being output twice, a destructive replacement without an explicit
   // reviewed rule, or two SPF TXT records that receivers may select unpredictably.
   it.each([
-    ["duplicate target owner/type", handoffInput({ postbox: { evidence: { id: "postbox", capturedAt: "2026-08-21T12:01:00.000Z", status: "verified", records: [...postboxRecords, { ...postboxRecords[0], value: "second-value" }] }, records: [...postboxRecords, { ...postboxRecords[0], value: "second-value" }] } })],
+    ["duplicate target owner/type", handoffInput({ postbox: configuredPostbox([...postboxRecords, { ...postboxRecords[0], value: "second-value" }], "postbox") })],
     ["destructive apex replacement", handoffInput({ currentZone: [...currentZone, { name: "v-b.tech", type: "A", value: "198.51.100.1", ttl: 3_600 }] })],
     ["two current SPF records", handoffInput({ currentZone: [...currentZone, { name: "v-b.tech", type: "TXT", value: "v=spf1 include:second.example.test -all", ttl: 3_600 }] })],
   ])("rejects %s", (_label, input) => {
@@ -305,5 +303,153 @@ describe("external DNS handoff builder", () => {
     } finally {
       await rm(directory, { force: true, recursive: true });
     }
+  });
+
+  // Catches accepting only a subset of the provider's verified requirements, such as silently
+  // dropping one of several DKIM selectors.
+  it("requires an exact Postbox evidence multiset including every DKIM record", () => {
+    const secondDkim = { ...postboxRecords[1], name: "postbox2._domainkey.v-b.tech", value: "dkim2-target.from-supplied-evidence.test." };
+    const evidenceRecords = [...postboxRecords, secondDkim];
+    const input = handoffInput({
+      postbox: { ...configuredPostbox(postboxRecords, "postbox-two-dkim"), evidence: { ...configuredPostbox(postboxRecords, "postbox-two-dkim").evidence, records: evidenceRecords } },
+    } as unknown as DnsHandoffInput);
+    expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_postbox_evidence_mismatch");
+  });
+
+  // Catches replacing a provider TXT DKIM selector by appending a second TXT value rather than
+  // requiring an exact destructive RRset rule with values and TTLs.
+  it("requires a full TXT RRset replacement rule for an occupied DKIM selector", () => {
+    const dkimTxt = { ...postboxRecords[1], type: "TXT", value: "v=DKIM1; k=rsa; p=new-key" };
+    const records = [postboxRecords[0], dkimTxt, postboxRecords[2], postboxRecords[3]];
+    const currentDkim = { name: dkimTxt.name, type: "TXT", value: "v=DKIM1; k=rsa; p=old-key", ttl: 3_600 };
+    const input = handoffInput({ currentZone: [...currentZone, currentDkim], postbox: configuredPostbox(records, "postbox-txt-dkim") } as unknown as DnsHandoffInput);
+    expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_destructive_replacement_requires_merge_rule");
+
+    expect(() => buildDnsHandoff({
+      ...input,
+      mergeRules: [...input.mergeRules!, {
+        id: "replace-old-dkim-txt-without-rrset",
+        kind: "replace-record",
+        name: dkimTxt.name,
+        type: "TXT",
+        currentValues: [currentDkim.value],
+      } satisfies DnsMergeRule],
+    })).toThrow("dns_handoff_destructive_replacement_requires_merge_rule");
+
+    const reviewed = buildDnsHandoff({
+      ...input,
+      mergeRules: [...input.mergeRules!, {
+        id: "replace-old-dkim-txt",
+        kind: "replace-record",
+        name: dkimTxt.name,
+        type: "TXT",
+        currentValues: [currentDkim.value],
+        currentRecords: [{ type: "TXT", value: currentDkim.value, ttl: currentDkim.ttl }],
+      } satisfies DnsMergeRule],
+    });
+    expect(reviewed.records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: dkimTxt.name, type: "TXT", action: "replace", rollbackTtl: 3_600, rollbackRecords: [{ type: "TXT", value: currentDkim.value, ttl: 3_600 }] }),
+    ]));
+  });
+
+  // Catches treating a matching A value as a migration-TTL rewrite or hiding the current TTL
+  // needed for an exact rollback.
+  it("uses approved edge TTL evidence and preserves the actual TTL on an unchanged A record", () => {
+    const input = handoffInput({
+      edge: { ipv4: "198.51.100.24", evidence: { id: "edge-ttl", capturedAt: "2026-08-21T12:00:00.000Z", ipv4: "198.51.100.24", migrationTtl: 120, normalTtl: 3_600 } },
+      currentZone: [...currentZone, { name: "v-b.tech", type: "A", value: "198.51.100.24", ttl: 900 }],
+    } as unknown as DnsHandoffInput);
+    const row = buildDnsHandoff(input).records.find((record) => record.name === "v-b.tech" && record.type === "A");
+    expect(row).toMatchObject({ action: "keep", ttl: 900, currentTtl: 900, rollbackTtl: 900, normalTtl: 3_600 });
+  });
+
+  // Catches weak rule bookkeeping and delimiter-concatenated equality that can accept a different
+  // RRset than the operator approved.
+  it.each([
+    ["blank rule ID", [{ ...handoffInput().mergeRules![0], id: "" }]],
+    ["duplicate rule ID", [handoffInput().mergeRules![0], { id: "merge-existing-spf-with-postbox", kind: "replace-record", name: "www.v-b.tech", type: "CNAME", currentValues: [] }]],
+    ["unused rule", [...handoffInput().mergeRules!, { id: "unused", kind: "replace-record", name: "www.v-b.tech", type: "CNAME", currentValues: [] }]],
+  ])("rejects %s", (_label, mergeRules) => {
+    expect(() => buildDnsHandoff(handoffInput({ mergeRules } as Partial<DnsHandoffInput>))).toThrow(/dns_handoff_(invalid|duplicate|unused)_merge_rule/);
+  });
+
+  // Catches accepting a configured MAIL FROM record set when Postbox has explicitly verified that
+  // custom MAIL FROM is not configured, or requiring records when it is not configured.
+  it("permits no custom MAIL FROM records only when Postbox verifies it as not configured", () => {
+    const records = [postboxRecords[0], postboxRecords[1], postboxRecords[3]];
+    const input = handoffInput({ postbox: { customMailFrom: "not-configured", records, evidence: { id: "postbox-no-mail-from", capturedAt: "2026-08-21T12:01:00.000Z", status: "verified", customMailFrom: "not-configured", records } } } as unknown as DnsHandoffInput);
+    expect(() => buildDnsHandoff(input)).not.toThrow();
+  });
+
+  it.each([
+    ["configured without records", "configured", [postboxRecords[0], postboxRecords[1], postboxRecords[3]]],
+    ["not configured with records", "not-configured", postboxRecords],
+  ] as const)("rejects %s", (_label, customMailFrom, records) => {
+    const input = handoffInput({ postbox: { customMailFrom, records, evidence: { id: "postbox-mail-from-state", capturedAt: "2026-08-21T12:01:00.000Z", status: "verified", customMailFrom, records } } } as unknown as DnsHandoffInput);
+    expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_invalid_custom_mail_from_state");
+  });
+
+  // Catches a selected IPv6 value that was not present in the attached edge evidence, including
+  // stale evidence IPv6 when the release input intentionally selects none.
+  it.each([
+    ["selected IPv6 differs", { ipv4: "198.51.100.24", ipv6: "2001:db8::25", evidence: { ...handoffInput().edge!.evidence, ipv6: "2001:db8::24" } }],
+    ["evidence has unselected IPv6", { ipv4: "198.51.100.24", ipv6: undefined, evidence: handoffInput().edge!.evidence }],
+  ])("rejects %s", (_label, edge) => {
+    expect(() => buildDnsHandoff(handoffInput({ edge }))).toThrow("dns_handoff_unverified_edge_ip");
+  });
+
+  // Catches treating a provider record with an unverified TTL as equivalent to the evidence.
+  it("requires the provider TTL to match its verified evidence", () => {
+    const records = postboxRecords.map((record) => record.purpose === "dkim" ? { ...record, ttl: 600 } : record);
+    const configured = configuredPostbox(records, "postbox-ttl-mismatch");
+    expect(() => buildDnsHandoff(handoffInput({
+      postbox: { ...configured, evidence: { ...configured.evidence, records: postboxRecords } },
+    }))).toThrow("dns_handoff_postbox_evidence_mismatch");
+  });
+
+  // Catches delimiter-joined comparison accepting a different RRset and a pipe splitting a
+  // rendered table cell.
+  it("compares replacement values structurally and escapes Markdown cells", () => {
+    const currentA = [
+      { name: "v-b.tech", type: "A" as const, value: "one | two", ttl: 3_600 },
+      { name: "v-b.tech", type: "A" as const, value: "three", ttl: 3_600 },
+    ];
+    expect(() => buildDnsHandoff(handoffInput({
+      currentZone: [...currentZone, ...currentA],
+      mergeRules: [...handoffInput().mergeRules!, { id: "wrong-delimited-values", kind: "replace-record", name: "v-b.tech", type: "A", currentValues: ["one", "two | three"] }],
+    }))).toThrow("dns_handoff_destructive_replacement_requires_merge_rule");
+
+    const markdown = renderMarkdownHandoff(buildDnsHandoff(handoffInput({
+      currentZone: [...currentZone, { name: "v-b.tech", type: "TXT", value: "safe | preserved", ttl: 3_600 }],
+    })));
+    expect(markdown).toContain("safe \\| preserved");
+  });
+
+  // Catches drift between the documented pinned bundle invocation and the local entry point, as
+  // well as an accidental overwrite of an already-reviewed artifact.
+  it("runs the documented bundled CLI and refuses an existing output artifact", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "vbtech-dns-bundle-"));
+    const inputPath = join(directory, "input.json");
+    const outputPath = join(directory, "2026-08-21-vbtech-dns-handoff.md");
+    const bundlePath = join(directory, "vbtech-dns-handoff.cjs");
+    const repositoryRoot = join(process.cwd(), "..", "..");
+    try {
+      await writeFile(inputPath, JSON.stringify(handoffInput()), "utf8");
+      await execFileAsync("corepack", ["pnpm", "exec", "esbuild", "deploy/dns/cli.ts", "--bundle", "--platform=node", "--format=cjs", `--outfile=${bundlePath}`], { cwd: repositoryRoot });
+      await execFileAsync(process.execPath, [bundlePath, inputPath, outputPath]);
+      await expect(readFile(outputPath, "utf8")).resolves.toContain("# v-b.tech external DNS handoff — 2026-08-21");
+      await expect(execFileAsync(process.execPath, [bundlePath, inputPath, outputPath])).rejects.toMatchObject({ stderr: expect.stringContaining("EEXIST") });
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
+  });
+
+  // Catches prefix-recognition of malformed policies and unsafe owners/Markdown data.
+  it.each([
+    ["malformed SPF version", { name: "v-b.tech", type: "TXT", value: "v=spf10 include:bad.example -all", ttl: 300 }],
+    ["malformed DMARC version", { name: "_dmarc.v-b.tech", type: "TXT", value: "v=DMARC10; p=none", ttl: 300 }],
+    ["unsafe owner", { name: "bad owner.v-b.tech", type: "TXT", value: "safe", ttl: 300 }],
+  ] as const)("rejects %s", (_label, record) => {
+    expect(() => buildDnsHandoff(handoffInput({ currentZone: [...currentZone, record] }))).toThrow(/dns_handoff_invalid_record/);
   });
 });
