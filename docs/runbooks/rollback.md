@@ -37,7 +37,7 @@ node deploy/production/release-artifact.mjs validate "$VBTECH_DISABLED_RELEASE_D
 
 Deploy the exact pre-approved disabled web image through the reviewed web executor, without changing DNS or removing routes. This is the first production mutation. Capture old/new image digests, release headers, executor audit ID, and completion time. Do not rebuild at the server.
 
-Immediately verify that `/` and `/en/` report submission disabled, the contact client is absent, `/api/contact` is rejected through the edge, all nine HTML routes remain available, and direct contacts still render. If deployment fails, retry only within the incident's exact target/window; otherwise stop and escalate to the approved edge recovery path. Do not proceed by deleting legal pages or DNS records.
+Immediately verify that `/` and `/en/` report submission disabled, the contact client is absent, `/api/contact` is rejected through the edge, and all nine HTML routes remain available. The 17-check route smoke does not inspect legal identities or direct-contact links; the next independent card proves those preserved surfaces. If deployment fails, retry only within the incident's exact target/window; otherwise stop and escalate to the approved edge recovery path. Do not proceed by deleting legal pages or DNS records.
 
 ### Command: Verify public containment on the disabled web release
 
@@ -53,6 +53,28 @@ set -euo pipefail
 export VBTECH_DISABLED_RELEASE_SHA_EVIDENCE
 node --input-type=module -e 'import { runSmoke } from "./deploy/production/smoke.mjs"; const result = await runSmoke({ baseUrl: "https://v-b.tech", mode: "public", expected: { releaseSha: process.env.VBTECH_DISABLED_RELEASE_SHA_EVIDENCE, submissionState: "disabled", consentId: "VBT-PD-02/DRAFT" } }); process.stdout.write(`${JSON.stringify(result)}\n`);'
 ```
+
+### Command: Verify preserved legal releases and direct contacts
+
+- Target/resource: six exact canonical HTTPS routes after containment: RU/EN landings, policy pages, and consent pages on `https://v-b.tech`
+- Classification: **READ-ONLY**
+- Expected output: bounded local parsing reports four exact DRAFT legal identities and both direct contact links on both preserved landings
+- Bounded failure branch: stop further rollback changes, remove temporary HTML, retain only failed route/marker metadata, and restore the prior disabled web image if available
+
+```bash
+set -euo pipefail
+evidence_dir="$(mktemp -d)"
+trap 'rm -rf "$evidence_dir"' EXIT
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/" --output "$evidence_dir/ru-home.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/" --output "$evidence_dir/en-home.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/privacy/" --output "$evidence_dir/ru-policy.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/privacy/" --output "$evidence_dir/en-policy.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/personal-data-consent/" --output "$evidence_dir/ru-consent.html"
+curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/personal-data-consent/" --output "$evidence_dir/en-consent.html"
+node --input-type=module -e 'import { readFile } from "node:fs/promises"; import { join } from "node:path"; const dir = process.argv[1]; const checks = [["ru-policy.html", ["VBT-PD-01/DRAFT"]], ["en-policy.html", ["VBT-PD-01/DRAFT"]], ["ru-consent.html", ["VBT-PD-02/DRAFT"]], ["en-consent.html", ["VBT-PD-02/DRAFT"]], ["ru-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["en-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]]]; for (const [file, markers] of checks) { const html = await readFile(join(dir, file), "utf8"); for (const marker of markers) if (!html.includes(marker)) throw new Error(`evidence_mismatch:${file}:${marker}`); } process.stdout.write(`${JSON.stringify({ legalPages: 4, landingPages: 2, directContacts: 4 })}\n`);' "$evidence_dir"
+```
+
+Record only the six response hashes, exact marker names, release SHA, operator, and UTC time. A 200 status or generic route-smoke pass without this marker evidence does not prove preservation.
 
 ### 2. Disable backend acceptance
 
@@ -87,7 +109,7 @@ Starting state: public form enabled, backend enabled, legal pages available, dir
 | 3 | `restore-independent-artifacts` | disabled | kept | kept |
 | 4 | `optional-approved-dns-restore` | disabled | kept | kept |
 
-The exercise passes only if action 1 contains public intake before any backend/artifact/DNS recovery, every later state keeps legal pages and direct contacts, web and function recovery can be chosen independently, DNS remains optional and separately approved, and accepted work has an explicit processing/retention decision.
+The exercise passes only if action 1 contains public intake before any backend/artifact/DNS recovery, every later state keeps legal pages and direct contacts, web and function recovery can be chosen independently, DNS remains optional and separately approved, and accepted work has an explicit processing/retention decision. The tabletop record must state that the legal/contact evidence command passed after action 1 and cite its six response hashes; table cells alone are not proof.
 
 ### Command: Execute the local tabletop contract
 

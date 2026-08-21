@@ -9,6 +9,10 @@ async function runbook(name) {
   return readFile(new URL(`docs/runbooks/${name}.md`, root), "utf8");
 }
 
+async function source(path) {
+  return readFile(new URL(path, root), "utf8");
+}
+
 function assertOrdered(source, labels) {
   let previous = -1;
   for (const label of labels) {
@@ -43,7 +47,25 @@ function commandCards(source, name) {
   }
 }
 
-test("publication gates inventory before mutation and deploy disabled before separately approved DNS", async () => {
+function operatorCards(source, name) {
+  const headings = [...source.matchAll(/^### Operator card: ([^\n]+)$/gm)];
+  const cards = [...source.matchAll(
+    /### Operator card: ([^\n]+)\n\n- Target\/resource: ([^\n]+)\n- Classification: \*\*(READ-ONLY|MUTATING)\*\*\n- Required evidence: ([^\n]+)\n- Expected output: ([^\n]+)\n- Bounded failure branch: ([^\n]+)/g,
+  )];
+
+  assert.ok(cards.length > 0, `${name} must include at least one operator card`);
+  assert.equal(cards.length, headings.length, `${name} has an unclassified operator step`);
+  for (const [, title, target, classification, required, expected, failure] of cards) {
+    for (const [field, value] of Object.entries({ title, target, required, expected, failure })) {
+      assert.ok(value.trim().length >= 12, `${name} operator ${field} is not specific`);
+    }
+    assert.match(failure, /stop|abort|do not|escalate|restore|retain/i);
+    assert.ok(["READ-ONLY", "MUTATING"].includes(classification));
+  }
+  return cards.map((card) => ({ title: card[1], classification: card[3] }));
+}
+
+test("publication separates artifact approval from ordered cloud and disabled-runtime mutation", async () => {
   const source = await runbook("publication");
 
   assertOrdered(source, [
@@ -51,17 +73,50 @@ test("publication gates inventory before mutation and deploy disabled before sep
     "dns-inventory",
     "publication-approval",
     "immutable-publication",
-    "disabled-deploy",
+    "cloud-runtime-approval",
+    "isolated-database",
+    "runtime-secrets",
+    "least-privilege-permissions",
+    "database-bootstrap",
+    "disabled-function-deploy",
+    "disabled-web-deploy",
     "private-smoke",
+    "private-legal-contact-evidence",
     "dns-approval",
     "dns-mutation",
     "public-smoke",
+    "public-legal-contact-evidence",
   ]);
   assert.match(source, /release-time evidence placeholder/i);
   assert.match(source, /fail(?:s|ed)? closed/i);
+  assert.match(source, /cloud\/database\/private runtime mutation approval ID/i);
+  assert.match(source, /publication approval[^\n]*does not authorize[^\n]*(?:cloud|database|runtime)/i);
+  assert.match(source, /Task 8[^\n]*Step 1/i);
+  assert.match(source, /remote deployment executor[^\n]*not configured/i);
   assert.match(source, /DNS approval ID/i);
   assert.match(source, /form activation requires a separate approval/i);
+  const operators = operatorCards(source, "publication");
+  assert.ok(operators.some(({ title, classification }) => /runtime inventory/i.test(title) && classification === "READ-ONLY"));
+  assert.ok(operators.some(({ title, classification }) => /DNS.*inventory/i.test(title) && classification === "READ-ONLY"));
   commandCards(source, "publication");
+});
+
+test("route smoke is supplemented by bounded legal-release and direct-contact evidence", async () => {
+  const publication = await runbook("publication");
+  const rollback = await runbook("rollback");
+
+  assert.match(publication, /17-check route smoke does not verify[^\n]*legal[^\n]*direct contacts/i);
+  assert.match(publication, /### Command: Verify private legal releases and direct contacts/);
+  assert.match(publication, /### Command: Verify public legal releases and direct contacts/);
+  assert.match(rollback, /### Command: Verify preserved legal releases and direct contacts/);
+  for (const document of [publication, rollback]) {
+    assert.match(document, /curl[^\n]*--max-filesize/);
+    assert.match(document, /VBT-PD-01\/DRAFT/);
+    assert.match(document, /VBT-PD-02\/DRAFT/);
+    assert.match(document, /mailto:hello@v-b\.tech/);
+    assert.match(document, /https:\/\/t\.me\/thevladbog/);
+  }
+  assert.match(rollback, /tabletop[^\n]*legal\/contact evidence[^\n]*passed/i);
 });
 
 test("form activation requires approved active legal releases and its own approval before mutation", async () => {
@@ -133,4 +188,24 @@ test("all runbooks keep secrets, live IDs, and personal request content out of e
   assert.match(combined, /named release-time evidence placeholders/i);
   assert.doesNotMatch(combined, /BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY/);
   assert.doesNotMatch(combined, /postgres(?:ql)?:\/\/[^\s`]+:[^\s`]+@/i);
+});
+
+test("external DNS handoff acquires evidence before sheet approval and structures every operation", async () => {
+  const dns = await source("docs/runbooks/external-dns.md");
+  const sequence = [
+    "obtain read-only evidence",
+    "prepare the exact local sheet",
+    "request separate approval for that exact sheet",
+    "apply only after approval",
+  ];
+  let previous = -1;
+  for (const phrase of sequence) {
+    const position = dns.toLowerCase().indexOf(phrase.toLowerCase());
+    assert.ok(position > previous, `external DNS sequence is missing or reorders: ${phrase}`);
+    previous = position;
+  }
+  const operators = operatorCards(dns, "external-dns");
+  assert.ok(operators.some(({ title, classification }) => /acquire.*DNS.*evidence/i.test(title) && classification === "READ-ONLY"));
+  assert.ok(operators.some(({ title, classification }) => /apply.*DNS/i.test(title) && classification === "MUTATING"));
+  commandCards(dns, "external-dns");
 });
