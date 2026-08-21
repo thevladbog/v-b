@@ -122,7 +122,8 @@ async function mockCaptcha(page: Page, mode: CaptchaMode = "token", holdLoad = f
             window.__vbtechCaptchaDestroyedWidgets.push(widgetId);
           },
           };
-          window[url.searchParams.get("onload")]();
+          const onload = window[url.searchParams.get("onload")];
+          if (typeof onload === "function") onload();
         };
         if (window.__vbtechHoldCaptchaLoad) {
           window.__vbtechReleaseCaptchaLoad = completeLoad;
@@ -433,6 +434,129 @@ test("a hung local API route is aborted after the fixed ten-second operation tim
   await expect(page.getByLabel(localized.labels.name, { exact: true })).toBeEnabled();
   await expect(page.getByLabel(localized.labels.message, { exact: true })).toHaveValue("Project enquiry.");
   release();
+});
+
+test("a held captcha loader is bounded by the form operation deadline and ignores late onload", async ({ page }) => {
+  const localized = locales[1];
+  const requestId = "11111111-1111-4111-8111-111111111111";
+  const apiRequests: string[] = [];
+  await page.clock.install();
+  await page.addInitScript((fixedId) => {
+    window.__vbtechRequestIdCount = 0;
+    Object.defineProperty(window.crypto, "randomUUID", {
+      configurable: true,
+      value: () => {
+        window.__vbtechRequestIdCount = (window.__vbtechRequestIdCount ?? 0) + 1;
+        return fixedId;
+      },
+    });
+  }, requestId);
+  page.on("request", (request) => {
+    if (request.url() === `${fixtureOrigin}/api/contact`) apiRequests.push(request.url());
+  });
+  await mockCaptcha(page, "token", true);
+  await page.goto(`${fixtureOrigin}/en/slow/`);
+  await fillValidDraft(page, localized);
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+  const form = page.locator("[data-contact-form]");
+  const name = page.getByLabel(localized.labels.name, { exact: true });
+  const consent = page.getByRole("checkbox", { name: localized.labels.consent });
+
+  await page.getByRole("button", { name: localized.labels.submit }).click();
+  await expect(form).toHaveAttribute("aria-busy", "true");
+  await expect(name).toBeDisabled();
+  await expect(consent).toBeDisabled();
+  await expect(page.locator(`script[src^="${captchaScript}"]`)).toHaveCount(1);
+
+  await page.clock.fastForward(10_001);
+
+  await expect(page.getByRole("status")).toContainText(/temporarily unavailable/i);
+  await expect(form).toHaveAttribute("aria-busy", "false");
+  await expect(name).toBeEnabled();
+  await expect(consent).toBeEnabled();
+  await expect(name).toHaveValue("Vlad");
+  await expect(page.getByLabel(localized.labels.message, { exact: true })).toHaveValue("Project enquiry.");
+  await expect(consent).toBeChecked();
+  await expect(page.locator(`script[src^="${captchaScript}"]`)).toHaveCount(0);
+  expect(apiRequests).toEqual([]);
+  expect(await page.evaluate(() => window.__vbtechRequestIdCount)).toBe(1);
+
+  const statusAfterTimeout = await page.getByRole("status").textContent();
+  await page.evaluate(() => window.__vbtechReleaseCaptchaLoad?.());
+  await expect(page.getByRole("status")).toHaveText(statusAfterTimeout ?? "");
+  await expect(page.locator("[data-smartcaptcha-disclosure]")).toHaveCount(0);
+  expect(apiRequests).toEqual([]);
+  expect(await page.evaluate(() => window.__vbtechRequestIdCount)).toBe(1);
+});
+
+test("one timed-out form releases only its shared-loader subscription while a later form succeeds", async ({ page }) => {
+  const localized = locales[1];
+  const firstId = "11111111-1111-4111-8111-111111111111";
+  const secondId = "22222222-2222-4222-8222-222222222222";
+  const captchaRequests: string[] = [];
+  const bodies: Array<{ name: string; requestId: string; captchaToken: string }> = [];
+  await page.clock.install();
+  await page.addInitScript(({ first, second }) => {
+    const ids = [first, second] as const;
+    window.__vbtechRequestIdCount = 0;
+    Object.defineProperty(window.crypto, "randomUUID", {
+      configurable: true,
+      value: () => {
+        const index = window.__vbtechRequestIdCount ?? 0;
+        window.__vbtechRequestIdCount = index + 1;
+        return ids[index] ?? second;
+      },
+    });
+  }, { first: firstId, second: secondId });
+  page.on("request", (request) => {
+    if (request.url().startsWith(captchaScript)) captchaRequests.push(request.url());
+  });
+  await mockCaptcha(page, "token", true);
+  await page.route(`${fixtureOrigin}/api/contact`, async (route) => {
+    const body = route.request().postDataJSON() as (typeof bodies)[number];
+    bodies.push(body);
+    await apiJson(route, 202, { accepted: true, requestId: body.requestId });
+  });
+  await page.goto(`${fixtureOrigin}/en/multi/`);
+  const forms = page.locator("[data-contact-form]");
+  const first = forms.nth(0);
+  const second = forms.nth(1);
+  await fillValidForm(first, localized, " Alpha");
+  await fillValidForm(second, localized, " Beta");
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+
+  await first.getByRole("button", { name: localized.labels.submit }).click();
+  await expect(first).toHaveAttribute("aria-busy", "true");
+  await page.clock.fastForward(5_000);
+  await second.getByRole("button", { name: localized.labels.submit }).click();
+  await expect(second).toHaveAttribute("aria-busy", "true");
+  expect(captchaRequests).toHaveLength(1);
+
+  await page.clock.fastForward(5_001);
+
+  await expect(first.getByRole("status")).toContainText(/temporarily unavailable/i, { timeout: 1_000 });
+  await expect(first).toHaveAttribute("aria-busy", "false", { timeout: 1_000 });
+  await expect(first.getByLabel(localized.labels.name, { exact: true })).toBeEnabled();
+  await expect(first.getByLabel(localized.labels.name, { exact: true })).toHaveValue("Vlad Alpha");
+  await expect(second).toHaveAttribute("aria-busy", "true");
+  await expect(second.getByLabel(localized.labels.name, { exact: true })).toBeDisabled();
+  await expect(page.locator(`script[src^="${captchaScript}"]`)).toHaveCount(1);
+  expect(bodies).toEqual([]);
+
+  await page.evaluate(() => window.__vbtechReleaseCaptchaLoad?.());
+
+  await expect(second.getByRole("status")).toContainText(localized.labels.success);
+  await expect(first.getByRole("status")).toContainText(/temporarily unavailable/i);
+  await expect(first.locator("[data-smartcaptcha-disclosure]")).toHaveCount(0);
+  await expect(second.locator("[data-smartcaptcha-disclosure]")).toBeVisible();
+  expect(captchaRequests).toHaveLength(1);
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]).toMatchObject({
+    name: "Vlad Beta",
+    requestId: secondId,
+    captchaToken: "fixture-token-1",
+  });
+  expect(await page.evaluate(() => window.__vbtechRequestIdCount)).toBe(2);
 });
 
 test("safe retry reacquires a one-time token and reuses the UUID, then accepted and changed drafts rotate it", async ({ page, contactFailures }) => {

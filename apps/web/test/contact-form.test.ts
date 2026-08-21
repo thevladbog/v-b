@@ -204,6 +204,62 @@ describe("contact form binding", () => {
     expect(form.attributes.get("aria-busy")).toBe("false");
   });
 
+  it("bounds pending captcha acquisition and ignores its late resolution", async () => {
+    const form = new FakeForm();
+    fillValid(form);
+    const timers = new Map<number, { callback(): void; milliseconds: number }>();
+    let nextTimer = 0;
+    let resolveCaptcha!: (token: string) => void;
+    const fetch = vi.fn();
+    const createRequestId = vi.fn(() => "11111111-1111-4111-8111-111111111111");
+    const dependencies = enhancedDependencies({
+      createRequestId,
+      fetch,
+      captcha: {
+        acquire: vi.fn(() => new Promise<string>((resolve) => { resolveCaptcha = resolve; })),
+        reset: vi.fn(),
+        dispose: vi.fn(),
+      },
+      clock: {
+        setTimeout(callback, milliseconds) {
+          const id = ++nextTimer;
+          timers.set(id, { callback, milliseconds });
+          return id;
+        },
+        clearTimeout(id) { timers.delete(id); },
+      },
+    });
+    bindContactForm(form as unknown as HTMLFormElement, "en", dependencies);
+
+    form.submit();
+    await vi.waitFor(() => expect(dependencies.captcha.acquire).toHaveBeenCalledTimes(1));
+    expect(form.fieldset.disabled).toBe(true);
+    expect(form.attributes.get("aria-busy")).toBe("true");
+    expect(createRequestId).toHaveBeenCalledTimes(1);
+
+    [...timers.values()].find(({ milliseconds }) => milliseconds === 10_000)!.callback();
+
+    await vi.waitFor(() => expect(form.status.textContent).toMatch(/temporarily unavailable/i));
+    expect(form.fieldset.disabled).toBe(false);
+    expect(form.submitControl.disabled).toBe(false);
+    expect(form.attributes.get("aria-busy")).toBe("false");
+    expect(form.controls.name.value).toBe("Vlad");
+    expect(form.controls.contact.value).toBe("@abc_1");
+    expect(form.controls.message.value).toBe("Project enquiry");
+    expect(form.controls.consent.checked).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(createRequestId).toHaveBeenCalledTimes(1);
+
+    const statusAfterTimeout = form.status.textContent;
+    resolveCaptcha("late-token");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(form.status.textContent).toBe(statusAfterTimeout);
+    expect(form.resetCount).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(createRequestId).toHaveBeenCalledTimes(1);
+  });
+
   it("aborts on teardown and ignores a late accepted response without mutating the disposed form", async () => {
     const form = new FakeForm();
     fillValid(form);

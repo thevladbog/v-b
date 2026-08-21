@@ -47,7 +47,7 @@ interface ContactControls {
 }
 
 export interface CaptchaTokenProvider {
-  acquire(): Promise<string>;
+  acquire(signal: AbortSignal): Promise<string>;
   reset(): void;
   dispose(): void;
 }
@@ -217,6 +217,27 @@ const defaultClock: ContactClock = {
   clearTimeout: (timer) => globalThis.clearTimeout(timer as ReturnType<typeof setTimeout>),
 };
 
+const operationAbortedError = () => new DOMException("contact_operation_aborted", "AbortError");
+
+const raceWithAbort = <Value>(promise: Promise<Value>, signal: AbortSignal): Promise<Value> => {
+  if (signal.aborted) return Promise.reject(operationAbortedError());
+  return new Promise<Value>((resolve, reject) => {
+    let settled = false;
+    const finish = (complete: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      complete();
+    };
+    const onAbort = () => finish(() => reject(operationAbortedError()));
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => finish(() => resolve(value)),
+      (error: unknown) => finish(() => reject(error)),
+    );
+  });
+};
+
 export function bindContactForm(
   form: HTMLFormElement,
   locale: Locale,
@@ -292,7 +313,10 @@ export function bindContactForm(
       try {
         let captchaToken: string;
         try {
-          captchaToken = await dependencies.captcha.acquire();
+          captchaToken = await raceWithAbort(
+            dependencies.captcha.acquire(controller.signal),
+            controller.signal,
+          );
         } catch {
           if (!disposed) {
             const message = controller.signal.aborted
@@ -488,18 +512,21 @@ const createCaptchaTokenProvider = (
     active = undefined;
     current.resolve(token);
   };
-  const ensureWidget = async (): Promise<SmartCaptchaApi> => {
+  const ensureWidget = async (signal: AbortSignal): Promise<SmartCaptchaApi> => {
     if (disposed) throw new Error("smartcaptcha_provider_disposed");
     if (!container || !siteKey) throw new Error("smartcaptcha_fixture_config_missing");
     subscription ??= subscribeSmartCaptcha(windowTarget, documentTarget, timeoutMs);
+    const currentSubscription = subscription;
     try {
-      api = await subscription.promise;
+      api = await raceWithAbort(currentSubscription.promise, signal);
     } catch (error) {
-      subscription.release();
-      subscription = undefined;
+      if (subscription === currentSubscription) {
+        currentSubscription.release();
+        subscription = undefined;
+      }
       throw error;
     }
-    if (disposed) throw new Error("smartcaptcha_provider_disposed");
+    if (disposed || signal.aborted) throw operationAbortedError();
     widgetId ??= api.render(container, {
       sitekey: siteKey,
       hl: locale,
@@ -511,9 +538,10 @@ const createCaptchaTokenProvider = (
     return api;
   };
   return {
-    async acquire() {
-      const ready = await ensureWidget();
-      if (disposed || widgetId === undefined) throw new Error("smartcaptcha_widget_missing");
+    async acquire(signal) {
+      const ready = await ensureWidget(signal);
+      if (disposed || signal.aborted) throw operationAbortedError();
+      if (widgetId === undefined) throw new Error("smartcaptcha_widget_missing");
       rejectActive("smartcaptcha_replaced_attempt");
       const token = new Promise<string>((resolve, reject) => {
         active = {
@@ -524,7 +552,12 @@ const createCaptchaTokenProvider = (
       });
       ready.reset(widgetId);
       ready.execute(widgetId);
-      return token;
+      try {
+        return await raceWithAbort(token, signal);
+      } catch (error) {
+        if (signal.aborted) rejectActive("smartcaptcha_operation_aborted");
+        throw error;
+      }
     },
     reset() {
       rejectActive("smartcaptcha_reset");
