@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 const root = new URL("../../../", import.meta.url);
 const runbookNames = ["publication", "form-activation", "data-retention", "rollback"];
+const execFileAsync = promisify(execFile);
 
 async function runbook(name) {
   return readFile(new URL(`docs/runbooks/${name}.md`, root), "utf8");
@@ -21,6 +26,15 @@ function commandBody(source, title) {
   const fenceEnd = source.indexOf("\n```", fenceStart);
   assert.ok(fenceStart >= 0 && fenceEnd > fenceStart, `missing bash body for ${title}`);
   return source.slice(fenceStart + "```bash\n".length, fenceEnd);
+}
+
+function evidenceParser(command, title) {
+  const prefix = "node --input-type=module -e '";
+  const suffix = "' \"$evidence_dir\"";
+  const start = command.lastIndexOf(prefix);
+  const end = command.indexOf(suffix, start + prefix.length);
+  assert.ok(start >= 0 && end > start, `missing executable evidence parser for ${title}`);
+  return command.slice(start + prefix.length, end);
 }
 
 function assertOrdered(source, labels) {
@@ -123,6 +137,14 @@ test("route smoke is supplemented by bounded legal-release and direct-contact ev
     "ru-consent.html",
     "en-consent.html",
   ];
+  const fixtures = new Map([
+    ["ru-home.html", "RU mailto:hello@v-b.tech https://t.me/thevladbog body-canary-ru-home"],
+    ["en-home.html", "EN mailto:hello@v-b.tech https://t.me/thevladbog body-canary-en-home"],
+    ["ru-policy.html", "RU VBT-PD-01/DRAFT body-canary-ru-policy"],
+    ["en-policy.html", "EN VBT-PD-01/DRAFT body-canary-en-policy"],
+    ["ru-consent.html", "RU VBT-PD-02/DRAFT body-canary-ru-consent"],
+    ["en-consent.html", "EN VBT-PD-02/DRAFT body-canary-en-consent"],
+  ]);
 
   assert.match(publication, /17-check route smoke does not verify[^\n]*legal[^\n]*direct contacts/i);
   assert.match(publication, /### Command: Verify private legal releases and direct contacts/);
@@ -135,23 +157,37 @@ test("route smoke is supplemented by bounded legal-release and direct-contact ev
     assert.match(document, /mailto:hello@v-b\.tech/);
     assert.match(document, /https:\/\/t\.me\/thevladbog/);
   }
-  for (const [document, title] of [
-    [publication, "Verify private legal releases and direct contacts"],
-    [publication, "Verify public legal releases and direct contacts"],
-    [rollback, "Verify preserved legal releases and direct contacts"],
-  ]) {
-    const command = commandBody(document, title);
-    const checksStart = command.indexOf("const checks = ");
-    const checksEnd = command.indexOf("; const hashes =", checksStart);
-    assert.ok(checksStart >= 0 && checksEnd > checksStart, `${title} must define hash order`);
-    const responseOrder = [...command.slice(checksStart, checksEnd).matchAll(
-      /"((?:ru|en)-(?:home|policy|consent)\.html)"/g,
-    )].map((match) => match[1]);
+  const evidenceDir = await mkdtemp(join(tmpdir(), "vbtech-runbook-evidence-"));
+  try {
+    await Promise.all([...fixtures].map(([file, body]) => writeFile(join(evidenceDir, file), body)));
+    for (const [document, title] of [
+      [publication, "Verify private legal releases and direct contacts"],
+      [publication, "Verify public legal releases and direct contacts"],
+      [rollback, "Verify preserved legal releases and direct contacts"],
+    ]) {
+      const parser = evidenceParser(commandBody(document, title), title);
+      const { stdout, stderr } = await execFileAsync(
+        process.execPath,
+        ["--input-type=module", "-e", parser, evidenceDir],
+        { encoding: "utf8" },
+      );
+      const lines = stdout.trim().split("\n");
+      assert.equal(lines.length, 1, `${title} must emit exactly one JSON object`);
+      const output = JSON.parse(lines[0]);
 
-    assert.deepEqual(responseOrder, expectedResponseOrder, `${title} hash order must be stable`);
-    assert.match(command, /import \{ createHash \} from "node:crypto"/);
-    assert.match(command, /createHash\("sha256"\)\.update\(body\)\.digest\("hex"\)/);
-    assert.match(command, /responses: hashes/);
+      assert.equal(stderr, "", `${title} must not emit auxiliary evidence`);
+      assert.deepEqual(Object.keys(output), ["responses"], `${title} top-level schema is too broad`);
+      assert.ok(Array.isArray(output.responses));
+      assert.equal(output.responses.length, 6);
+      assert.deepEqual(output.responses.map(({ file }) => file), expectedResponseOrder);
+      for (const response of output.responses) {
+        assert.deepEqual(Object.keys(response), ["file", "sha256"]);
+        assert.match(response.sha256, /^[0-9a-f]{64}$/);
+      }
+      assert.doesNotMatch(stdout, /body-canary/);
+    }
+  } finally {
+    await rm(evidenceDir, { recursive: true, force: true });
   }
   assert.match(rollback, /tabletop[^\n]*legal\/contact evidence[^\n]*passed/i);
 });
