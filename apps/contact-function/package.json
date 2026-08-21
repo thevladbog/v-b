@@ -8,6 +8,7 @@
   "scripts": {
     "test": "vitest run test/crypto.test.ts test/db-test-helper.test.ts test/config.test.ts test/submit.test.ts test/captcha.test.ts test/http-handler.test.ts test/rate-limit-unit.test.ts test/postbox.test.ts test/worker.test.ts test/timer-handler.test.ts test/telemetry.test.ts",
     "test:db": "vitest run --no-file-parallelism test/outbox-repository.test.ts test/rate-limit.test.ts test/retention.test.ts",
+    "test:e2e": "vitest run --no-file-parallelism test/contact-pipeline.e2e.test.ts",
     "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "tsc --noEmit"
   },
