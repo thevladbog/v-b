@@ -115,6 +115,16 @@ export interface SiteContent {
       message: string;
       consent: string;
     };
+    activeSubmission: {
+      directContactContext: string;
+      formTitle: string;
+      formConsentInstruction: string;
+      formNote: string;
+      formSuccess: string;
+      consentLinkLabel: string;
+      consentDraftContext: string;
+      consentError: string;
+    };
   };
   footerLine: string;
 }

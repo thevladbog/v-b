@@ -12,6 +12,7 @@ const document = getCurrentLegalDocument("VBT-PD-01", locale);
   title={`${document.content.title} | v-b.tech`}
   description={document.content.description}
   route="privacy-policy"
+  status={document.status}
 >
   <LegalDocument locale={locale} document={document} />
 </LegalLayout>

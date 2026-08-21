@@ -25,6 +25,11 @@ const pages = [
     consentHref: "/personal-data-consent/",
     draftContext: "согласие пока нельзя принять",
     consentPhrase: "Я ознакомился(-ась) с политикой обработки персональных данных и проектом согласия на обработку персональных данных.",
+    directContext: "Онлайн-форма пока недоступна. Telegram и email работают и остаются прямыми способами связи.",
+    formTitle: "Черновик обращения",
+    formNote: "Это отключённая production-оболочка: данные не передаются.",
+    consentInstruction: "Флажок изначально снят. Перед возможной отправкой потребуется отдельное согласие.",
+    consentError: "Для отправки потребуется явно подтвердить согласие.",
   },
   {
     file: "dist/en/index.html",
@@ -33,6 +38,11 @@ const pages = [
     consentHref: "/en/personal-data-consent/",
     draftContext: "draft consent cannot yet be accepted",
     consentPhrase: "I have reviewed the personal data processing policy and the draft personal data processing consent.",
+    directContext: "Online submission is currently unavailable. Telegram and email remain active direct contact options.",
+    formTitle: "Enquiry draft",
+    formNote: "This is a disabled production shell: no data is transmitted.",
+    consentInstruction: "The checkbox starts unchecked. Separate consent will be required before submission can be enabled.",
+    consentError: "Submission will require explicit consent confirmation.",
   },
 ] as const;
 
@@ -192,6 +202,10 @@ describe("disabled contact shell", () => {
     expect(consentIdentity).toHaveLength(1);
     expect(text(consentIdentity[0]!)).toBe(CURRENT_CONTACT_CONSENT_ID);
     expect(text(form)).toContain(page.draftContext);
+    expect(text(byId(document, "home-contact-title")!)).toBe(page.formTitle);
+    expect(text(byId(document, "home-contact-note")!)).toBe(page.formNote);
+    expect(text(byId(document, "home-contact-consent-instruction")!)).toContain(page.consentInstruction);
+    expect(attr(byId(document, "home-contact-consent-error")!, "data-error-message")).toBe(page.consentError);
     const consentLabel = elements(form, (node) =>
       node.tagName === "label" && attr(node, "for") === "home-contact-consent",
     )[0]!;
@@ -206,6 +220,7 @@ describe("disabled contact shell", () => {
     expect(elements(form, (node) => attr(node, "data-contact-errors") !== undefined)).toHaveLength(1);
 
     const contactPanel = byId(document, "contact")!;
+    expect(text(elements(contactPanel, (node) => attr(node, "class") === "contact-direct-context")[0]!)).toBe(page.directContext);
     expect(elements(contactPanel, (node) => attr(node, "href") === "https://t.me/thevladbog")).toHaveLength(1);
     expect(elements(contactPanel, (node) => attr(node, "href") === "mailto:hello@v-b.tech")).toHaveLength(1);
   });

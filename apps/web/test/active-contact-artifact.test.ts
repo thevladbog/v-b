@@ -15,9 +15,11 @@ const publicSiteKey = "vbtech-reviewed-active-public-site-key";
 
 interface HtmlAttribute { name: string; value: string }
 interface HtmlNode {
+  nodeName?: string;
   tagName?: string;
   attrs?: HtmlAttribute[];
   childNodes?: HtmlNode[];
+  value?: string;
 }
 
 const attr = (node: HtmlNode, name: string) =>
@@ -32,6 +34,58 @@ const elements = (root: HtmlNode, predicate: (node: HtmlNode) => boolean): HtmlN
   visit(root);
   return found;
 };
+
+const text = (node: HtmlNode): string =>
+  node.nodeName === "#text"
+    ? node.value ?? ""
+    : (node.childNodes ?? []).map(text).join(" ").replace(/\s+/g, " ").trim();
+
+const activeLandingCopy = {
+  "index.html": {
+    directContext: "Отправьте обращение через форму ниже или свяжитесь напрямую по email или в Telegram.",
+    formTitle: "Отправить обращение",
+    formNote: "Форма передаёт введённые данные, чтобы я мог ответить на обращение. Ознакомьтесь с действующей политикой обработки персональных данных и согласием по ссылкам выше.",
+    consentLink: "согласием на обработку персональных данных",
+    consentInstruction: "Перед отправкой ознакомьтесь с действующим согласием и примите его, установив флажок. Действующая редакция:",
+    consentContext: "Это согласие применяется к отправке формы.",
+    consentError: "Ознакомьтесь с действующим согласием и примите его, установив флажок.",
+  },
+  "en/index.html": {
+    directContext: "Send an enquiry using the form below, or contact me directly by email or Telegram.",
+    formTitle: "Send an enquiry",
+    formNote: "The form transmits the entered data so I can respond to your enquiry. Review the current personal data processing policy and consent linked above.",
+    consentLink: "personal data processing consent",
+    consentInstruction: "Review and accept the current consent by selecting the checkbox before sending. Current revision:",
+    consentContext: "This consent applies to the form submission.",
+    consentError: "Review and accept the current consent by selecting the checkbox.",
+  },
+} as const;
+
+const forbiddenActivePhrases = [
+  "Онлайн-форма пока недоступна",
+  "Черновик обращения",
+  "отключённая production-оболочка",
+  "данные не передаются",
+  "проектом согласия на обработку персональных данных",
+  "Проект не вступил в силу",
+  "согласие пока нельзя принять",
+  "Для отправки потребуется явно подтвердить согласие",
+  "Проект. Документ не вступил в силу",
+  "В реестре находятся только кандидаты для проверки",
+  "Статус: проект",
+  "Online submission is currently unavailable",
+  "Enquiry draft",
+  "disabled production shell",
+  "no data is transmitted",
+  "draft personal data processing consent",
+  "draft consent cannot yet be accepted",
+  "Submission will require explicit consent confirmation",
+  "Draft. This document is not in force",
+  "review candidates only",
+  "Status: draft",
+  "VBT-PD-01/DRAFT",
+  "VBT-PD-02/DRAFT",
+] as const;
 
 const buildActive = (extraEnv: Record<string, string | undefined> = {}, extraArgs: string[] = []) =>
   execFileAsync("node_modules/.bin/astro", [
@@ -54,7 +108,7 @@ beforeAll(async () => {
 }, 120_000);
 
 describe("private production-shaped ACTIVE contact artifact", () => {
-  it.each(["index.html", "en/index.html"])("renders the actual enabled production form in %s", async (file) => {
+  it.each(Object.entries(activeLandingCopy))("renders exact state-aware production copy and form in %s", async (file, copy) => {
     const html = await readFile(join(activeOutDir, file), "utf8");
     const document = parse(html) as unknown as HtmlNode;
     const forms = elements(document, (node) => attr(node, "data-contact-form") !== undefined);
@@ -71,6 +125,35 @@ describe("private production-shaped ACTIVE contact artifact", () => {
     expect(elements(form, (node) => attr(node, "id") === "home-contact-disabled")).toHaveLength(0);
     expect(elements(form, (node) => node.tagName === "fieldset").map((node) => attr(node, "disabled"))).toEqual([undefined]);
     expect(elements(form, (node) => node.tagName === "fieldset").map((node) => attr(node, "aria-describedby"))).toEqual([undefined]);
+    expect(text(elements(document, (node) => attr(node, "class") === "contact-direct-context")[0]!)).toBe(copy.directContext);
+    expect(text(elements(document, (node) => attr(node, "id") === "home-contact-title")[0]!)).toBe(copy.formTitle);
+    expect(text(elements(form, (node) => attr(node, "id") === "home-contact-note")[0]!)).toBe(copy.formNote);
+    expect(text(elements(form, (node) => attr(node, "data-contact-consent-link") === "consent")[0]!)).toBe(copy.consentLink);
+    expect(text(elements(form, (node) => attr(node, "id") === "home-contact-consent-instruction")[0]!)).toContain(copy.consentInstruction);
+    expect(text(elements(form, (node) => attr(node, "id") === "home-contact-consent-instruction")[0]!)).toContain(copy.consentContext);
+    expect(attr(elements(form, (node) => attr(node, "id") === "home-contact-consent-error")[0]!, "data-error-message")).toBe(copy.consentError);
+  });
+
+  it("renders coherent synthetic ACTIVE legal pages without DRAFT or disabled phrases", async () => {
+    const legalPages = [
+      "legal/index.html", "privacy/index.html", "personal-data-consent/index.html",
+      "en/legal/index.html", "en/privacy/index.html", "en/personal-data-consent/index.html",
+    ];
+    const html = await Promise.all(legalPages.map((file) => readFile(join(activeOutDir, file), "utf8")));
+    const artifact = html.join("\n");
+
+    expect(artifact).toContain("VBT-PD-01/2099.01/01");
+    expect(artifact).toContain(activeConsentId);
+    expect(artifact).toContain("Синтетическая действующая редакция для закрытого тестового контура");
+    expect(artifact).toContain("Synthetic active revision for the private test contour");
+    for (const phrase of forbiddenActivePhrases) expect(artifact).not.toContain(phrase);
+  });
+
+  it("contains no DRAFT, disabled, or no-transmission copy on any ACTIVE RU/EN landing or legal route", async () => {
+    const htmlFiles = (await readdir(activeOutDir, { recursive: true }))
+      .filter((file) => file.endsWith(".html"));
+    const artifact = (await Promise.all(htmlFiles.map((file) => readFile(join(activeOutDir, file), "utf8")))).join("\n");
+    for (const phrase of forbiddenActivePhrases) expect(artifact).not.toContain(phrase);
   });
 
   it("emits one shared request-capable client chunk without fixture or secret material", async () => {

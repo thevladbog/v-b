@@ -4,17 +4,23 @@ import LegalLayout from "../../layouts/LegalLayout.astro";
 
 const locale = "ru";
 const documents = listCurrentLegalDocuments(locale);
-const title = "Правовые документы v-b.tech — проекты";
-const description =
-  "Реестр проектов документов v-b.tech: политика обработки персональных данных и согласие для будущей формы обращения.";
+const registryStatus = documents.every((document) => document.status === "draft") ? "draft" : "active";
+const title = registryStatus === "draft" ? "Правовые документы v-b.tech — проекты" : "Правовые документы v-b.tech";
+const description = registryStatus === "draft"
+  ? "Реестр проектов документов v-b.tech: политика обработки персональных данных и согласие для будущей формы обращения."
+  : "Реестр действующих документов v-b.tech для формы обращения.";
+const introduction = registryStatus === "draft"
+  ? "В реестре находятся только кандидаты для проверки. Действующих документов сейчас нет."
+  : "В реестре опубликованы действующие документы для формы обращения.";
+const statusLabel = (status: (typeof documents)[number]["status"]) => status === "active" ? "действует" : status;
 ---
 
-<LegalLayout locale={locale} title={title} description={description} route="legal-register">
+<LegalLayout locale={locale} title={title} description={description} route="legal-register" status={registryStatus}>
   <div class="legal-register">
     <header class="legal-register-header">
       <p class="legal-kicker">v-b.tech / legal</p>
       <h1>Правовые документы</h1>
-      <p>В реестре находятся только кандидаты для проверки. Действующих документов сейчас нет.</p>
+      <p>{introduction}</p>
     </header>
     <ul class="legal-register-list">
       {documents.map((document) => (
@@ -22,7 +28,7 @@ const description =
           <article>
             <p class="legal-register-meta">{document.code} · {document.identity}</p>
             <h2><a href={document.routes.ru}>{document.content.title}</a></h2>
-            <p>Статус: проект</p>
+            <p>Статус: {document.status === "draft" ? "проект" : statusLabel(document.status)}</p>
             <p>{document.content.summary}</p>
           </article>
         </li>

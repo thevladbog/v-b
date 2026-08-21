@@ -1,5 +1,6 @@
 ---
 import type { Locale } from "@vbtech/content";
+import type { LegalDocumentStatus } from "@vbtech/legal-documents";
 import BaseLayout from "./BaseLayout.astro";
 import { localizedPath, type LocalizedRoute } from "../lib/locale.js";
 import "../styles/legal.css";
@@ -9,13 +10,25 @@ interface Props {
   title: string;
   description: string;
   route: LocalizedRoute;
+  status: LegalDocumentStatus;
 }
 
-const { locale, title, description, route } = Astro.props;
-const banner =
-  locale === "ru"
-    ? "Проект. Документ не вступил в силу. Дата вступления в силу отсутствует. Отправка формы отключена."
-    : "Draft. This document is not in force. No effective date. Submission is disabled.";
+const { locale, title, description, route, status } = Astro.props;
+const statusCopy = {
+  ru: {
+    draft: "Проект. Документ не вступил в силу. Дата вступления в силу отсутствует. Отправка формы отключена.",
+    active: "Действующий документ. Редакция и дата вступления в силу указаны ниже.",
+    superseded: "Архивная редакция. Документ заменён более новой редакцией.",
+    withdrawn: "Документ отозван и больше не действует.",
+  },
+  en: {
+    draft: "Draft. This document is not in force. No effective date. Submission is disabled.",
+    active: "Current document. The revision and effective date are shown below.",
+    superseded: "Archived revision. A newer revision has replaced this document.",
+    withdrawn: "This document has been withdrawn and is no longer in force.",
+  },
+} as const;
+const banner = statusCopy[locale][status];
 ---
 
 <BaseLayout

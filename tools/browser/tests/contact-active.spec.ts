@@ -72,6 +72,10 @@ for (const localized of [
     message: "Что вы хотите спроектировать или улучшить?",
     consent: /Я ознакомился/,
     submit: "Отправить обращение",
+    directContext: "Отправьте обращение через форму ниже или свяжитесь напрямую по email или в Telegram.",
+    formTitle: "Отправить обращение",
+    formNote: "Форма передаёт введённые данные, чтобы я мог ответить на обращение. Ознакомьтесь с действующей политикой обработки персональных данных и согласием по ссылкам выше.",
+    consentLink: "согласием на обработку персональных данных",
   },
   {
     path: "/en/",
@@ -80,6 +84,10 @@ for (const localized of [
     message: "What do you want to design or improve?",
     consent: /I have reviewed/,
     submit: "Send enquiry",
+    directContext: "Send an enquiry using the form below, or contact me directly by email or Telegram.",
+    formTitle: "Send an enquiry",
+    formNote: "The form transmits the entered data so I can respond to your enquiry. Review the current personal data processing policy and consent linked above.",
+    consentLink: "personal data processing consent",
   },
 ] as const) {
   test(`${localized.path} production-shaped active form is accessible before and after validation`, async ({ page }) => {
@@ -91,6 +99,10 @@ for (const localized of [
     await expect(form).toHaveAttribute("data-consent-id", activeConsentId);
     await expect(form).toHaveAttribute("data-captcha-site-key", publicSiteKey);
     await expect(form).not.toHaveAttribute("data-internal-test-fixture", /.+/);
+    await expect(page.locator(".contact-direct-context")).toHaveText(localized.directContext);
+    await expect(page.locator("#home-contact-title")).toHaveText(localized.formTitle);
+    await expect(form.locator("#home-contact-note")).toHaveText(localized.formNote);
+    await expect(form.locator('[data-contact-consent-link="consent"]')).toHaveText(localized.consentLink);
     expect(await page.evaluate(() => window.__vbtechActiveContactSubmitBindings)).toBe(1);
 
     for (const theme of ["light", "dark"] as const) {
@@ -118,6 +130,34 @@ for (const localized of [
     }
   });
 }
+
+test("all RU/EN production-shaped legal routes expose coherent ACTIVE identities and copy", async ({ page }) => {
+  const routes = [
+    { path: "/legal/", identity: "VBT-PD-01/2099.01/01", copy: "В реестре опубликованы действующие документы для формы обращения." },
+    { path: "/privacy/", identity: "VBT-PD-01/2099.01/01", copy: "Синтетическая действующая редакция для закрытого тестового контура." },
+    { path: "/personal-data-consent/", identity: activeConsentId, copy: "Синтетическая действующая редакция для закрытого тестового контура." },
+    { path: "/en/legal/", identity: "VBT-PD-01/2099.01/01", copy: "The register contains the current documents for the enquiry form." },
+    { path: "/en/privacy/", identity: "VBT-PD-01/2099.01/01", copy: "Synthetic active revision for the private test contour." },
+    { path: "/en/personal-data-consent/", identity: activeConsentId, copy: "Synthetic active revision for the private test contour." },
+  ] as const;
+  const forbidden = [
+    "Проект. Документ не вступил в силу",
+    "Статус: проект",
+    "VBT-PD-01/DRAFT",
+    "VBT-PD-02/DRAFT",
+    "Draft. This document is not in force",
+    "Status: draft",
+  ] as const;
+
+  for (const route of routes) {
+    await page.goto(`${origin}${route.path}`);
+    const main = page.locator("main");
+    await expect(main).toContainText(route.identity);
+    await expect(main).toContainText(route.copy);
+    const body = await main.innerText();
+    for (const phrase of forbidden) expect(body).not.toContain(phrase);
+  }
+});
 
 test("actual production page acquires one captcha token and posts the exact same-origin JSON contract", async ({ page }) => {
   await installRuntimeObservation(page);

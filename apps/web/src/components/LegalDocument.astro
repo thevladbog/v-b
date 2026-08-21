@@ -11,8 +11,8 @@ interface Props {
 const { locale, document } = Astro.props;
 const labels =
   locale === "ru"
-    ? { code: "Код", identity: "Идентификатор", status: "Статус", draft: "проект", back: "К реестру документов" }
-    : { code: "Code", identity: "Identity", status: "Status", draft: "draft", back: "Back to legal register" };
+    ? { code: "Код", identity: "Идентификатор", status: "Статус", effectiveDate: "Дата вступления в силу", draft: "проект", active: "действует", superseded: "заменён", withdrawn: "отозван", back: "К реестру документов" }
+    : { code: "Code", identity: "Identity", status: "Status", effectiveDate: "Effective date", draft: "draft", active: "active", superseded: "superseded", withdrawn: "withdrawn", back: "Back to legal register" };
 ---
 
 <article class="legal-document">
@@ -23,7 +23,8 @@ const labels =
     <dl class="legal-metadata">
       <div><dt>{labels.code}</dt><dd>{document.code}</dd></div>
       <div><dt>{labels.identity}</dt><dd>{document.identity}</dd></div>
-      <div><dt>{labels.status}</dt><dd>{labels.draft}</dd></div>
+      <div><dt>{labels.status}</dt><dd>{labels[document.status]}</dd></div>
+      {document.effectiveDate && <div><dt>{labels.effectiveDate}</dt><dd>{document.effectiveDate}</dd></div>}
     </dl>
   </header>
 
