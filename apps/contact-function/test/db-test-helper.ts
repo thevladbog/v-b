@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 const migrationUrl = new URL("../migrations/0001_contact_outbox.sql", import.meta.url);
 const EXPECTED_DATABASE_NAME = "vbtech_contact_test";
@@ -58,7 +58,10 @@ export const createTestPool = () =>
     max: 8,
   });
 
-export const resetContactSchema = async (pool: Pool): Promise<void> => {
+const withVerifiedDisposableDatabase = async (
+  pool: Pool,
+  action: (client: PoolClient) => Promise<void>,
+): Promise<void> => {
   const client = await pool.connect();
   try {
     const identity = await client.query<{
@@ -72,22 +75,28 @@ export const resetContactSchema = async (pool: Pool): Promise<void> => {
       current?.database_name ?? "",
       current?.role_name ?? "",
     );
-    await client.query(
-      "DROP TABLE IF EXISTS email_outbox, contact_requests, contact_rate_limits",
-    );
-    await client.query("DROP FUNCTION IF EXISTS contact_test_reject_outbox()");
+    await action(client);
   } finally {
     client.release();
   }
 };
+
+export const resetContactSchema = async (pool: Pool): Promise<void> =>
+  withVerifiedDisposableDatabase(pool, async (client) => {
+    await client.query(
+      "DROP TABLE IF EXISTS email_outbox, contact_requests, contact_rate_limits",
+    );
+    await client.query("DROP FUNCTION IF EXISTS contact_test_reject_outbox()");
+  });
 
 export const migrate = async (pool: Pool): Promise<void> => {
   const sql = await readFile(fileURLToPath(migrationUrl), "utf8");
   await pool.query(sql);
 };
 
-export const resetContactTables = async (pool: Pool): Promise<void> => {
-  await pool.query(
-    "TRUNCATE TABLE email_outbox, contact_requests, contact_rate_limits RESTART IDENTITY",
-  );
-};
+export const resetContactTables = async (pool: Pool): Promise<void> =>
+  withVerifiedDisposableDatabase(pool, async (client) => {
+    await client.query(
+      "TRUNCATE TABLE email_outbox, contact_requests, contact_rate_limits RESTART IDENTITY",
+    );
+  });

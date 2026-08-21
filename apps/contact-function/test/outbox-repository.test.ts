@@ -1,12 +1,13 @@
 import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { ContactRequest } from "@vbtech/contracts";
-import type { Pool } from "pg";
+import { Pool } from "pg";
 import { decryptPayload } from "../src/crypto.js";
 import { OutboxRepository } from "../src/outbox-repository.js";
 import {
   createTestPool,
   migrate,
+  requireTestDatabaseUrl,
   resetContactSchema,
   resetContactTables,
 } from "./db-test-helper.js";
@@ -48,6 +49,26 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await pool?.end();
+});
+
+describe("database reset safety", () => {
+  // Catches a test-safety break that lets per-test TRUNCATE bypass the connected database identity check.
+  it("rejects the loopback maintenance database before truncating", async () => {
+    const maintenanceUrl = new URL(requireTestDatabaseUrl());
+    maintenanceUrl.pathname = "/postgres";
+    const maintenancePool = new Pool({
+      connectionString: maintenanceUrl.toString(),
+      options: "-c default_transaction_read_only=on",
+    });
+
+    try {
+      await expect(resetContactTables(maintenancePool)).rejects.toThrow(
+        "database reset requires vbtech_test@vbtech_contact_test",
+      );
+    } finally {
+      await maintenancePool.end();
+    }
+  });
 });
 
 describe("transactional contact acceptance", () => {
