@@ -1,3 +1,4 @@
+import { contactRequestSchema } from "@vbtech/contracts";
 import type { Locale } from "@vbtech/content";
 
 export type ContactField = "name" | "contact" | "message" | "consent";
@@ -14,31 +15,40 @@ export interface ContactValidation {
   fields: readonly ContactField[];
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TELEGRAM_PATTERN = /^@[A-Za-z0-9_]{5,}$/;
-
 export function normalizeContact(value: string): string {
-  return value.trim();
+  const trimmed = value.trim();
+  return trimmed.startsWith("@") ? trimmed : trimmed.toLowerCase();
 }
 
 export function validateDraft(
   draft: ContactDraft,
-  _locale: Locale,
+  locale: Locale,
 ): ContactValidation {
-  const fields: ContactField[] = [];
   const name = draft.name.trim();
   const contact = normalizeContact(draft.contact);
   const message = draft.message.trim();
-
-  if (name.length === 0 || name.length > 100) fields.push("name");
-  if (
-    contact.length === 0 ||
-    contact.length > 254 ||
-    (!EMAIL_PATTERN.test(contact) && !TELEGRAM_PATTERN.test(contact))
-  ) {
-    fields.push("contact");
-  }
-  if (message.length === 0 || message.length > 4_000) fields.push("message");
+  const result = contactRequestSchema.safeParse({
+    requestId: "00000000-0000-4000-8000-000000000000",
+    locale,
+    name,
+    contact,
+    message,
+    sourcePath: locale === "ru" ? "/" : "/en/",
+    consentId: "local-validation",
+    captchaToken: "local-validation",
+    website: "",
+  });
+  const invalidPaths = new Set(
+    result.success
+      ? []
+      : result.error.issues
+          .map(({ path }) => path[0])
+          .filter((path): path is ContactField =>
+            path === "name" || path === "contact" || path === "message"),
+  );
+  const fields: ContactField[] = ["name", "contact", "message"].filter(
+    (field): field is ContactField => invalidPaths.has(field as ContactField),
+  );
   if (!draft.consent) fields.push("consent");
 
   return { valid: fields.length === 0, fields };

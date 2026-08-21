@@ -1,0 +1,40 @@
+name: vbtech-contact-local
+
+services:
+  postgres:
+    image: postgres:17-alpine@sha256:dc17045ccfd343b49600570ea734b9c4991cf1c3f3302e67df51e3b402dd55c4
+    environment:
+      POSTGRES_DB: vbtech_contact_test
+      POSTGRES_PASSWORD: vbtech_test_only
+      POSTGRES_USER: vbtech_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vbtech_test -d vbtech_contact_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - contact-postgres-data:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit:v1.30.7@sha256:a0ec6df78d03abfa0328c76ccb16ff164eb9e08623ef7ddd6f0fd5a43ab35ed8
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_LABEL: vbtech-task7-dedicated
+    ports:
+      - "127.0.0.1:51025:1025"
+      - "127.0.0.1:58025:8025"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8025/api/v1/info >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 2s
+    volumes:
+      - contact-mailpit-data:/data
+
+volumes:
+  contact-postgres-data:
+  contact-mailpit-data:

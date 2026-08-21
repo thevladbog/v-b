@@ -1,0 +1,59 @@
+---
+import { SITE_CONTENT, type Locale } from "@vbtech/content";
+import ContactForm from "../../src/components/ContactForm.astro";
+import "../../src/styles/global.css";
+import "../../src/styles/landing.css";
+
+interface Props { locale: Locale; prefixes: readonly string[]; captchaLoadTimeoutMs?: number }
+const { locale, prefixes, captchaLoadTimeoutMs } = Astro.props;
+const content = SITE_CONTENT[locale].contact;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Internal contact fixture</title>
+  </head>
+  <body>
+    <main id="main-content">
+      {prefixes.map((idPrefix) => (
+        <section class="contact-panel" aria-label={`${content.formTitle} ${idPrefix}`}>
+          <ContactForm
+            idPrefix={idPrefix}
+            locale={locale}
+            content={content}
+            internalContactFixture={{
+              siteKey: "vbtech-internal-fixture-site-key",
+              loadTimeoutMs: captchaLoadTimeoutMs ?? (prefixes.length > 1 ? 2_000 : 300),
+            }}
+          />
+        </section>
+      ))}
+    </main>
+    <script>
+      import { disposeContactForm, initializeContactForms } from "../../src/scripts/contact-form";
+      let disposeAll = initializeContactForms();
+      Object.assign(window, {
+        __vbtechInitializeContactForms: () => initializeContactForms(),
+        __vbtechDisposeContactForms: () => disposeAll(),
+        __vbtechRemountContactForms: () => {
+          disposeAll();
+          disposeAll = initializeContactForms();
+        },
+        __vbtechDisposeContactForm: (instance) => {
+          const form = document.querySelector(`[data-contact-instance="${instance}"]`);
+          if (form instanceof HTMLFormElement) disposeContactForm(form);
+        },
+      });
+    </script>
+  </body>
+</html>
+
+<style>
+  body { min-height: 100vh; padding: 2rem 1rem; }
+  main { width: min(100%, 48rem); margin-inline: auto; }
+  .contact-panel { scroll-margin-top: 1rem; margin-block-end: 3rem; }
+</style>

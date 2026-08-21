@@ -87,6 +87,22 @@ export interface LegalPublishedRelease extends LegalDocumentReleaseBase {
 
 export type LegalDocumentRelease = LegalDraftRelease | LegalPublishedRelease;
 
+export type LegalActiveRelease = Omit<LegalPublishedRelease, "status"> & {
+  readonly status: "active";
+};
+
+export type PersonalDataLegalContour =
+  | {
+      readonly status: "draft";
+      readonly policy: LegalDraftRelease;
+      readonly consent: LegalDraftRelease;
+    }
+  | {
+      readonly status: "active";
+      readonly policy: LegalActiveRelease;
+      readonly consent: LegalActiveRelease;
+    };
+
 export interface LegalDocumentSource {
   readonly releaseIdentity: LegalDocumentIdentity;
   readonly content: Readonly<Record<LegalLocale, LegalDocumentLocaleContent>>;

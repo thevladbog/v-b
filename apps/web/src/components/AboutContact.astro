@@ -1,6 +1,8 @@
 ---
-import type { Locale, SiteContent } from "@vbtech/content";
+import { PUBLIC_CONTACT_SUBMISSION_ENABLED } from "astro:env/client";
+import { resolveContactContent, type Locale, type SiteContent } from "@vbtech/content";
 import ContactForm from "./ContactForm.astro";
+import { resolveContactSubmissionReadiness } from "../lib/form-state.js";
 
 interface Props {
   locale: Locale;
@@ -9,6 +11,8 @@ interface Props {
 }
 
 const { locale, about, contact } = Astro.props;
+const readiness = resolveContactSubmissionReadiness(PUBLIC_CONTACT_SUBMISSION_ENABLED);
+const resolvedContact = resolveContactContent(contact, readiness.submissionEnabled);
 const signatureLabel = locale === "ru"
   ? "Влад Богатырев — продуктовая инженерия и эксплуатация"
   : "Vlad Bogatyrev — product engineering and operations";
@@ -27,19 +31,19 @@ const signatureLabel = locale === "ru"
     </section>
 
     <section class="contact-panel" id="contact" data-section="contact" aria-labelledby="contact-title">
-      <p class="eyebrow">{contact.eyebrow}</p>
-      <h2 id="contact-title">{contact.title}</h2>
-      <p class="contact-lead">{contact.lead}</p>
-      <p class="contact-direct-context">{contact.directContactContext}</p>
+      <p class="eyebrow">{resolvedContact.eyebrow}</p>
+      <h2 id="contact-title">{resolvedContact.title}</h2>
+      <p class="contact-lead">{resolvedContact.lead}</p>
+      <p class="contact-direct-context">{resolvedContact.directContactContext}</p>
       <div class="contact-links">
-        <a href="https://t.me/thevladbog" target="_blank" rel="noopener noreferrer" aria-label={contact.telegramNewTabLabel}>
-          <span>{contact.telegram}</span><b>@thevladbog <i aria-hidden="true">↗</i></b>
+        <a href="https://t.me/thevladbog" target="_blank" rel="noopener noreferrer" aria-label={resolvedContact.telegramNewTabLabel}>
+          <span>{resolvedContact.telegram}</span><b>@thevladbog <i aria-hidden="true">↗</i></b>
         </a>
         <a href="mailto:hello@v-b.tech">
-          <span>{contact.email}</span><b>hello@v-b.tech <i aria-hidden="true">↗</i></b>
+          <span>{resolvedContact.email}</span><b>hello@v-b.tech <i aria-hidden="true">↗</i></b>
         </a>
       </div>
-      <ContactForm locale={locale} content={contact} />
+      <ContactForm idPrefix="home-contact" locale={locale} content={resolvedContact} />
     </section>
   </div>
 </div>

@@ -1,0 +1,77 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`contact notification rendering > renders the English notification with escaped user content and all approved fields 1`] = `
+{
+  "html": "<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html lang="en"><head><meta content="light dark" name="color-scheme"/><meta content="light dark" name="supported-color-schemes"/></head><body style="background-color:#1b1e20;color:#22262a;font-family:Arial, sans-serif;margin:0;padding:24px 12px"><!--$--><!--html--><!--head--><!--body--><div style="display:none;max-height:0;opacity:0;overflow:hidden">A new v-b.tech enquiry is ready to review.</div><table cellPadding="0" cellSpacing="0" role="presentation" style="margin:0 auto;width:100%"><tbody><tr><td align="center"><table cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#f6f3ed;border:1px solid #d8d1c5;border-radius:4px;margin:0 auto;max-width:640px;overflow:hidden" width="100%"><tbody><tr><td style="background-color:#1b1e20;color:#ffffff;padding:24px 28px 20px"><p style="color:#ffffff;font-family:Arial, sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.5px;line-height:28px;margin:0">v<span style="color:#d88900">-</span>b.tech</p></td></tr><tr><td style="padding:8px 28px 20px"><h1 style="color:#22262a;font-family:Arial, sans-serif;font-size:24px;font-weight:700;line-height:30px;margin:20px 0 12px">New enquiry</h1><p style="color:#22262a;font-family:Arial, sans-serif;font-size:16px;line-height:24px;margin:16px 0">A new v-b.tech enquiry is ready to review.</p><hr style="border-color:#d8d1c5;margin:20px 0"/><table cellPadding="0" cellSpacing="0" role="presentation" style="width:100%"><tbody><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.4px;line-height:18px;margin:0 0 2px;text-transform:uppercase">Name</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:15px;line-height:22px;margin:0 0 14px;white-space:pre-wrap">&lt;Vlad &amp; &quot;team&quot;&gt;</p></td></tr></tbody></table><table cellPadding="0" cellSpacing="0" role="presentation" style="width:100%"><tbody><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.4px;line-height:18px;margin:0 0 2px;text-transform:uppercase">Contact</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:15px;line-height:22px;margin:0 0 14px;white-space:pre-wrap">hello@example.com</p></td></tr></tbody></table><table cellPadding="0" cellSpacing="0" role="presentation" style="width:100%"><tbody><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.4px;line-height:18px;margin:0 0 2px;text-transform:uppercase">Message</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:15px;line-height:22px;margin:0 0 14px;white-space:pre-wrap">Build the product safely.</p></td></tr></tbody></table><hr style="border-color:#d8d1c5;margin:20px 0"/><table cellPadding="0" cellSpacing="0" role="presentation" style="width:100%"><tbody><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.4px;line-height:18px;margin:0 0 2px;text-transform:uppercase">Locale</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:15px;line-height:22px;margin:0 0 14px;white-space:pre-wrap">en</p></td></tr></tbody></table><table cellPadding="0" cellSpacing="0" role="presentation" style="width:100%"><tbody><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.4px;line-height:18px;margin:0 0 2px;text-transform:uppercase">Source path</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:15px;line-height:22px;margin:0 0 14px;white-space:pre-wrap">/en/</p></td></tr></tbody></table><table cellPadding="0" cellSpacing="0" role="presentation" style="width:100%"><tbody><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.4px;line-height:18px;margin:0 0 2px;text-transform:uppercase">Received at</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:15px;line-height:22px;margin:0 0 14px;white-space:pre-wrap">2026-08-20T12:00:00.000Z</p></td></tr></tbody></table><table cellPadding="0" cellSpacing="0" role="presentation" style="width:100%"><tbody><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.4px;line-height:18px;margin:0 0 2px;text-transform:uppercase">Request ID</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:15px;line-height:22px;margin:0 0 14px;white-space:pre-wrap">11111111-1111-4111-8111-111111111111</p></td></tr></tbody></table><table cellPadding="0" cellSpacing="0" role="presentation" style="width:100%"><tbody><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;font-weight:700;letter-spacing:0.4px;line-height:18px;margin:0 0 2px;text-transform:uppercase">Consent ID</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:15px;line-height:22px;margin:0 0 14px;white-space:pre-wrap">VBT-PD-02/DRAFT</p></td></tr></tbody></table></td></tr><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;line-height:18px;margin:0;padding:12px 28px 24px">v-b.tech · Product engineering for systems that need to work.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>",
+  "subject": "New v-b.tech enquiry",
+  "text": "A new v-b.tech enquiry is ready to review.
+
+v-b.tech
+
+
+NEW ENQUIRY
+
+A new v-b.tech enquiry is ready to review.
+
+----------------------------------------
+
+Name
+
+<Vlad & "team">
+
+Contact
+
+hello@example.com
+
+Message
+
+Build the product safely.
+
+----------------------------------------
+
+Locale
+
+en
+
+Source path
+
+/en/
+
+Received at
+
+2026-08-20T12:00:00.000Z
+
+Request ID
+
+11111111-1111-4111-8111-111111111111
+
+Consent ID
+
+VBT-PD-02/DRAFT
+
+v-b.tech · Product engineering for systems that need to work.",
+}
+`;
+
+exports[`visitor confirmation rendering > renders an email-only English confirmation without the enquiry message 1`] = `
+{
+  "html": "<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html lang="en"><head><meta content="light dark" name="color-scheme"/><meta content="light dark" name="supported-color-schemes"/></head><body style="background-color:#1b1e20;color:#22262a;font-family:Arial, sans-serif;margin:0;padding:24px 12px"><!--$--><!--html--><!--head--><!--body--><div style="display:none;max-height:0;opacity:0;overflow:hidden">Your v-b.tech enquiry was received.</div><table cellPadding="0" cellSpacing="0" role="presentation" style="margin:0 auto;width:100%"><tbody><tr><td align="center"><table cellPadding="0" cellSpacing="0" role="presentation" style="background-color:#f6f3ed;border:1px solid #d8d1c5;border-radius:4px;margin:0 auto;max-width:640px;overflow:hidden" width="100%"><tbody><tr><td style="background-color:#1b1e20;color:#ffffff;padding:24px 28px 20px"><p style="color:#ffffff;font-family:Arial, sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.5px;line-height:28px;margin:0">v<span style="color:#d88900">-</span>b.tech</p></td></tr><tr><td style="padding:8px 28px 20px"><h1 style="color:#22262a;font-family:Arial, sans-serif;font-size:24px;font-weight:700;line-height:30px;margin:20px 0 12px">Your enquiry was received</h1><p style="color:#22262a;font-family:Arial, sans-serif;font-size:16px;line-height:24px;margin:16px 0">I will review it and reply if a next step is useful.</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:16px;line-height:24px;margin:16px 0">Request ID<!-- -->: <!-- -->11111111-1111-4111-8111-111111111111</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:16px;line-height:24px;margin:16px 0">For a direct follow-up, use email or Telegram.</p><p style="color:#22262a;font-family:Arial, sans-serif;font-size:16px;line-height:24px;margin:16px 0"><a href="mailto:hello@v-b.tech" style="color:#805000;text-decoration:underline">hello@v-b.tech</a> · <a href="https://t.me/thevladbog" style="color:#805000;text-decoration:underline">@thevladbog</a></p></td></tr><tr><td><p style="color:#656a70;font-family:Arial, sans-serif;font-size:12px;line-height:18px;margin:0;padding:12px 28px 24px">v-b.tech · Product engineering for systems that need to work.</p></td></tr></tbody></table></td></tr></tbody></table><!--/$--></body></html>",
+  "subject": "We received your v-b.tech enquiry",
+  "text": "Your v-b.tech enquiry was received.
+
+v-b.tech
+
+
+YOUR ENQUIRY WAS RECEIVED
+
+I will review it and reply if a next step is useful.
+
+Request ID: 11111111-1111-4111-8111-111111111111
+
+For a direct follow-up, use email or Telegram.
+
+hello@v-b.tech · @thevladbog https://t.me/thevladbog
+
+v-b.tech · Product engineering for systems that need to work.",
+}
+`;

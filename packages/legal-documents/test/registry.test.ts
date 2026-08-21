@@ -9,6 +9,7 @@ import {
   OPERATOR_PROFILES,
   assertContactConsentPublishable,
   deriveCurrentLegalReleases,
+  derivePersonalDataLegalContour,
   getActiveLegalDocument,
   getCurrentLegalDocument,
   listActiveLegalDocuments,
@@ -341,6 +342,97 @@ line.ts"]}`,
 
   it("accepts a future valid active release set", () => {
     expect(() => validateLegalRegistry(syntheticActiveReleases(), syntheticActiveDocuments())).not.toThrow();
+  });
+
+  describe("personal data legal contour", () => {
+    it("derives the two current DRAFT releases in code order regardless of input order", () => {
+      for (const releases of [LEGAL_RELEASES, [...LEGAL_RELEASES].reverse()]) {
+        const contour = derivePersonalDataLegalContour(releases);
+        expect(contour.status).toBe("draft");
+        expect(contour.policy).toMatchObject({
+          code: "VBT-PD-01",
+          identity: "VBT-PD-01/DRAFT",
+          revision: null,
+          effectiveDate: null,
+          status: "draft",
+        });
+        expect(contour.consent).toMatchObject({
+          code: "VBT-PD-02",
+          identity: "VBT-PD-02/DRAFT",
+          revision: null,
+          effectiveDate: null,
+          status: "draft",
+        });
+      }
+    });
+
+    it("derives two independently versioned valid ACTIVE releases without requiring matching dates", () => {
+      const releases = syntheticActiveReleases();
+      releases[1] = {
+        ...releases[1]!,
+        identity: "VBT-PD-02/2026.10/07",
+        revision: "2026.10/07",
+        effectiveDate: "2026-10-21",
+      } as LegalDocumentRelease;
+
+      for (const candidates of [releases, [...releases].reverse()]) {
+        const contour = derivePersonalDataLegalContour(candidates);
+        expect(contour.status).toBe("active");
+        expect(contour.policy.identity).toBe("VBT-PD-01/2026.09/01");
+        expect(contour.consent.identity).toBe("VBT-PD-02/2026.10/07");
+      }
+    });
+
+    it.each([
+      ["active policy with draft consent", 0],
+      ["draft policy with active consent", 1],
+    ] as const)("fails closed for %s", (_label, activeIndex) => {
+      const active = syntheticActiveReleases();
+      const mixed = [...LEGAL_RELEASES] as LegalDocumentRelease[];
+      mixed[activeIndex] = active[activeIndex]!;
+      expect(() => derivePersonalDataLegalContour(mixed)).toThrow(
+        /incoherent personal data legal contour.*VBT-PD-01=(?:active|draft).*VBT-PD-02=(?:active|draft)/i,
+      );
+    });
+
+    it.each(["VBT-PD-01", "VBT-PD-02"] as const)(
+      "fails closed when the current %s release is missing",
+      (missingCode) => {
+        expect(() => derivePersonalDataLegalContour(
+          LEGAL_RELEASES.filter(({ code }) => code !== missingCode),
+        )).toThrow(new RegExp(`no current active or draft legal release.*${missingCode}`, "i"));
+      },
+    );
+
+    it.each([
+      ["null revision", (release: LegalDocumentRelease) => ({ ...release, revision: null })],
+      ["invalid effective date", (release: LegalDocumentRelease) => ({ ...release, effectiveDate: "2026-02-31" })],
+      ["identity inconsistent with revision", (release: LegalDocumentRelease) => ({ ...release, identity: "VBT-PD-01/2026.12/99" })],
+    ] as const)("rejects ACTIVE metadata with %s", (_label, mutate) => {
+      const releases = syntheticActiveReleases();
+      releases[0] = mutate(releases[0]!) as LegalDocumentRelease;
+      expect(() => derivePersonalDataLegalContour(releases)).toThrow(
+        /active personal data release VBT-PD-01.*(?:revision|effective date|identity)/i,
+      );
+    });
+
+    it("rejects a DRAFT identity or publication metadata that contradicts its state", () => {
+      const invalidIdentity = [
+        { ...LEGAL_RELEASES[0]!, identity: "VBT-PD-01/2026.09/01" },
+        LEGAL_RELEASES[1]!,
+      ] as unknown as LegalDocumentRelease[];
+      expect(() => derivePersonalDataLegalContour(invalidIdentity)).toThrow(
+        /draft personal data release VBT-PD-01.*identity/i,
+      );
+
+      const invalidMetadata = [
+        LEGAL_RELEASES[0]!,
+        { ...LEGAL_RELEASES[1]!, revision: "2026.09/02" },
+      ] as unknown as LegalDocumentRelease[];
+      expect(() => derivePersonalDataLegalContour(invalidMetadata)).toThrow(
+        /draft personal data release VBT-PD-02.*revision.*effective date/i,
+      );
+    });
   });
 
   it("derives the same current release per code from retained history in either order", () => {

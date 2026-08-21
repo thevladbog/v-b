@@ -1,20 +1,28 @@
 ---
-import { listCurrentLegalDocuments } from "@vbtech/legal-documents";
+import {
+  CURRENT_PERSONAL_DATA_LEGAL_CONTOUR,
+  listCurrentLegalDocuments,
+} from "@vbtech/legal-documents";
 import LegalLayout from "../../../layouts/LegalLayout.astro";
 
 const locale = "en";
 const documents = listCurrentLegalDocuments(locale);
-const title = "v-b.tech legal documents — drafts";
-const description =
-  "Register of v-b.tech draft documents: the personal data processing policy and consent for the future enquiry form.";
+const registryStatus = CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.status;
+const title = registryStatus === "draft" ? "v-b.tech legal documents — drafts" : "v-b.tech legal documents";
+const description = registryStatus === "draft"
+  ? "Register of v-b.tech draft documents: the personal data processing policy and consent for the future enquiry form."
+  : "Register of current v-b.tech documents for the enquiry form.";
+const introduction = registryStatus === "draft"
+  ? "The register contains review candidates only. There are currently no active documents."
+  : "The register contains the current documents for the enquiry form.";
 ---
 
-<LegalLayout locale={locale} title={title} description={description} route="legal-register">
+<LegalLayout locale={locale} title={title} description={description} route="legal-register" status={registryStatus}>
   <div class="legal-register">
     <header class="legal-register-header">
       <p class="legal-kicker">v-b.tech / legal</p>
       <h1>Legal documents</h1>
-      <p>The register contains review candidates only. There are currently no active documents.</p>
+      <p>{introduction}</p>
     </header>
     <ul class="legal-register-list">
       {documents.map((document) => (
@@ -22,7 +30,7 @@ const description =
           <article>
             <p class="legal-register-meta">{document.code} · {document.identity}</p>
             <h2><a href={document.routes.en}>{document.content.title}</a></h2>
-            <p>Status: draft</p>
+            <p>Status: {document.status}</p>
             <p>{document.content.summary}</p>
           </article>
         </li>

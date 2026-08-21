@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
+import { CONTACT_FIELD_LIMITS } from "@vbtech/contracts";
 import { parse } from "parse5";
 import { describe, expect, it } from "vitest";
 
@@ -24,6 +25,11 @@ const pages = [
     consentHref: "/personal-data-consent/",
     draftContext: "согласие пока нельзя принять",
     consentPhrase: "Я ознакомился(-ась) с политикой обработки персональных данных и проектом согласия на обработку персональных данных.",
+    directContext: "Онлайн-форма пока недоступна. Telegram и email работают и остаются прямыми способами связи.",
+    formTitle: "Черновик обращения",
+    formNote: "Это отключённая production-оболочка: данные не передаются.",
+    consentInstruction: "Флажок изначально снят. Перед возможной отправкой потребуется отдельное согласие.",
+    consentError: "Для отправки потребуется явно подтвердить согласие.",
   },
   {
     file: "dist/en/index.html",
@@ -32,6 +38,11 @@ const pages = [
     consentHref: "/en/personal-data-consent/",
     draftContext: "draft consent cannot yet be accepted",
     consentPhrase: "I have reviewed the personal data processing policy and the draft personal data processing consent.",
+    directContext: "Online submission is currently unavailable. Telegram and email remain active direct contact options.",
+    formTitle: "Enquiry draft",
+    formNote: "This is a disabled production shell: no data is transmitted.",
+    consentInstruction: "The checkbox starts unchecked. Separate consent will be required before submission can be enabled.",
+    consentError: "Submission will require explicit consent confirmation.",
   },
 ] as const;
 
@@ -117,11 +128,13 @@ describe("disabled contact shell", () => {
 
     expect(forms).toHaveLength(1);
     const form = forms[0]!;
-    expect(attr(form, "method")).toBe("post");
-    expect(attr(form, "action")).toBe("/api/contact");
+    expect(attr(form, "method")).toBeUndefined();
+    expect(attr(form, "action")).toBeUndefined();
     expect(attr(form, "novalidate")).toBe("");
     expect(attr(form, "data-submission-enabled")).toBe("false");
-    expect(attr(form, "data-consent-identity")).toBe(CURRENT_CONTACT_CONSENT_ID);
+    expect(attr(form, "data-consent-id")).toBe(CURRENT_CONTACT_CONSENT_ID);
+    expect(attr(form, "data-contact-instance")).toBe("home-contact");
+    expect(attr(form, "aria-busy")).toBe("false");
 
     const fieldset = elements(form, (node) => node.tagName === "fieldset")[0]!;
     expect(attr(fieldset, "disabled")).toBe("");
@@ -134,9 +147,9 @@ describe("disabled contact shell", () => {
     expect([...named.keys()]).toEqual(["name", "contact", "message", "consent"]);
 
     const expected = {
-      name: { tag: "input", type: "text", autocomplete: "name", maxlength: "100" },
-      contact: { tag: "input", type: "text", autocomplete: "email", maxlength: "254" },
-      message: { tag: "textarea", type: undefined, autocomplete: "off", maxlength: "4000" },
+      name: { tag: "input", type: "text", autocomplete: "name", maxlength: String(CONTACT_FIELD_LIMITS.name) },
+      contact: { tag: "input", type: "text", autocomplete: "email", maxlength: String(CONTACT_FIELD_LIMITS.contact) },
+      message: { tag: "textarea", type: undefined, autocomplete: "off", maxlength: String(CONTACT_FIELD_LIMITS.message) },
       consent: { tag: "input", type: "checkbox", autocomplete: undefined, maxlength: undefined },
     } as const;
 
@@ -147,22 +160,23 @@ describe("disabled contact shell", () => {
       expect(attr(control, "autocomplete")).toBe(contract.autocomplete);
       expect(attr(control, "maxlength")).toBe(contract.maxlength);
       expect(attr(control, "required")).toBe("");
-      expect(attr(control, "id")).toBe(`contact-${name}`);
+      expect(attr(control, "id")).toBe(`home-contact-${name}`);
       expect(attr(control, "checked")).toBeUndefined();
 
       const label = elements(form, (node) =>
-        node.tagName === "label" && attr(node, "for") === `contact-${name}`,
+        node.tagName === "label" && attr(node, "for") === `home-contact-${name}`,
       );
       expect(label).toHaveLength(1);
 
       const describedBy = attr(control, "aria-describedby")?.split(/\s+/) ?? [];
       expect(describedBy).toEqual([
-        `contact-${name}-instruction`,
-        `contact-${name}-error`,
+        `home-contact-${name}-instruction`,
+        `home-contact-${name}-error`,
       ]);
       describedBy.forEach((id) => expect(byId(document, id)).toBeDefined());
-      expect(attr(byId(document, `contact-${name}-error`)!, "data-error-message")).toBeTruthy();
-      expect(text(byId(document, `contact-${name}-error`)!)).toBe("");
+      expect(attr(byId(document, `home-contact-${name}-error`)!, "data-error-message")).toBeTruthy();
+      expect(attr(byId(document, `home-contact-${name}-error`)!, "data-contact-error")).toBe(name);
+      expect(text(byId(document, `home-contact-${name}-error`)!)).toBe("");
     }
 
     const legalLinks = elements(form, (node) => node.tagName === "a").map((node) => attr(node, "href"));
@@ -188,8 +202,12 @@ describe("disabled contact shell", () => {
     expect(consentIdentity).toHaveLength(1);
     expect(text(consentIdentity[0]!)).toBe(CURRENT_CONTACT_CONSENT_ID);
     expect(text(form)).toContain(page.draftContext);
+    expect(text(byId(document, "home-contact-title")!)).toBe(page.formTitle);
+    expect(text(byId(document, "home-contact-note")!)).toBe(page.formNote);
+    expect(text(byId(document, "home-contact-consent-instruction")!)).toContain(page.consentInstruction);
+    expect(attr(byId(document, "home-contact-consent-error")!, "data-error-message")).toBe(page.consentError);
     const consentLabel = elements(form, (node) =>
-      node.tagName === "label" && attr(node, "for") === "contact-consent",
+      node.tagName === "label" && attr(node, "for") === "home-contact-consent",
     )[0]!;
     const consentCopy = elements(consentLabel, (node) => node.tagName === "span")[0]!;
     expect(contiguousText(consentCopy)).toBe(page.consentPhrase);
@@ -202,26 +220,33 @@ describe("disabled contact shell", () => {
     expect(elements(form, (node) => attr(node, "data-contact-errors") !== undefined)).toHaveLength(1);
 
     const contactPanel = byId(document, "contact")!;
+    expect(text(elements(contactPanel, (node) => attr(node, "class") === "contact-direct-context")[0]!)).toBe(page.directContext);
     expect(elements(contactPanel, (node) => attr(node, "href") === "https://t.me/thevladbog")).toHaveLength(1);
     expect(elements(contactPanel, (node) => attr(node, "href") === "mailto:hello@v-b.tech")).toHaveLength(1);
   });
 
   it("ships no captcha or request-capable client runtime in the default build", async () => {
-    const directory = new URL("../dist/_astro/", import.meta.url);
-    const files = (await readdir(directory)).filter((file) => file.endsWith(".js"));
-    const externalJavascript = (
-      await Promise.all(files.map((file) => readFile(new URL(file, directory), "utf8")))
-    ).join("\n");
-    const html = `${await readBuilt("dist/index.html")}\n${await readBuilt("dist/en/index.html")}`;
-    const inlineJavascript = [...html.matchAll(/<script type="module"(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
-      .map((match) => match[1])
-      .join("\n");
-    const javascript = `${externalJavascript}\n${inlineJavascript}`;
+    const directory = new URL("../dist/", import.meta.url);
+    const emitted = (await readdir(directory, { recursive: true }))
+      .filter((file) => /\.(?:html|js|mjs)$/.test(file))
+      .sort();
+    const entries = await Promise.all(emitted.map(async (file) => ({
+      file,
+      body: await readFile(new URL(file, directory), "utf8"),
+    })));
+    const artifact = entries.map(({ body }) => body).join("\n");
+    const javascript = entries.filter(({ file }) => /\.(?:js|mjs)$/.test(file)).map(({ body }) => body).join("\n");
 
-    expect(`${html}\n${javascript}`).not.toMatch(/smartcaptcha|captcha\.yandex|grecaptcha/i);
+    expect(entries.filter(({ file }) => file.endsWith(".html"))).toHaveLength(9);
+    expect(entries.filter(({ file }) => /\.(?:js|mjs)$/.test(file))).toHaveLength(0);
+    expect(artifact).not.toMatch(/\/api\/contact/i);
+    expect(artifact).not.toMatch(/smartcaptcha\.cloud\.yandex\.ru|captcha\.js|window\.smartCaptcha|grecaptcha|vbtech-reviewed-active-public-site-key/i);
     expect(javascript).not.toMatch(/\bfetch\s*\(|\bXMLHttpRequest\b|\.sendBeacon\s*\(/);
     expect(javascript).not.toContain(CURRENT_CONTACT_CONSENT_ID);
-    expect(html).not.toContain('data-submission-enabled="true"');
+    expect(artifact).not.toContain('data-submission-enabled="true"');
+    expect(artifact).not.toContain("data-captcha-site-key");
+    expect(artifact).not.toContain("data-internal-test-fixture");
+    expect(artifact).not.toContain("vbtech-internal-fixture-site-key");
   });
 });
 

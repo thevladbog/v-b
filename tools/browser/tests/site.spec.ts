@@ -127,7 +127,7 @@ for (const { path, locale, alternate } of landingPairs) {
     });
     await page.goto(path);
 
-    const form = page.locator("form[action='/api/contact']");
+    const form = page.locator("[data-contact-form]");
     const fieldset = form.getByRole("group");
     const checkbox = form.getByRole("checkbox");
     const submit = form.getByRole("button", { name: locale === "ru" ? "Отправить обращение" : "Send enquiry" });
@@ -156,7 +156,7 @@ for (const { path, locale, alternate } of landingPairs) {
   test(`${path} mobile consent legal actions meet the 44 CSS pixel contract`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "Pixel 7", "Mobile consent actions are accepted on Pixel 7");
     await page.goto(path);
-    const form = page.locator("form[action='/api/contact']");
+    const form = page.locator("[data-contact-form]");
     const actions = [
       form.getByRole("link", { name: locale === "ru" ? "политикой обработки персональных данных" : "personal data processing policy" }),
       form.getByRole("link", { name: locale === "ru" ? "проектом согласия на обработку персональных данных" : "draft personal data processing consent" }),

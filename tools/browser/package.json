@@ -7,7 +7,10 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "playwright test --config playwright.config.ts",
+    "test": "playwright test --config playwright.config.ts && playwright test --config contact.playwright.config.ts && playwright test --config contact-active.playwright.config.ts",
+    "test:contact": "playwright test --config contact.playwright.config.ts",
+    "test:contact-active": "playwright test --config contact-active.playwright.config.ts",
+    "accept:contact-emails": "playwright test --config email.playwright.config.ts",
     "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit"
