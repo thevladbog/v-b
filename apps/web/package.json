@@ -5,7 +5,9 @@
   "scripts": {
     "build": "astro build",
     "build:contact-fixture": "VBTECH_INTERNAL_CONTACT_FIXTURE=1 astro build --config test-fixture/astro.config.mjs",
+    "build:contact-active": "VBTECH_PRIVATE_ACTIVE_LEGAL_ARTIFACT=1 astro build --config test-active/astro.config.mjs",
     "preview:contact-fixture": "VBTECH_INTERNAL_CONTACT_FIXTURE=1 astro preview --config test-fixture/astro.config.mjs --host 127.0.0.1 --port 43219",
+    "preview:contact-active": "VBTECH_PRIVATE_ACTIVE_LEGAL_ARTIFACT=1 astro preview --config test-active/astro.config.mjs --host 127.0.0.1 --port 43229",
     "test": "astro build && vitest run",
     "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "astro check",

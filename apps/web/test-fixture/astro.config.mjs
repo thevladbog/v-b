@@ -22,6 +22,11 @@ export default defineConfig({
         access: "public",
         default: false,
       }),
+      PUBLIC_SMARTCAPTCHA_SITE_KEY: envField.string({
+        context: "client",
+        access: "public",
+        default: "",
+      }),
     },
   },
   build: { inlineStylesheets: "never" },

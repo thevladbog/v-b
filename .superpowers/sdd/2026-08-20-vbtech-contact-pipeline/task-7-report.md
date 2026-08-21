@@ -102,9 +102,9 @@ The single Important finding in `task-7-rereview-1.md` was independently verifie
 - Rendered document and each PNG: 1,440×2,048 pixels; each capture PNG: 524,288 bytes.
 - All generated evidence including manifest: 8,388,608 bytes.
 - Contact sheet: 1,280×4,096 pixels / 4,194,304 bytes.
-- Failure removes the entire partial bounded output; the manifest records actual content, document, image, and file measurements for all 32 captures and the sheet.
+- Failure removes the entire partial bounded output. The manifest records actual content counts plus document/image/file measurements and hashes for all 32 captures; its separate sheet record contains document/image dimensions, file bytes, and SHA-256.
 
-The values are comfortably above the current controlled set while still bounding memory and disk cost: 2,085,570 total bytes; largest capture `1280×1402`/74,652 bytes; sheet `1120×3026`/396,659 bytes. Real marked PostgreSQL 17 + Mailpit E2E passed 3/3; the real-message Playwright acceptance passed 9/9 (eight boundary cases plus the four-kind generator). The regenerated sheet was visually inspected and remains readable/distinct across HTML/text, desktop/mobile, and light/controlled-dark. Manifest SHA-256 is `56fb097de27c49c7c5b8aefbfc5065c256effd9f4cc91f6db2019c69036a86c5`; sheet SHA-256 is `4222140c1eab3486cef607919c52ed9627ca15034474603ee2e018182c7fd1d0`.
+The values are comfortably above the current controlled set while still bounding memory and disk cost: 2,085,570 total bytes; independent capture maxima of 1,280 pixels wide, 1,402 pixels high (`390×1402` RU notification plain-text mobile), and 74,652 PNG bytes (`ru-notification-text-desktop-light.png`, `1280×1234`); sheet `1120×3026`/396,659 bytes. Real marked PostgreSQL 17 + Mailpit E2E passed 3/3; the real-message Playwright acceptance passed 9/9 (eight boundary cases plus the four-kind generator). The regenerated sheet was visually inspected and remains readable/distinct across HTML/text, desktop/mobile, and light/controlled-dark. Manifest SHA-256 is `56fb097de27c49c7c5b8aefbfc5065c256effd9f4cc91f6db2019c69036a86c5`; sheet SHA-256 is `4222140c1eab3486cef607919c52ed9627ca15034474603ee2e018182c7fd1d0`.
 
 ### Final gates and cleanup
 

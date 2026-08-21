@@ -146,9 +146,6 @@ export class OutboxRepository implements OutboxLeaseRepository {
 
   async accept(input: ContactRequest): Promise<AcceptResult> {
     const request = contactRequestSchema.parse(input);
-    if (request.consentId !== CURRENT_CONTACT_CONSENT_ID) {
-      throw new Error("consent_revision_changed");
-    }
     const durable = durableRequest(request);
     const contentHash = durableHash(durable);
     const client = await this.pool.connect();
@@ -171,6 +168,10 @@ export class OutboxRepository implements OutboxLeaseRepository {
         }
         await client.query("COMMIT");
         return "existing";
+      }
+
+      if (request.consentId !== CURRENT_CONTACT_CONSENT_ID) {
+        throw new Error("consent_revision_changed");
       }
 
       await client.query(

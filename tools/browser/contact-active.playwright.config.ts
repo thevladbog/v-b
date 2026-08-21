@@ -2,14 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const port = 43_218;
-const baseURL = `http://127.0.0.1:${port}`;
+const baseURL = "http://127.0.0.1:43229";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "**/*.spec.ts",
-  testIgnore: ["**/contact.spec.ts", "**/contact-active.spec.ts", "**/email-acceptance*.spec.ts"],
-  outputDir: join(tmpdir(), "vbtech-task-8-playwright"),
+  testMatch: "**/contact-active.spec.ts",
+  outputDir: join(tmpdir(), "vbtech-contact-active-playwright"),
   fullyParallel: true,
   workers: 2,
   forbidOnly: Boolean(process.env.CI),
@@ -26,18 +24,12 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   projects: [
-    {
-      name: "Desktop Chrome",
-      use: { ...devices["Desktop Chrome"] },
-    },
-    {
-      name: "Pixel 7",
-      use: { ...devices["Pixel 7"] },
-    },
+    { name: "Desktop Chrome", use: { ...devices["Desktop Chrome"] } },
+    { name: "Pixel 7", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
     command:
-      "corepack pnpm --dir ../../apps/web build && corepack pnpm --dir ../../apps/web exec astro preview --host 127.0.0.1 --port 43218",
+      "cd ../../apps/web && VBTECH_PRIVATE_ACTIVE_LEGAL_ARTIFACT=1 node_modules/.bin/astro build --config test-active/astro.config.mjs && VBTECH_PRIVATE_ACTIVE_LEGAL_ARTIFACT=1 node_modules/.bin/astro preview --config test-active/astro.config.mjs --host 127.0.0.1 --port 43229",
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

@@ -86,7 +86,7 @@ Generation fails closed at these committed ceilings:
 - complete generated evidence, including the stable manifest: 8,388,608 bytes;
 - contact sheet: 1,280 × 4,096 pixels and 4,194,304 bytes.
 
-The current synthetic set uses about 2.1 MB in total; its largest message capture is `1280×1402` and 74,652 bytes, while the sheet is `1120×3026` and 396,659 bytes. The ceilings intentionally leave practical copy/layout headroom while preventing an unexpected mailbox response or page from causing unbounded JSON parsing, browser expansion, memory use, or disk output. PNG dimensions and bytes are inspected before write, the stable manifest records actual dimensions/bytes for all captures and the sheet, and any failure removes partial output.
+The current synthetic set uses about 2.1 MB in total. Its independent capture maxima are 1,280 pixels wide, 1,402 pixels high, and 74,652 PNG bytes: the height belongs to a `390×1402` RU notification plain-text mobile capture, while the byte maximum belongs to `ru-notification-text-desktop-light.png` at `1280×1234`. The sheet is `1120×3026` and 396,659 bytes. The ceilings intentionally leave practical copy/layout headroom while preventing an unexpected mailbox response or page from causing unbounded JSON parsing, browser expansion, memory use, or disk output. PNG dimensions and bytes are inspected before write, the stable manifest records actual dimensions/bytes for all captures and the sheet, and any failure removes partial output.
 
 For every message, inspect HTML and plain text at both sizes and modes. Dark captures use the documented deterministic `controlled-local-email-client-emulation-v1` palette layer. It mechanically proves that the requested mode was applied, that key text contrast is at least 4.5:1, and that every dark pixel hash differs from its light counterpart. It is regression evidence only, not a claim of Gmail, Outlook, Apple Mail, or other real-client acceptance. Confirm:
 
@@ -122,13 +122,18 @@ The final listing must contain no Task 7 service. Volumes are retained only duri
 
 ## Production operating sequence (not executed by this runbook)
 
-1. Approve and publish the exact Russian legal wording, paired English translation, active consent revision, effective date, operator profile, and provider inventory.
-2. Provision a separate v-b.tech database/user and apply `0001_contact_outbox.sql` with least privilege. Never point reset helpers or local credentials at a managed database.
-3. Store independent outbox-encryption and rate-limit HMAC keys plus SmartCaptcha secret in the approved secret store. Never compile them into the site or log them.
-4. Configure the verified `hello@v-b.tech` Postbox sender and the function service-account permissions.
-5. Deploy the function with contact submission disabled. Verify the exact route remains neutral and alternate API paths/methods stay 404.
-6. Start the timer worker, observe only bounded telemetry fields, and verify notification/confirmation routing with controlled non-sensitive data.
-7. Activate public submission only as a separate approved change after live SmartCaptcha, Postbox, mailbox, DNS/TLS, and legal gates pass.
+The private ACTIVE contour is a release gate, not a deployable artifact. It is restricted to `http://127.0.0.1:43229`, writes only to the OS temporary directory, requires `VBTECH_PRIVATE_ACTIVE_LEGAL_ARTIFACT=1`, and uses a test-only legal alias. It cannot be selected by `PUBLIC_CONTACT_SUBMISSION_ENABLED`, cannot target `https://v-b.tech`, and must never be copied to the public output.
+
+1. Approve and publish the exact Russian legal wording, paired English translation, non-DRAFT consent revision, effective date, operator profile, and complete provider inventory in `@vbtech/legal-documents`. Treat that publication as a separately reviewed legal change.
+2. Before changing the production registry, run `corepack pnpm --dir apps/web build:contact-active` and `corepack pnpm --dir tools/browser test:contact-active`. Require the actual production layouts/pages to produce nine HTML files, one shared initialized contact client, the reviewed test public key, exact same-origin JSON submission, a one-time SmartCaptcha lifecycle, and no fixture marker or secret.
+3. Provision a separate v-b.tech database/user and apply `0001_contact_outbox.sql` with least privilege. Never point reset helpers or local credentials at a managed database.
+4. Store independent outbox-encryption and rate-limit HMAC keys plus `SMARTCAPTCHA_SECRET` in the approved server-side secret store. Never compile them into the site or log them.
+5. Configure the reviewed public SmartCaptcha site key as `PUBLIC_SMARTCAPTCHA_SITE_KEY`. This value is intentionally public; it must match the reviewed production SmartCaptcha site and must never be replaced with `SMARTCAPTCHA_SECRET`.
+6. Configure the verified `hello@v-b.tech` Postbox sender, function service-account permissions, database access, HTTP handler route, and timer trigger. Keep server-side `CONTACT_SUBMISSION_ENABLED` disabled.
+7. Deploy the handler/backend with submission disabled. Verify `/api/contact` remains a neutral 404, alternate paths/methods stay 404, the worker can reach the dedicated database and Postbox, and bounded synthetic notification/confirmation delivery succeeds.
+8. After the legal registry is ACTIVE, build the real `https://v-b.tech` artifact with `PUBLIC_CONTACT_SUBMISSION_ENABLED=true` and the reviewed `PUBLIC_SMARTCAPTCHA_SITE_KEY`. Require nine HTML files and exactly one shared request-capable JS/MJS chunk containing the active consent identity, public site key, SmartCaptcha URL, and `/api/contact`, with no fixture marker, secret name/value, or developer path.
+9. Enable the backend handler, then deploy the reviewed active web artifact as separate approved changes. Verify SmartCaptcha domain restrictions, exact route behavior, same-origin TLS/DNS/Caddy routing, Postbox sender identity, mailbox receipt, timer delivery, and the public form with controlled non-sensitive data.
+10. Keep the default/DRAFT regression mandatory throughout: a normal build produces nine HTML files and zero JS/MJS; the recursive deny-list contains no `/api/contact`, SmartCaptcha endpoint/API/client, public site key, enabled marker, fixture marker, request-capable fetch/XHR/beacon, secret, or developer path. A public-flag build against DRAFT must fail with the exact documented error.
 
 ### Queue diagnosis
 
@@ -142,8 +147,8 @@ Use metadata-only queries: public request UUID, kind, timestamps, attempt counte
 
 ### Disable and rollback
 
-1. Disable public submission first; keep legal pages and direct email/Telegram contacts available.
-2. Keep the timer worker running long enough to process already accepted jobs unless incident handling requires a deliberate stop.
-3. Roll back function and web artifacts independently.
+1. Disable public submission first by rebuilding/redeploying the web artifact without `PUBLIC_CONTACT_SUBMISSION_ENABLED=true`; keep legal pages and direct email/Telegram contacts available.
+2. Disable server-side `CONTACT_SUBMISSION_ENABLED` so the handler returns the neutral response. Keep the timer worker running long enough to process already accepted jobs unless incident handling requires a deliberate stop.
+3. Roll back function and web artifacts independently; verify the restored web artifact again has nine HTML files, zero JS/MJS, and no request-capable contact runtime.
 4. Preserve only the minimum metadata needed for recovery and follow the approved mailbox/outbox retention policy.
 5. DNS, public exposure, replay, deletion, and live infrastructure changes require separate explicit approval.

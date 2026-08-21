@@ -108,6 +108,33 @@ describe("transactional contact acceptance", () => {
     expect(rows.rows[0]?.count).toBe("1");
   });
 
+  // Catches omission of any durable visitor field from the idempotency content hash.
+  it.each([
+    ["locale", "ru"],
+    ["name", "A different visitor"],
+    ["contact", "@different_handle"],
+    ["message", "Different durable content"],
+    ["sourcePath", "/"],
+    ["consentId", "VBT-PD-02/2099.01/01"],
+  ] as const)("rejects reused UUID when durable field %s changes", async (field, value) => {
+    await expect(repository.accept(telegramRequest)).resolves.toBe("created");
+
+    await expect(repository.accept({
+      ...telegramRequest,
+      [field]: value,
+    })).rejects.toThrow("request_id_reused");
+  });
+
+  // Catches accidental inclusion of one-time abuse controls in the durable idempotency hash.
+  it("accepts captcha-token and honeypot-only changes as the same durable request", async () => {
+    await expect(repository.accept(telegramRequest)).resolves.toBe("created");
+    await expect(repository.accept({
+      ...telegramRequest,
+      captchaToken: "a-distinct-one-time-proof",
+      website: "non-durable-honeypot-value",
+    })).resolves.toBe("existing");
+  });
+
   // Catches a production break that races concurrent retries into duplicate request or delivery rows.
   it("serializes concurrent duplicate acceptance by public request ID", async () => {
     const results = await Promise.all([
@@ -248,15 +275,55 @@ describe("transactional contact acceptance", () => {
     const requestRows = await pool.query<Record<string, unknown>>(
       "SELECT * FROM contact_requests",
     );
+    const outboxColumns = await pool.query<{
+      column_name: string;
+      data_type: string;
+      is_nullable: "YES" | "NO";
+    }>(`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'email_outbox'
+      ORDER BY ordinal_position
+    `);
+    expect(outboxColumns.rows).toEqual([
+      { column_name: "id", data_type: "uuid", is_nullable: "NO" },
+      { column_name: "public_request_id", data_type: "uuid", is_nullable: "NO" },
+      { column_name: "kind", data_type: "text", is_nullable: "NO" },
+      { column_name: "payload_ciphertext", data_type: "bytea", is_nullable: "YES" },
+      { column_name: "payload_iv", data_type: "bytea", is_nullable: "YES" },
+      { column_name: "payload_auth_tag", data_type: "bytea", is_nullable: "YES" },
+      { column_name: "attempt_count", data_type: "integer", is_nullable: "NO" },
+      { column_name: "delivery_attempt_count", data_type: "integer", is_nullable: "NO" },
+      { column_name: "delivery_attempt_generation", data_type: "integer", is_nullable: "NO" },
+      { column_name: "next_attempt_at", data_type: "timestamp with time zone", is_nullable: "NO" },
+      { column_name: "lease_owner", data_type: "text", is_nullable: "YES" },
+      { column_name: "lease_expires_at", data_type: "timestamp with time zone", is_nullable: "YES" },
+      { column_name: "delivered_at", data_type: "timestamp with time zone", is_nullable: "YES" },
+      { column_name: "failed_at", data_type: "timestamp with time zone", is_nullable: "YES" },
+      { column_name: "provider_message_id", data_type: "text", is_nullable: "YES" },
+      { column_name: "created_at", data_type: "timestamp with time zone", is_nullable: "NO" },
+    ]);
+
     const jobRows = await pool.query<{
       public_request_id: string;
       kind: "notification" | "confirmation";
       payload_ciphertext: Buffer;
       payload_iv: Buffer;
       payload_auth_tag: Buffer;
-    }>(
-      `SELECT public_request_id::text, kind, payload_ciphertext, payload_iv, payload_auth_tag
-       FROM email_outbox ORDER BY kind`,
+      [key: string]: unknown;
+    }>("SELECT * FROM email_outbox ORDER BY kind");
+
+    const permittedMetadata = new Set([
+      "id", "public_request_id", "kind", "attempt_count", "delivery_attempt_count",
+      "delivery_attempt_generation", "next_attempt_at", "lease_owner", "lease_expires_at",
+      "delivered_at", "failed_at", "provider_message_id", "created_at",
+    ]);
+    const authenticatedEnvelope = new Set([
+      "payload_ciphertext", "payload_iv", "payload_auth_tag",
+    ]);
+    expect(Object.keys(jobRows.rows[0] ?? {})).toEqual(outboxColumns.rows.map(({ column_name }) => column_name));
+    expect(new Set(Object.keys(jobRows.rows[0] ?? {}))).toEqual(
+      new Set([...permittedMetadata, ...authenticatedEnvelope]),
     );
 
     expect(Object.keys(requestRows.rows[0] ?? {}).sort()).toEqual([

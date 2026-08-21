@@ -1,9 +1,13 @@
 ---
-import { PUBLIC_CONTACT_SUBMISSION_ENABLED } from "astro:env/client";
+import {
+  PUBLIC_CONTACT_SUBMISSION_ENABLED,
+  PUBLIC_SMARTCAPTCHA_SITE_KEY,
+} from "astro:env/client";
 import type { Locale, SiteContent } from "@vbtech/content";
 import { CONTACT_FIELD_LIMITS } from "@vbtech/contracts";
 import { localizedPath } from "../lib/locale.js";
 import { resolveContactSubmissionReadiness } from "../lib/form-state.js";
+import { assertReviewedPublicSmartCaptchaSiteKey } from "../lib/contact-runtime-config.js";
 
 interface InternalContactFixture {
   siteKey: string;
@@ -30,15 +34,26 @@ const defaultReadiness = resolveContactSubmissionReadiness(PUBLIC_CONTACT_SUBMIS
 const readiness = fixtureRequested
   ? { ...defaultReadiness, submissionEnabled: true }
   : defaultReadiness;
+const captchaSiteKey = internalContactFixture?.siteKey ?? PUBLIC_SMARTCAPTCHA_SITE_KEY;
+if (readiness.submissionEnabled && !fixtureRequested) {
+  assertReviewedPublicSmartCaptchaSiteKey(captchaSiteKey);
+}
 const disabled = !readiness.submissionEnabled;
 const fixtureNotice = locale === "ru"
   ? `ВНУТРЕННИЙ ТЕСТОВЫЙ СТЕНД — ${readiness.consentIdentity} не действует; эта страница не предназначена для публикации.`
   : `INTERNAL TEST FIXTURE — ${readiness.consentIdentity} is not active; this page is not deployable.`;
+const availabilityMessage = fixtureRequested
+  ? fixtureNotice
+  : disabled
+    ? content.formDisabled
+    : undefined;
 ---
 
 <div class="contact-form-shell">
   <h3 id={id("title")}>{content.formTitle}</h3>
-  <p class="contact-form-disabled" id={id("disabled")}>{fixtureRequested ? fixtureNotice : content.formDisabled}</p>
+  {availabilityMessage && (
+    <p class="contact-form-disabled" id={id("disabled")}>{availabilityMessage}</p>
+  )}
 
   <form
     id={id("form")}
@@ -50,18 +65,18 @@ const fixtureNotice = locale === "ru"
     data-submission-enabled={String(readiness.submissionEnabled)}
     data-consent-id={readiness.consentIdentity}
     data-source-path={locale === "ru" ? "/" : "/en/"}
-    data-captcha-site-key={internalContactFixture?.siteKey}
+    data-captcha-site-key={readiness.submissionEnabled ? captchaSiteKey : undefined}
     data-captcha-load-timeout-ms={internalContactFixture?.loadTimeoutMs}
     data-internal-test-fixture={fixtureRequested ? "true" : undefined}
     data-error-summary-message={content.errorSummary}
     aria-busy="false"
     aria-labelledby={id("title")}
-    aria-describedby={`${id("disabled")} ${id("note")}`}
+    aria-describedby={availabilityMessage ? `${id("disabled")} ${id("note")}` : id("note")}
   >
     <p id={id("warning")} class="contact-form-warning" data-contact-warning>{content.formWarning}</p>
     <div id={id("error-summary")} class="contact-error-summary" data-contact-errors role="alert" hidden></div>
 
-    <fieldset id={id("fields")} data-contact-fields disabled={disabled} aria-describedby={id("disabled")}>
+    <fieldset id={id("fields")} data-contact-fields disabled={disabled} aria-describedby={disabled ? id("disabled") : undefined}>
       <legend id={id("legend")} class="sr-only">{content.formTitle}</legend>
 
       <div class="contact-field">

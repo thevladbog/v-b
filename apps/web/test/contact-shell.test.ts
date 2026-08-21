@@ -213,19 +213,24 @@ describe("disabled contact shell", () => {
   it("ships no captcha or request-capable client runtime in the default build", async () => {
     const directory = new URL("../dist/", import.meta.url);
     const emitted = (await readdir(directory, { recursive: true }))
-      .filter((file) => file.endsWith(".html") || file.endsWith(".js"));
+      .filter((file) => /\.(?:html|js|mjs)$/.test(file))
+      .sort();
     const entries = await Promise.all(emitted.map(async (file) => ({
       file,
       body: await readFile(new URL(file, directory), "utf8"),
     })));
     const artifact = entries.map(({ body }) => body).join("\n");
-    const javascript = entries.filter(({ file }) => file.endsWith(".js")).map(({ body }) => body).join("\n");
+    const javascript = entries.filter(({ file }) => /\.(?:js|mjs)$/.test(file)).map(({ body }) => body).join("\n");
 
+    expect(entries.filter(({ file }) => file.endsWith(".html"))).toHaveLength(9);
+    expect(entries.filter(({ file }) => /\.(?:js|mjs)$/.test(file))).toHaveLength(0);
     expect(artifact).not.toMatch(/\/api\/contact/i);
-    expect(artifact).not.toMatch(/smartcaptcha\.cloud\.yandex\.ru|captcha\.js|window\.smartCaptcha|grecaptcha/i);
+    expect(artifact).not.toMatch(/smartcaptcha\.cloud\.yandex\.ru|captcha\.js|window\.smartCaptcha|grecaptcha|vbtech-reviewed-active-public-site-key/i);
     expect(javascript).not.toMatch(/\bfetch\s*\(|\bXMLHttpRequest\b|\.sendBeacon\s*\(/);
     expect(javascript).not.toContain(CURRENT_CONTACT_CONSENT_ID);
     expect(artifact).not.toContain('data-submission-enabled="true"');
+    expect(artifact).not.toContain("data-captcha-site-key");
+    expect(artifact).not.toContain("data-internal-test-fixture");
     expect(artifact).not.toContain("vbtech-internal-fixture-site-key");
   });
 });
