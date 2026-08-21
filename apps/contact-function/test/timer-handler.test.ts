@@ -71,15 +71,23 @@ describe("Yandex timer handler", () => {
     expect(compositions).toBe(0);
   });
 
-  // Catches static/malformed authorization and proves composition waits for a valid invocation token.
+  // Catches malformed authorization only when a leased delivery actually requests the lazy token.
   it.each([undefined, "", "\n", "x".repeat(8_193)])(
-    "requires a non-empty bounded context.token.access_token",
+    "validates context.token.access_token when provider work requests it",
     async (accessToken) => {
       let compositions = 0;
+      let closed = false;
       const handler = createTimerHandler({
-        createRuntime: async () => {
+        createRuntime: async ({ getIamToken }) => {
           compositions += 1;
-          throw new Error("must not compose");
+          return {
+            drainOutbox: async () => {
+              await getIamToken();
+              return { leased: 1, delivered: 0, rescheduled: 1, failed: 0, leaseLost: 0 };
+            },
+            runRetention: async () => ({ payloadsErased: 0, outboxDeleted: 0, requestsDeleted: 0 }),
+            close: async () => { closed = true; },
+          };
         },
       });
 
@@ -87,14 +95,44 @@ describe("Yandex timer handler", () => {
         ...functionContext(),
         token: { ...functionContext().token!, access_token: accessToken as string },
       })).rejects.toThrow("invalid_timer_context");
-      expect(compositions).toBe(0);
+      expect(compositions).toBe(1);
+      expect(closed).toBe(true);
     },
   );
+
+  // Catches eager token access that breaks empty-queue and retention-only timer invocations.
+  it("runs an empty delivery and retention pass without reading context.token", async () => {
+    let tokenReads = 0;
+    const actions: string[] = [];
+    const context = {
+      requestId: "function-invocation-id",
+      get token() {
+        tokenReads += 1;
+        return undefined;
+      },
+    };
+    const handler = createTimerHandler({
+      createRuntime: async () => ({
+        drainOutbox: async () => {
+          actions.push("drain");
+          return { leased: 0, delivered: 0, rescheduled: 0, failed: 0, leaseLost: 0 };
+        },
+        runRetention: async () => {
+          actions.push("retention");
+          return { payloadsErased: 0, outboxDeleted: 0, requestsDeleted: 0 };
+        },
+        close: async () => { actions.push("close"); },
+      }),
+    });
+
+    await expect(handler(timerEvent(), context)).resolves.toEqual({ statusCode: 204 });
+    expect(tokenReads).toBe(0);
+    expect(actions).toEqual(["drain", "retention", "close"]);
+  });
 
   // Catches omission of either the delivery or retention pass and accidental visitor-bearing timer responses.
   it("drains, applies retention, closes the runtime, and returns content-free 204", async () => {
     const actions: string[] = [];
-    let runtimeToken = "";
     const runtime: TimerRuntime = {
       drainOutbox: async ({ limit, workerId }) => {
         actions.push(`drain:${limit}:${workerId}`);
@@ -110,14 +148,10 @@ describe("Yandex timer handler", () => {
     };
     const handler = createTimerHandler({
       now: () => new Date("2026-08-20T14:00:00.000Z"),
-      createRuntime: async ({ getIamToken }) => {
-        runtimeToken = await getIamToken();
-        return runtime;
-      },
+      createRuntime: async () => runtime,
     });
 
     await expect(handler(timerEvent(), functionContext())).resolves.toEqual({ statusCode: 204 });
-    expect(runtimeToken).toBe("short-lived-iam-token");
     expect(actions).toEqual([
       "drain:25:timer-function-invocation-id",
       "retain:2026-08-20T14:00:00.000Z",

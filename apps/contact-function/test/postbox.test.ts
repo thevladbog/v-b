@@ -100,6 +100,31 @@ describe("Yandex Postbox adapter", () => {
     expect(fetchCalls).toBe(0);
   });
 
+  // Catches a prepared credential lingering when the database lease is lost before network delivery.
+  it("discards a prepared IAM token when the provider call will not run", async () => {
+    let tokenReads = 0;
+    let fetchCalls = 0;
+    const postbox = new YandexPostbox({
+      getIamToken: async () => {
+        tokenReads += 1;
+        return "short-lived-iam-token";
+      },
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        return new Response(null, { status: 200 });
+      },
+    });
+
+    const prepared = await postbox.prepare(sendInput());
+    prepared.discard();
+    await expect(prepared.send()).rejects.toMatchObject({
+      disposition: "transient",
+      safeCode: "postbox_auth_unavailable",
+    });
+    expect(tokenReads).toBe(1);
+    expect(fetchCalls).toBe(0);
+  });
+
   // Catches a retry break that permanently drops provider/network outages.
   it.each([
     ["network", async () => Promise.reject(new TypeError("socket failed"))],
@@ -166,23 +191,104 @@ describe("Yandex Postbox adapter", () => {
     await expect(outcome).resolves.toBe("transient:postbox_unavailable");
   });
 
-  // Catches a poison-message loop that retries documented request/address failures forever.
-  it.each([400, 404])("classifies documented HTTP %s rejection as terminal without reading its body", async (status) => {
+  // Catches irreversible erasure when provider account/configuration errors share HTTP 400/404 with message rejection.
+  it.each([
+    [400, "BadRequestException"],
+    [400, "AccountSuspendedException"],
+    [400, "SendingPausedException"],
+    [400, "MailFromDomainNotVerifiedException"],
+    [400, "LimitExceededException"],
+    [404, "NotFoundException"],
+  ])("classifies HTTP %s %s as recoverable without exposing its message", async (status, Code) => {
     const postbox = new YandexPostbox({
       getIamToken: async () => "short-lived-iam-token",
-      fetchImpl: async () => ({
-        status,
-        get body() {
-          throw new Error("provider error body must stay unread");
-        },
-      } as unknown as Response),
+      fetchImpl: async () => new Response(JSON.stringify({
+        Code,
+        message: "visitor@example.com and rendered provider details must not escape",
+      }), { status }),
     });
 
-    await expect(postbox.send(sendInput())).rejects.toMatchObject({
+    const error = await postbox.send(sendInput()).catch((caught: unknown) => caught);
+    expect(error).toMatchObject({
+      name: "PostboxDeliveryError",
+      disposition: "transient",
+      safeCode: "postbox_unavailable",
+    });
+    expect(JSON.stringify(error)).not.toContain("visitor@example.com");
+    expect(String(error)).not.toContain("rendered provider details");
+  });
+
+  // Catches a poison-message loop while restricting terminal classification to the provider's exact documented code.
+  it("classifies exact MessageRejected as terminal without retaining the provider message", async () => {
+    const postbox = new YandexPostbox({
+      getIamToken: async () => "short-lived-iam-token",
+      fetchImpl: async () => new Response(JSON.stringify({
+        Code: "MessageRejected",
+        message: "visitor@example.com and provider details",
+      }), { status: 400 }),
+    });
+
+    const error = await postbox.send(sendInput()).catch((caught: unknown) => caught);
+    expect(error).toMatchObject({
       name: "PostboxDeliveryError",
       disposition: "terminal",
       safeCode: "postbox_message_rejected",
     });
+    expect(JSON.stringify(error)).not.toContain("visitor@example.com");
+    expect(String(error)).not.toContain("provider details");
+  });
+
+  // Catches malformed/unknown provider errors being mistaken for visitor-content poison.
+  it.each([
+    ["malformed JSON", "{"],
+    ["unknown code", JSON.stringify({ Code: "UnexpectedProviderCode", message: "private" })],
+    ["missing code", JSON.stringify({ message: "private" })],
+    ["oversized", JSON.stringify({ Code: "MessageRejected", message: "x".repeat(8_192) })],
+  ])("keeps a %s error response recoverable", async (_label, body) => {
+    const postbox = new YandexPostbox({
+      getIamToken: async () => "short-lived-iam-token",
+      fetchImpl: async () => new Response(body, { status: 400 }),
+    });
+
+    await expect(postbox.send(sendInput())).rejects.toMatchObject({
+      disposition: "transient",
+    });
+  });
+
+  // Catches non-UTF-8 provider bytes bypassing the bounded operational-error path.
+  it("keeps a non-UTF-8 error response recoverable", async () => {
+    const postbox = new YandexPostbox({
+      getIamToken: async () => "short-lived-iam-token",
+      fetchImpl: async () => new Response(new Uint8Array([0xff]), { status: 400 }),
+    });
+
+    await expect(postbox.send(sendInput())).rejects.toMatchObject({
+      disposition: "transient",
+      safeCode: "postbox_response_invalid",
+    });
+  });
+
+  // Catches retained Undici response streams after bounded non-200 inspection.
+  it("cancels an oversized non-200 response stream before clearing its deadline", async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(8_192));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const postbox = new YandexPostbox({
+      getIamToken: async () => "short-lived-iam-token",
+      fetchImpl: async () => new Response(body, { status: 400 }),
+    });
+
+    await expect(postbox.send(sendInput())).rejects.toMatchObject({
+      disposition: "transient",
+      safeCode: "postbox_response_invalid",
+    });
+    expect(cancelled).toBe(true);
   });
 
   // Catches unbounded/malformed success parsing that stores attacker-controlled provider output.
@@ -190,6 +296,7 @@ describe("Yandex Postbox adapter", () => {
     ["empty", "{}"],
     ["control character", JSON.stringify({ MessageId: "bad\nidentifier" })],
     ["oversized", JSON.stringify({ MessageId: "x".repeat(513) })],
+    ["extra-field", JSON.stringify({ MessageId: "provider-message-123", extra: true })],
   ])("rejects a %s success response as transient", async (_label, body) => {
     const postbox = new YandexPostbox({
       getIamToken: async () => "short-lived-iam-token",

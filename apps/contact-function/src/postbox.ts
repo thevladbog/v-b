@@ -11,8 +11,19 @@ const MAX_PROVIDER_MESSAGE_ID_LENGTH = 512;
 const MAX_RENDERED_PART_BYTES = 96_000;
 const MAX_RAW_MIME_BYTES = 200_000;
 const MAX_SUCCESS_BODY_BYTES = 8_192;
+const MAX_ERROR_BODY_BYTES = 4_096;
 const POSTBOX_REQUEST_TIMEOUT_MILLISECONDS = 10_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const DOCUMENTED_PROVIDER_ERROR_CODES = new Set([
+  "BadRequestException",
+  "AccountSuspendedException",
+  "SendingPausedException",
+  "MessageRejected",
+  "MailFromDomainNotVerifiedException",
+  "NotFoundException",
+  "TooManyRequestsException",
+  "LimitExceededException",
+]);
 
 export type PostboxFailureDisposition = "transient" | "terminal";
 
@@ -39,8 +50,13 @@ export interface PostboxSendResult {
   providerMessageId: string;
 }
 
+export interface PreparedPostboxDelivery {
+  discard(): void;
+  send(): Promise<PostboxSendResult>;
+}
+
 export interface PostboxSender {
-  send(input: PostboxSendInput): Promise<PostboxSendResult>;
+  prepare(input: PostboxSendInput): Promise<PreparedPostboxDelivery>;
 }
 
 export interface YandexPostboxOptions {
@@ -149,7 +165,7 @@ const requireIamToken = (value: string): string => {
   return value;
 };
 
-const readBoundedText = async (response: Response): Promise<string> => {
+const readBoundedText = async (response: Response, maximumBytes: number): Promise<string> => {
   if (!response.body) return "";
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -159,7 +175,7 @@ const readBoundedText = async (response: Response): Promise<string> => {
       const item = await reader.read();
       if (item.done) break;
       size += item.value.byteLength;
-      if (size > MAX_SUCCESS_BODY_BYTES) {
+      if (size > maximumBytes) {
         await reader.cancel();
         throw new PostboxDeliveryError("transient", "postbox_response_invalid");
       }
@@ -177,13 +193,22 @@ const readBoundedText = async (response: Response): Promise<string> => {
 };
 
 const parseProviderMessageId = async (response: Response): Promise<string> => {
-  const text = await readBoundedText(response);
+  const text = await readBoundedText(response, MAX_SUCCESS_BODY_BYTES);
   try {
     const parsed = JSON.parse(text) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("invalid");
     }
-    const messageId = (parsed as Record<string, unknown>).MessageId;
+    const record = parsed as Record<string, unknown>;
+    const keys = Object.keys(record);
+    if (
+      keys.length !== 1 ||
+      keys[0] !== "MessageId" ||
+      !Object.prototype.hasOwnProperty.call(record, "MessageId")
+    ) {
+      throw new Error("invalid");
+    }
+    const messageId = record.MessageId;
     if (
       typeof messageId !== "string" ||
       messageId.length < 1 ||
@@ -199,6 +224,22 @@ const parseProviderMessageId = async (response: Response): Promise<string> => {
   }
 };
 
+const documentedProviderErrorCode = async (response: Response): Promise<string | undefined> => {
+  const text = await readBoundedText(response, MAX_ERROR_BODY_BYTES);
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const record = parsed as Record<string, unknown>;
+    if (!Object.prototype.hasOwnProperty.call(record, "Code")) return undefined;
+    const code = record.Code;
+    return typeof code === "string" && DOCUMENTED_PROVIDER_ERROR_CODES.has(code)
+      ? code
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export class YandexPostbox implements PostboxSender {
   private readonly fetchImpl: typeof fetch;
 
@@ -206,7 +247,7 @@ export class YandexPostbox implements PostboxSender {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  async send(input: PostboxSendInput): Promise<PostboxSendResult> {
+  async prepare(input: PostboxSendInput): Promise<PreparedPostboxDelivery> {
     const raw = buildRawMime(input);
     let token: string;
     try {
@@ -216,6 +257,31 @@ export class YandexPostbox implements PostboxSender {
       throw new PostboxDeliveryError("transient", "postbox_auth_unavailable");
     }
 
+    let preparedToken: string | undefined = token;
+    return {
+      discard: () => {
+        preparedToken = undefined;
+      },
+      send: async () => {
+        const requestToken = preparedToken;
+        preparedToken = undefined;
+        if (!requestToken) {
+          throw new PostboxDeliveryError("transient", "postbox_auth_unavailable");
+        }
+        return this.sendPrepared(input, raw, requestToken);
+      },
+    };
+  }
+
+  async send(input: PostboxSendInput): Promise<PostboxSendResult> {
+    return (await this.prepare(input)).send();
+  }
+
+  private async sendPrepared(
+    input: PostboxSendInput,
+    raw: Buffer,
+    token: string,
+  ): Promise<PostboxSendResult> {
     const abortController = new AbortController();
     const timeout = setTimeout(
       () => abortController.abort(),
@@ -239,10 +305,14 @@ export class YandexPostbox implements PostboxSender {
       if (response.status === 200) {
         return { providerMessageId: await parseProviderMessageId(response) };
       }
-      if (response.status === 400 || response.status === 404) {
+      const errorCode = await documentedProviderErrorCode(response);
+      if (response.status === 400 && errorCode === "MessageRejected") {
         throw new PostboxDeliveryError("terminal", "postbox_message_rejected");
       }
-      throw new PostboxDeliveryError("transient", "postbox_unavailable");
+      throw new PostboxDeliveryError(
+        "transient",
+        errorCode === undefined ? "postbox_response_invalid" : "postbox_unavailable",
+      );
     } catch (error) {
       if (error instanceof PostboxDeliveryError) throw error;
       throw new PostboxDeliveryError("transient", "postbox_unavailable");

@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS email_outbox (
   payload_iv bytea CHECK (payload_iv IS NULL OR octet_length(payload_iv) = 12),
   payload_auth_tag bytea CHECK (payload_auth_tag IS NULL OR octet_length(payload_auth_tag) = 16),
   attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  delivery_attempt_count integer NOT NULL DEFAULT 0 CHECK (
+    delivery_attempt_count BETWEEN 0 AND 5
+  ),
+  delivery_attempt_generation integer NOT NULL DEFAULT 0 CHECK (
+    delivery_attempt_generation >= 0
+  ),
   next_attempt_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   lease_owner text,
   lease_expires_at timestamptz,
@@ -36,7 +42,9 @@ CREATE TABLE IF NOT EXISTS email_outbox (
   CHECK (
     delivered_at IS NOT NULL OR failed_at IS NOT NULL OR payload_ciphertext IS NOT NULL
   ),
-  CHECK (provider_message_id IS NULL OR delivered_at IS NOT NULL)
+  CHECK (provider_message_id IS NULL OR delivered_at IS NOT NULL),
+  CHECK (delivery_attempt_count <= delivery_attempt_generation),
+  CHECK (delivery_attempt_generation <= attempt_count)
 );
 
 CREATE INDEX IF NOT EXISTS email_outbox_due_idx

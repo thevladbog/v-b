@@ -16,6 +16,11 @@ import type { ContactDatabasePool } from "./db.js";
 
 export type AcceptResult = "created" | "existing";
 export type StateUpdateResult = "updated" | "lease_lost";
+export type BeginDeliveryAttemptResult =
+  | { status: "started"; deliveryAttemptCount: number }
+  | { status: "already_started"; deliveryAttemptCount: number }
+  | { status: "attempts_exhausted" }
+  | { status: "lease_lost" };
 
 export interface LeasedOutboxJob {
   id: string;
@@ -23,6 +28,7 @@ export interface LeasedOutboxJob {
   kind: DeliveryKind;
   encryptedPayload: EncryptedPayload;
   attemptCount: number;
+  deliveryAttemptCount: number;
   leaseOwner: string;
   leaseExpiresAt: Date;
   createdAt: Date;
@@ -30,6 +36,11 @@ export interface LeasedOutboxJob {
 
 export interface OutboxLeaseRepository {
   leaseDue(limit: number, workerId: string): Promise<LeasedOutboxJob[]>;
+  beginDeliveryAttempt(
+    jobId: string,
+    workerId: string,
+    attemptCount: number,
+  ): Promise<BeginDeliveryAttemptResult>;
   markDelivered(
     jobId: string,
     workerId: string,
@@ -72,12 +83,14 @@ interface LeasedRow {
   payload_iv: Buffer;
   payload_auth_tag: Buffer;
   attempt_count: number;
+  delivery_attempt_count: number;
   lease_owner: string;
   lease_expires_at: Date;
   created_at: Date;
 }
 
 const MAX_LEASE_BATCH = 100;
+const MAX_DELIVERY_ATTEMPTS = 5;
 const LEASE_DURATION_MILLISECONDS = 60_000;
 
 const durableRequest = (request: ContactRequest): DurableContactRequest => ({
@@ -230,6 +243,7 @@ export class OutboxRepository implements OutboxLeaseRepository {
            job.payload_iv,
            job.payload_auth_tag,
            job.attempt_count,
+           job.delivery_attempt_count,
            job.lease_owner,
            job.lease_expires_at,
            job.created_at`,
@@ -247,10 +261,82 @@ export class OutboxRepository implements OutboxLeaseRepository {
           authTag: row.payload_auth_tag,
         },
         attemptCount: row.attempt_count,
+        deliveryAttemptCount: row.delivery_attempt_count,
         leaseOwner: row.lease_owner,
         leaseExpiresAt: row.lease_expires_at,
         createdAt: row.created_at,
       }));
+    } catch (error) {
+      await rollback(client);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async beginDeliveryAttempt(
+    jobId: string,
+    workerId: string,
+    attemptCount: number,
+  ): Promise<BeginDeliveryAttemptResult> {
+    assertLeaseInput(1, workerId);
+    if (!Number.isInteger(attemptCount) || attemptCount < 1) {
+      throw new Error("invalid_lease_fence");
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const selected = await client.query<{
+        delivery_attempt_count: number;
+        delivery_attempt_generation: number;
+      }>(
+        `SELECT delivery_attempt_count, delivery_attempt_generation
+         FROM email_outbox
+         WHERE id = $1
+           AND lease_owner = $2
+           AND attempt_count = $3
+           AND lease_expires_at > clock_timestamp()
+           AND delivered_at IS NULL
+           AND failed_at IS NULL
+         FOR UPDATE`,
+        [jobId, workerId, attemptCount],
+      );
+      const row = selected.rows[0];
+      if (!row) {
+        await client.query("COMMIT");
+        return { status: "lease_lost" };
+      }
+      if (row.delivery_attempt_generation === attemptCount) {
+        await client.query("COMMIT");
+        return {
+          status: "already_started",
+          deliveryAttemptCount: row.delivery_attempt_count,
+        };
+      }
+      if (row.delivery_attempt_count >= MAX_DELIVERY_ATTEMPTS) {
+        await client.query("COMMIT");
+        return { status: "attempts_exhausted" };
+      }
+
+      const deliveryAttemptCount = row.delivery_attempt_count + 1;
+      const updated = await client.query(
+        `UPDATE email_outbox
+         SET delivery_attempt_count = $4,
+             delivery_attempt_generation = $3
+         WHERE id = $1
+           AND lease_owner = $2
+           AND attempt_count = $3
+           AND lease_expires_at > clock_timestamp()
+           AND delivered_at IS NULL
+           AND failed_at IS NULL`,
+        [jobId, workerId, attemptCount, deliveryAttemptCount],
+      );
+      if (updated.rowCount !== 1) {
+        await client.query("COMMIT");
+        return { status: "lease_lost" };
+      }
+      await client.query("COMMIT");
+      return { status: "started", deliveryAttemptCount };
     } catch (error) {
       await rollback(client);
       throw error;

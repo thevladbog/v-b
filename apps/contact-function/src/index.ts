@@ -10,6 +10,7 @@ export type {
 export { OutboxRepository } from "./outbox-repository.js";
 export type {
   AcceptResult,
+  BeginDeliveryAttemptResult,
   LeasedOutboxJob,
   OutboxDeliveryRepository,
   OutboxLeaseRepository,
@@ -30,6 +31,7 @@ export {
   buildRawMime,
 } from "./postbox.js";
 export type {
+  PreparedPostboxDelivery,
   PostboxFailureDisposition,
   PostboxSendInput,
   PostboxSendResult,
@@ -41,6 +43,7 @@ export type {
   DrainOptions,
   DrainOutbox,
   DrainSummary,
+  EmailRenderer,
   OutboxWorkerDependencies,
 } from "./worker.js";
 export {

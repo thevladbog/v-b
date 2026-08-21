@@ -2,8 +2,15 @@ import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { ContactRequest } from "@vbtech/contracts";
 import { Pool } from "pg";
+import { encryptPayload } from "../src/crypto.js";
 import { OutboxRepository } from "../src/outbox-repository.js";
+import type {
+  PreparedPostboxDelivery,
+  PostboxSendInput,
+  PostboxSender,
+} from "../src/postbox.js";
 import { PostgresOutboxRetention, runContactRetention } from "../src/retention.js";
+import { createDrainOutbox } from "../src/worker.js";
 import {
   createTestPool,
   migrate,
@@ -30,6 +37,21 @@ const request: ContactRequest = {
 let pool: Pool;
 let repository: OutboxRepository;
 let retention: PostgresOutboxRetention;
+
+class UnexpectedSender implements PostboxSender {
+  prepareCalls = 0;
+  sendCalls = 0;
+
+  async prepare(_input: PostboxSendInput): Promise<PreparedPostboxDelivery> {
+    this.prepareCalls += 1;
+    throw new Error("provider_boundary_must_not_be_reached");
+  }
+
+  async send(_input: PostboxSendInput): Promise<never> {
+    this.sendCalls += 1;
+    throw new Error("provider_boundary_must_not_be_reached");
+  }
+}
 
 beforeAll(async () => {
   pool = createTestPool();
@@ -136,6 +158,130 @@ describe("terminal payload lifecycle", () => {
     );
     expect(payloads.rows.find(({ id }) => id === terminalId)?.payload_ciphertext).toBeNull();
     expect(payloads.rows.find(({ id }) => id === pendingId)?.payload_ciphertext).toBeInstanceOf(Buffer);
+  });
+});
+
+describe("recoverable worker payload lifecycle", () => {
+  const storedPayload = async () => {
+    const result = await pool.query<{
+      failed_at: Date | null;
+      delivered_at: Date | null;
+      delivery_attempt_count: number;
+      payload_ciphertext: Buffer | null;
+      payload_iv: Buffer | null;
+      payload_auth_tag: Buffer | null;
+      lease_owner: string | null;
+    }>(
+      `SELECT failed_at, delivered_at, delivery_attempt_count,
+              payload_ciphertext, payload_iv, payload_auth_tag, lease_owner
+       FROM email_outbox`,
+    );
+    return result.rows[0]!;
+  };
+
+  // Catches a wrong deployment key destroying the only recoverable visitor payload.
+  it("preserves ciphertext and provider budget after decryption fails with a valid wrong key", async () => {
+    await repository.accept(request);
+    const sender = new UnexpectedSender();
+    const drain = createDrainOutbox({
+      repository,
+      sender,
+      encryptionKey: Buffer.alloc(32, 0xff),
+    });
+
+    await expect(drain({ limit: 1, workerId: "worker-a" })).resolves.toMatchObject({
+      rescheduled: 1,
+      failed: 0,
+    });
+
+    expect(await storedPayload()).toMatchObject({
+      failed_at: null,
+      delivered_at: null,
+      delivery_attempt_count: 0,
+      payload_ciphertext: expect.any(Buffer),
+      payload_iv: expect.any(Buffer),
+      payload_auth_tag: expect.any(Buffer),
+      lease_owner: null,
+    });
+    expect(sender.prepareCalls).toBe(0);
+    expect(sender.sendCalls).toBe(0);
+  });
+
+  // Catches a renderer/runtime deployment fault irreversibly erasing a valid durable request.
+  it("preserves ciphertext and provider budget after an injected renderer failure", async () => {
+    await repository.accept(request);
+    const sender = new UnexpectedSender();
+    const drain = createDrainOutbox({
+      repository,
+      sender,
+      encryptionKey,
+      renderNotification: async () => Promise.reject(new Error("renderer_runtime_failed")),
+    });
+
+    await expect(drain({ limit: 1, workerId: "worker-a" })).resolves.toMatchObject({
+      rescheduled: 1,
+      failed: 0,
+    });
+
+    expect(await storedPayload()).toMatchObject({
+      failed_at: null,
+      delivered_at: null,
+      delivery_attempt_count: 0,
+      payload_ciphertext: expect.any(Buffer),
+      payload_iv: expect.any(Buffer),
+      payload_auth_tag: expect.any(Buffer),
+      lease_owner: null,
+    });
+    expect(sender.prepareCalls).toBe(0);
+    expect(sender.sendCalls).toBe(0);
+  });
+
+  // Proves terminal schema poison is authenticated under the correct key, unlike key/config failures.
+  it("atomically erases an authenticated schema-invalid durable payload without provider budget", async () => {
+    await repository.accept(request);
+    const stored = await pool.query<{
+      id: string;
+      public_request_id: string;
+      kind: "notification" | "confirmation";
+    }>("SELECT id::text, public_request_id::text, kind FROM email_outbox");
+    const row = stored.rows[0]!;
+    const poison = encryptPayload(
+      {
+        locale: request.locale,
+        name: request.name,
+        contact: "NOT AN ADDRESS",
+        message: request.message,
+        sourcePath: request.sourcePath,
+        consentId: request.consentId,
+      },
+      encryptionKey,
+      { requestId: row.public_request_id, kind: row.kind },
+    );
+    await pool.query(
+      `UPDATE email_outbox
+       SET payload_ciphertext = $2, payload_iv = $3, payload_auth_tag = $4
+       WHERE id = $1`,
+      [row.id, poison.ciphertext, poison.iv, poison.authTag],
+    );
+    const sender = new UnexpectedSender();
+    const drain = createDrainOutbox({ repository, sender, encryptionKey });
+
+    await expect(drain({ limit: 1, workerId: "worker-a" })).resolves.toMatchObject({
+      rescheduled: 0,
+      failed: 1,
+    });
+
+    expect(await storedPayload()).toMatchObject({
+      failed_at: expect.any(Date),
+      delivered_at: null,
+      delivery_attempt_count: 0,
+      payload_ciphertext: null,
+      payload_iv: null,
+      payload_auth_tag: null,
+      lease_owner: null,
+    });
+    expect(sender.prepareCalls).toBe(0);
+    expect(sender.sendCalls).toBe(0);
   });
 });
 

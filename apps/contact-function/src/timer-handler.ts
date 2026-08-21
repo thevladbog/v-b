@@ -164,7 +164,6 @@ export const createTimerHandler = ({
   context: unknown,
 ): Promise<TimerHandlerResult> => {
   parseTimerEvent(event);
-  readIamToken(context);
   const workerId = readWorkerId(context);
   const getIamToken = async (): Promise<string> => readIamToken(context);
   const runtime = await createRuntime({ getIamToken });

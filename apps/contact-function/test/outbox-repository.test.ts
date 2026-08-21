@@ -310,6 +310,7 @@ describe("outbox leasing and terminal ownership", () => {
       new Set(["worker-a", "worker-b"]),
     );
     expect(leased.map((job) => job.attemptCount).sort()).toEqual([1, 1]);
+    expect(leased.map((job) => job.deliveryAttemptCount).sort()).toEqual([0, 0]);
   });
 
   // Catches a production break that allows unbounded batches or nonsensical lease limits.
@@ -334,6 +335,74 @@ describe("outbox leasing and terminal ownership", () => {
     expect(recovered[0]?.id).toBe(leased?.id);
     expect(recovered[0]?.leaseOwner).toBe("worker-b");
     expect(recovered[0]?.attemptCount).toBe(2);
+    expect(recovered[0]?.deliveryAttemptCount).toBe(0);
+  });
+
+  // Catches lease acquisition/recovery consuming provider budget before a network attempt is ready.
+  it("separates fenced lease generations from provider delivery attempts", async () => {
+    await resetContactTables(pool);
+    await repository.accept(telegramRequest);
+    const [stale] = await repository.leaseDue(1, "worker-a");
+    await pool.query(
+      "UPDATE email_outbox SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1",
+      [stale!.id],
+    );
+    const [current] = await repository.leaseDue(1, "worker-b");
+
+    await expect(repository.beginDeliveryAttempt(
+      stale!.id,
+      "worker-a",
+      stale!.attemptCount,
+    )).resolves.toEqual({ status: "lease_lost" });
+    await expect(repository.beginDeliveryAttempt(
+      current!.id,
+      "worker-b",
+      current!.attemptCount,
+    )).resolves.toEqual({ status: "started", deliveryAttemptCount: 1 });
+    await expect(repository.beginDeliveryAttempt(
+      current!.id,
+      "worker-b",
+      current!.attemptCount,
+    )).resolves.toEqual({ status: "already_started", deliveryAttemptCount: 1 });
+
+    const row = await pool.query<{
+      attempt_count: number;
+      delivery_attempt_count: number;
+      delivery_attempt_generation: number;
+    }>(
+      `SELECT attempt_count, delivery_attempt_count, delivery_attempt_generation
+       FROM email_outbox WHERE id = $1`,
+      [current!.id],
+    );
+    expect(row.rows[0]).toEqual({
+      attempt_count: 2,
+      delivery_attempt_count: 1,
+      delivery_attempt_generation: 2,
+    });
+  });
+
+  // Catches a crash after provider-attempt reservation losing the reservation on lease recovery.
+  it("carries a begun provider attempt across crash-style lease recovery", async () => {
+    await resetContactTables(pool);
+    await repository.accept(telegramRequest);
+    const [first] = await repository.leaseDue(1, "worker-a");
+    await expect(repository.beginDeliveryAttempt(
+      first!.id,
+      "worker-a",
+      first!.attemptCount,
+    )).resolves.toEqual({ status: "started", deliveryAttemptCount: 1 });
+    await pool.query(
+      "UPDATE email_outbox SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1",
+      [first!.id],
+    );
+    const [recovered] = await repository.leaseDue(1, "worker-b");
+
+    expect(recovered).toMatchObject({ attemptCount: 2, deliveryAttemptCount: 1 });
+    await expect(repository.beginDeliveryAttempt(
+      recovered!.id,
+      "worker-b",
+      recovered!.attemptCount,
+    )).resolves.toEqual({ status: "started", deliveryAttemptCount: 2 });
   });
 
   // Catches a production break that lets a worker finalize a job after losing its lease.
