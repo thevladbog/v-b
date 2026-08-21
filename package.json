@@ -7,7 +7,11 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "build:function-artifact": "node deploy/production/build-function-artifact.mjs",
     "test": "corepack pnpm run test:unit && corepack pnpm --dir tools/browser test",
+    "test:contracts": "node --test deploy/container/test/*.test.mjs deploy/production/test/*.test.mjs deploy/yandex/test/*.test.mjs",
+    "test:db": "corepack pnpm --filter @vbtech/contact-function test:db",
+    "test:e2e": "corepack pnpm --filter @vbtech/contact-function test:e2e",
     "test:unit": "turbo run test --filter='!@vbtech/browser'",
     "test:package-manager": "turbo run package-manager:contract",
     "typecheck": "turbo run typecheck",
@@ -17,6 +21,7 @@
     "pg": "8.22.0"
   },
   "devDependencies": {
+    "esbuild": "0.28.2",
     "pnpm": "11.10.0",
     "turbo": "2.10.4"
   }

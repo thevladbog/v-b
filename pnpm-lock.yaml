@@ -12,6 +12,9 @@ importers:
         specifier: 8.22.0
         version: 8.22.0
     devDependencies:
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       pnpm:
         specifier: 11.10.0
         version: 11.10.0

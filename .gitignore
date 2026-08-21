@@ -9,6 +9,7 @@ node_modules/
 .astro/
 dist/
 coverage/
+.artifacts/
 
 # Browser and test artifacts
 playwright-report/

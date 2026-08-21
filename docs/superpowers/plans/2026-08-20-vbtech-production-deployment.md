@@ -214,6 +214,13 @@ git commit -m "infra: define isolated v-b.tech serverless resources"
 
 ### Task 5: CI build and release gates
 
+> Implementation boundary (2026-08-21): this repository can verify and publish
+> immutable artifacts, but the existing Markiro production workflow does not yet
+> expose a trusted input contract for a v-b release manifest. Until that
+> cross-repository executor is implemented and approved, `deploy.yml` performs a
+> protected, disabled-state deployment handoff and explicitly makes no remote
+> mutation. Live deployment remains part of the later production activation gate.
+
 **Files:**
 - Create: `.github/workflows/ci.yml`
 - Create: `.github/workflows/publish.yml`
