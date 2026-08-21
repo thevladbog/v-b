@@ -42,6 +42,8 @@ The unconfigured gate also passed with one file/three tests reported skipped.
 
 Fix-round RED evidence was captured independently for all review findings: origin aliases/wrong ports and a wrong instance label were initially accepted (3/3 focused guard failures); the former global delete removed a seeded unrelated message (real-Mailpit E2E 1 failed/2 passed); the four-message assertion failed on the missing EN confirmation (1 failed/2 passed); the committed visual command failed because its capture module did not yet exist; and a deliberate local Message-ID mutation produced the exact expected-versus-received header diff. Each mutation was restored before final verification.
 
+The second fix round added eight focused boundary tests before implementation. All eight initially failed because the limits and bounded readers/validators did not exist. The completed implementation passed 8/8. A deliberate mutation that doubled each internal enforcement threshold while leaving the exported contracts unchanged produced six expected failures and two unaffected passes; after restoration the focused suite returned to 8/8.
+
 ## Delivery assertions
 
 | Synthetic request | Durable jobs | Actual Mailpit messages | Result |
@@ -70,9 +72,11 @@ Local evidence directory (ignored by Git):
 Evidence integrity:
 
 ```text
-manifest.json     sha256 f548debee342589b97adc805ae23e3b75e7ba4f44dbb665912f1a4b6740e819d
-contact-sheet.png sha256 cbb919d9ac099298e66f2f3a7e496a655c22ea098b4734408d77e6dc50009388
+manifest.json     sha256 56fb097de27c49c7c5b8aefbfc5065c256effd9f4cc91f6db2019c69036a86c5
+contact-sheet.png sha256 4222140c1eab3486cef607919c52ed9627ca15034474603ee2e018182c7fd1d0
 ```
+
+The committed evidence ceilings are: Mailpit JSON 1,048,576 bytes; HTML 32,768 characters/65,536 UTF-8 bytes; text 8,192 characters/16,384 UTF-8 bytes; document/capture 1,440×2,048 pixels and PNG 524,288 bytes; all evidence including the manifest 8,388,608 bytes; contact sheet 1,280×4,096 pixels and 4,194,304 bytes. The final manifest recorded 2,085,570 total bytes, a largest capture of `1280×1402` and 74,652 bytes, a `1120×3026`/396,659-byte contact sheet, and zero external requests. Every one of the 32 capture records and the sheet records its actual content characters/UTF-8 bytes, rendered and PNG dimensions, file bytes, and SHA-256. Streaming JSON, pre-capture document measurement, bounded PNG validation, stable total accounting, and failure cleanup were exercised by malformed and oversized fixtures without dangerous allocations.
 
 Mail content hashes from the captured run:
 

@@ -8,7 +8,7 @@ const baseURL = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: "./tests",
   testMatch: "**/*.spec.ts",
-  testIgnore: ["**/contact.spec.ts", "**/email-acceptance.spec.ts"],
+  testIgnore: ["**/contact.spec.ts", "**/email-acceptance*.spec.ts"],
   outputDir: join(tmpdir(), "vbtech-task-8-playwright"),
   fullyParallel: true,
   workers: 2,

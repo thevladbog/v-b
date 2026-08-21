@@ -77,6 +77,17 @@ CI=1 corepack pnpm --dir tools/browser accept:contact-emails
 
 The bounded output is `.superpowers/sdd/2026-08-20-vbtech-contact-pipeline/task-7-evidence/`: 32 uniquely named captures, `manifest.json`, and `contact-sheet.png`. The generator enforces the exact origin and instance label, four exact subjects, desktop `1280×900` and mobile `390×844`, HTML/plain text, request IDs, confirmation links, no external body requests, and content/pixel SHA-256 hashes.
 
+Generation fails closed at these committed ceilings:
+
+- Mailpit JSON response: 1,048,576 bytes, consumed as a bounded stream before UTF-8 decoding and JSON parsing;
+- each HTML part: 32,768 Unicode characters and 65,536 UTF-8 bytes;
+- each plain-text part: 8,192 Unicode characters and 16,384 UTF-8 bytes;
+- each rendered document and capture: 1,440 × 2,048 pixels, measured before capture; each PNG: 524,288 bytes;
+- complete generated evidence, including the stable manifest: 8,388,608 bytes;
+- contact sheet: 1,280 × 4,096 pixels and 4,194,304 bytes.
+
+The current synthetic set uses about 2.1 MB in total; its largest message capture is `1280×1402` and 74,652 bytes, while the sheet is `1120×3026` and 396,659 bytes. The ceilings intentionally leave practical copy/layout headroom while preventing an unexpected mailbox response or page from causing unbounded JSON parsing, browser expansion, memory use, or disk output. PNG dimensions and bytes are inspected before write, the stable manifest records actual dimensions/bytes for all captures and the sheet, and any failure removes partial output.
+
 For every message, inspect HTML and plain text at both sizes and modes. Dark captures use the documented deterministic `controlled-local-email-client-emulation-v1` palette layer. It mechanically proves that the requested mode was applied, that key text contrast is at least 4.5:1, and that every dark pixel hash differs from its light counterpart. It is regression evidence only, not a claim of Gmail, Outlook, Apple Mail, or other real-client acceptance. Confirm:
 
 - no horizontal clipping or unreadable contrast;

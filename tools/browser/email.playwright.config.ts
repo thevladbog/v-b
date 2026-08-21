@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "email-acceptance.spec.ts",
+  testMatch: ["email-acceptance.spec.ts", "email-acceptance-bounds.spec.ts"],
   fullyParallel: false,
   workers: 1,
   reporter: "list",

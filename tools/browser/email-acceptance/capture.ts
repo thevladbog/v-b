@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -9,11 +10,39 @@ const MAILPIT_ORIGIN = "http://127.0.0.1:58025";
 const MAILPIT_LABEL = "vbtech-task7-dedicated";
 const MAILPIT_TAG = "vbtech-task7";
 const DARK_STRATEGY = "controlled-local-email-client-emulation-v1";
+export const MAX_MAILPIT_JSON_RESPONSE_BYTES = 1_048_576;
+export const MAX_EMAIL_HTML_CHARACTERS = 32_768;
+export const MAX_EMAIL_HTML_UTF8_BYTES = 65_536;
+export const MAX_EMAIL_TEXT_CHARACTERS = 8_192;
+export const MAX_EMAIL_TEXT_UTF8_BYTES = 16_384;
+export const MAX_RENDERED_DOCUMENT_WIDTH = 1_440;
+export const MAX_RENDERED_DOCUMENT_HEIGHT = 2_048;
+export const MAX_CAPTURE_PNG_BYTES = 524_288;
+export const MAX_TOTAL_EVIDENCE_BYTES = 8_388_608;
+export const MAX_CONTACT_SHEET_WIDTH = 1_280;
+export const MAX_CONTACT_SHEET_HEIGHT = 4_096;
+export const MAX_CONTACT_SHEET_BYTES = 4_194_304;
+
+export const EMAIL_EVIDENCE_LIMITS = Object.freeze({
+  mailpitJsonBytes: MAX_MAILPIT_JSON_RESPONSE_BYTES,
+  htmlCharacters: MAX_EMAIL_HTML_CHARACTERS,
+  htmlUtf8Bytes: MAX_EMAIL_HTML_UTF8_BYTES,
+  textCharacters: MAX_EMAIL_TEXT_CHARACTERS,
+  textUtf8Bytes: MAX_EMAIL_TEXT_UTF8_BYTES,
+  documentWidth: MAX_RENDERED_DOCUMENT_WIDTH,
+  documentHeight: MAX_RENDERED_DOCUMENT_HEIGHT,
+  capturePngBytes: MAX_CAPTURE_PNG_BYTES,
+  totalEvidenceBytes: MAX_TOTAL_EVIDENCE_BYTES,
+  contactSheetWidth: MAX_CONTACT_SHEET_WIDTH,
+  contactSheetHeight: MAX_CONTACT_SHEET_HEIGHT,
+  contactSheetBytes: MAX_CONTACT_SHEET_BYTES,
+});
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const evidenceDirectory = path.join(
   repositoryRoot,
   ".superpowers/sdd/2026-08-20-vbtech-contact-pipeline/task-7-evidence",
 );
+export const EMAIL_EVIDENCE_DIRECTORY = evidenceDirectory;
 
 const kindsBySubject = {
   "New v-b.tech enquiry": "en-notification",
@@ -45,12 +74,29 @@ export interface EmailAcceptanceCapture {
   mode: PreviewMode;
   file: string;
   viewport: { width: number; height: number };
+  contentCharacters: number;
+  contentUtf8Bytes: number;
+  documentWidth: number;
+  documentHeight: number;
+  imageWidth: number;
+  imageHeight: number;
+  fileBytes: number;
   requestId: string;
   links: string[];
   contentSha256: string;
   pixelSha256: string;
   modeApplied: boolean;
   minimumContrast: number;
+}
+
+export interface EmailAcceptanceContactSheet {
+  file: string;
+  pixelSha256: string;
+  documentWidth: number;
+  documentHeight: number;
+  imageWidth: number;
+  imageHeight: number;
+  fileBytes: number;
 }
 
 export interface EmailAcceptanceResult {
@@ -61,11 +107,91 @@ export interface EmailAcceptanceResult {
   kinds: MessageKind[];
   captures: EmailAcceptanceCapture[];
   externalRequests: string[];
-  contactSheet: string;
+  limits: typeof EMAIL_EVIDENCE_LIMITS;
+  contactSheet: EmailAcceptanceContactSheet;
+  totalEvidenceBytes: number;
 }
 
 const sha256 = (value: string | Uint8Array): string =>
   createHash("sha256").update(value).digest("hex");
+
+const utf8Bytes = (value: string): number => Buffer.byteLength(value, "utf8");
+
+const unicodeCharacters = (value: string): number => {
+  let count = 0;
+  for (const _character of value) count += 1;
+  return count;
+};
+
+export const readBoundedJsonResponse = async (response: Response): Promise<unknown> => {
+  const declaredLength = response.headers.get("content-length");
+  if (declaredLength !== null) {
+    const parsedLength = Number(declaredLength);
+    if (!Number.isSafeInteger(parsedLength) || parsedLength < 0) {
+      throw new Error("mailpit_content_length_invalid");
+    }
+    if (parsedLength > MAX_MAILPIT_JSON_RESPONSE_BYTES) {
+      throw new Error("mailpit_json_response_too_large");
+    }
+  }
+  if (!response.body) throw new Error("mailpit_json_invalid");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      totalBytes += next.value.byteLength;
+      if (totalBytes > MAX_MAILPIT_JSON_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error("mailpit_json_response_too_large");
+      }
+      chunks.push(next.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks, totalBytes));
+  } catch {
+    throw new Error("mailpit_json_invalid");
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new Error("mailpit_json_invalid");
+  }
+};
+
+export const assertEmailBodyBounds = (
+  html: string,
+  text: string,
+): {
+  htmlCharacters: number;
+  htmlUtf8Bytes: number;
+  textCharacters: number;
+  textUtf8Bytes: number;
+} => {
+  const htmlCharacters = unicodeCharacters(html);
+  if (htmlCharacters > MAX_EMAIL_HTML_CHARACTERS) {
+    throw new Error("email_html_characters_exceeded");
+  }
+  const htmlUtf8Bytes = utf8Bytes(html);
+  if (htmlUtf8Bytes > MAX_EMAIL_HTML_UTF8_BYTES) {
+    throw new Error("email_html_utf8_bytes_exceeded");
+  }
+  const textCharacters = unicodeCharacters(text);
+  if (textCharacters > MAX_EMAIL_TEXT_CHARACTERS) {
+    throw new Error("email_text_characters_exceeded");
+  }
+  const textUtf8Bytes = utf8Bytes(text);
+  if (textUtf8Bytes > MAX_EMAIL_TEXT_UTF8_BYTES) {
+    throw new Error("email_text_utf8_bytes_exceeded");
+  }
+  return { htmlCharacters, htmlUtf8Bytes, textCharacters, textUtf8Bytes };
+};
 
 const requireDedicatedMailpitUrl = (): URL => {
   const value = process.env.VBTECH_MAILPIT_API_URL;
@@ -95,7 +221,7 @@ const fetchJson = async <T>(baseUrl: URL, pathname: string): Promise<T> => {
   if (url.origin !== MAILPIT_ORIGIN) throw new Error("mailpit_url_escape");
   const response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
   if (!response.ok) throw new Error(`mailpit_request_failed:${response.status}`);
-  return await response.json() as T;
+  return await readBoundedJsonResponse(response) as T;
 };
 
 const verifyDedicatedMailpit = async (baseUrl: URL): Promise<string> => {
@@ -127,6 +253,7 @@ const loadMessages = async (baseUrl: URL): Promise<Map<MessageKind, MailpitMessa
     if (typeof detail.HTML !== "string" || typeof detail.Text !== "string") {
       throw new Error("mailpit_message_body_invalid");
     }
+    assertEmailBodyBounds(detail.HTML, detail.Text);
     messages.set(kind, detail);
   }
   if (messages.size !== 4) throw new Error("mailpit_task7_message_matrix_incomplete");
@@ -246,6 +373,95 @@ const measurePreview = async (
   };
 };
 
+export const measureRenderedDocument = async (
+  page: Page,
+  kind: "capture" | "contact-sheet" = "capture",
+): Promise<{ width: number; height: number }> => {
+  const dimensions = await page.evaluate(() => ({
+    width: Math.ceil(Math.max(
+      window.innerWidth,
+      document.documentElement.clientWidth,
+      document.documentElement.scrollWidth,
+      document.body?.clientWidth ?? 0,
+      document.body?.scrollWidth ?? 0,
+    )),
+    height: Math.ceil(Math.max(
+      window.innerHeight,
+      document.documentElement.clientHeight,
+      document.documentElement.scrollHeight,
+      document.body?.clientHeight ?? 0,
+      document.body?.scrollHeight ?? 0,
+    )),
+  }));
+  if (!Number.isSafeInteger(dimensions.width) || dimensions.width < 1) {
+    throw new Error(`email_${kind === "capture" ? "document" : "contact_sheet"}_width_invalid`);
+  }
+  if (!Number.isSafeInteger(dimensions.height) || dimensions.height < 1) {
+    throw new Error(`email_${kind === "capture" ? "document" : "contact_sheet"}_height_invalid`);
+  }
+  const maxWidth = kind === "capture"
+    ? MAX_RENDERED_DOCUMENT_WIDTH
+    : MAX_CONTACT_SHEET_WIDTH;
+  const maxHeight = kind === "capture"
+    ? MAX_RENDERED_DOCUMENT_HEIGHT
+    : MAX_CONTACT_SHEET_HEIGHT;
+  const prefix = kind === "capture" ? "email_document" : "email_contact_sheet";
+  if (dimensions.width > maxWidth) throw new Error(`${prefix}_width_exceeded`);
+  if (dimensions.height > maxHeight) throw new Error(`${prefix}_height_exceeded`);
+  return dimensions;
+};
+
+export const inspectEvidencePng = (
+  bytes: Uint8Array,
+  kind: "capture" | "contact-sheet",
+): { width: number; height: number; fileBytes: number } => {
+  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (
+    buffer.byteLength < 24 ||
+    !buffer.subarray(0, 8).equals(signature) ||
+    buffer.readUInt32BE(8) !== 13 ||
+    buffer.toString("ascii", 12, 16) !== "IHDR"
+  ) {
+    throw new Error("email_png_invalid");
+  }
+  const width = buffer.readUInt32BE(16);
+  const height = buffer.readUInt32BE(20);
+  const fileBytes = buffer.byteLength;
+  const prefix = kind === "capture" ? "email_capture_png" : "email_contact_sheet";
+  const maxWidth = kind === "capture" ? MAX_RENDERED_DOCUMENT_WIDTH : MAX_CONTACT_SHEET_WIDTH;
+  const maxHeight = kind === "capture" ? MAX_RENDERED_DOCUMENT_HEIGHT : MAX_CONTACT_SHEET_HEIGHT;
+  const maxBytes = kind === "capture" ? MAX_CAPTURE_PNG_BYTES : MAX_CONTACT_SHEET_BYTES;
+  if (width < 1) throw new Error(`${prefix}_width_invalid`);
+  if (height < 1) throw new Error(`${prefix}_height_invalid`);
+  if (width > maxWidth) throw new Error(`${prefix}_width_exceeded`);
+  if (height > maxHeight) throw new Error(`${prefix}_height_exceeded`);
+  if (fileBytes > maxBytes) throw new Error(`${prefix}_bytes_exceeded`);
+  return { width, height, fileBytes };
+};
+
+export const assertTotalGeneratedEvidenceBytes = (bytes: number): void => {
+  if (!Number.isSafeInteger(bytes) || bytes < 0) {
+    throw new Error("email_total_evidence_bytes_invalid");
+  }
+  if (bytes > MAX_TOTAL_EVIDENCE_BYTES) {
+    throw new Error("email_total_evidence_bytes_exceeded");
+  }
+};
+
+export const withCleanEvidenceDirectory = async <T>(
+  operation: (directory: string) => Promise<T>,
+): Promise<T> => {
+  await rm(evidenceDirectory, { recursive: true, force: true });
+  await mkdir(evidenceDirectory, { recursive: true });
+  try {
+    return await operation(evidenceDirectory);
+  } catch (error) {
+    await rm(evidenceDirectory, { recursive: true, force: true });
+    throw error;
+  }
+};
+
 const extractRequestId = (message: MailpitMessage): string => {
   const values = `${message.HTML}\n${message.Text}`.match(
     /\b[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
@@ -271,12 +487,16 @@ const assertLinks = (kind: MessageKind, links: string[]): void => {
 const buildContactSheet = async (
   browser: Browser,
   captures: EmailAcceptanceCapture[],
-): Promise<{ file: string; sha256: string }> => {
+  captureBytes: number,
+): Promise<EmailAcceptanceContactSheet> => {
   const page = await browser.newPage({ viewport: { width: 1120, height: 900 } });
   try {
     const figures: string[] = [];
     for (const capture of captures) {
       const bytes = await readFile(path.join(evidenceDirectory, capture.file));
+      if (bytes.byteLength !== capture.fileBytes || sha256(bytes) !== capture.pixelSha256) {
+        throw new Error("email_capture_file_changed");
+      }
       figures.push(`<figure><figcaption>${escapeHtml(capture.file)}</figcaption><img alt="${escapeHtml(capture.file)}" src="data:image/png;base64,${bytes.toString("base64")}"></figure>`);
     }
     await page.setContent(`<!doctype html><html><head><style>
@@ -288,8 +508,23 @@ const buildContactSheet = async (
     </style></head><body><h1>v-b.tech contact email acceptance</h1><p>${GENERATOR_VERSION} · ${DARK_STRATEGY} · generated local evidence</p><main>${figures.join("")}</main></body></html>`);
     const file = "contact-sheet.png";
     const target = path.join(evidenceDirectory, file);
-    await page.screenshot({ path: target, fullPage: true });
-    return { file, sha256: sha256(await readFile(target)) };
+    const document = await measureRenderedDocument(page, "contact-sheet");
+    const screenshot = await page.screenshot({ fullPage: true, animations: "disabled", type: "png" });
+    const image = inspectEvidencePng(screenshot, "contact-sheet");
+    if (image.width !== document.width || image.height !== document.height) {
+      throw new Error("email_contact_sheet_dimensions_mismatch");
+    }
+    assertTotalGeneratedEvidenceBytes(captureBytes + image.fileBytes);
+    await writeFile(target, screenshot);
+    return {
+      file,
+      pixelSha256: sha256(screenshot),
+      documentWidth: document.width,
+      documentHeight: document.height,
+      imageWidth: image.width,
+      imageHeight: image.height,
+      fileBytes: image.fileBytes,
+    };
   } finally {
     await page.close();
   }
@@ -302,77 +537,112 @@ export const captureContactEmailAcceptance = async (
     throw new Error("email_evidence_path_escape");
   }
   const baseUrl = requireDedicatedMailpitUrl();
-  const mailpitVersion = await verifyDedicatedMailpit(baseUrl);
-  const messages = await loadMessages(baseUrl);
-  await rm(evidenceDirectory, { recursive: true, force: true });
-  await mkdir(evidenceDirectory, { recursive: true });
+  return await withCleanEvidenceDirectory(async () => {
+    const mailpitVersion = await verifyDedicatedMailpit(baseUrl);
+    const messages = await loadMessages(baseUrl);
+    const viewports = {
+      desktop: { width: 1280, height: 900 },
+      mobile: { width: 390, height: 844 },
+    } as const;
+    const captures: EmailAcceptanceCapture[] = [];
+    const externalRequests = new Set<string>();
+    let captureBytes = 0;
 
-  const viewports = {
-    desktop: { width: 1280, height: 900 },
-    mobile: { width: 390, height: 844 },
-  } as const;
-  const captures: EmailAcceptanceCapture[] = [];
-  const externalRequests = new Set<string>();
-
-  for (const [kind, message] of [...messages.entries()].sort(([left], [right]) => left.localeCompare(right))) {
-    const requestId = extractRequestId(message);
-    const links = extractLinks(message.HTML);
-    assertLinks(kind, links);
-    for (const part of ["html", "text"] as const) {
-      const content = part === "html" ? message.HTML : message.Text;
-      for (const [size, viewport] of Object.entries(viewports) as Array<[PreviewSize, typeof viewports[PreviewSize]]>) {
-        for (const mode of ["light", "dark"] as const) {
-          const page = await browser.newPage({ viewport });
-          const requests: string[] = [];
-          page.on("request", (request) => requests.push(request.url()));
-          await page.route("**/*", (route) => route.abort());
-          try {
-            if (part === "html") await prepareHtmlPreview(page, content, mode);
-            else await prepareTextPreview(page, content, mode);
-            await page.emulateMedia({ colorScheme: mode });
-            const measured = await measurePreview(page, part, mode);
-            const file = `${kind}-${part}-${size}-${mode}.png`;
-            const target = path.join(evidenceDirectory, file);
-            await page.screenshot({ path: target, fullPage: true });
-            const pixelSha256 = sha256(await readFile(target));
-            captures.push({
-              kind,
-              part,
-              size,
-              mode,
-              file,
-              viewport,
-              requestId,
-              links,
-              contentSha256: sha256(content),
-              pixelSha256,
-              modeApplied: measured.modeApplied,
-              minimumContrast: Number(measured.minimumContrast.toFixed(2)),
-            });
-          } finally {
-            await page.close();
+    for (const [kind, message] of [...messages.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+      const requestId = extractRequestId(message);
+      const links = extractLinks(message.HTML);
+      const bodyMeasurements = assertEmailBodyBounds(message.HTML, message.Text);
+      assertLinks(kind, links);
+      for (const part of ["html", "text"] as const) {
+        const content = part === "html" ? message.HTML : message.Text;
+        const contentCharacters = part === "html"
+          ? bodyMeasurements.htmlCharacters
+          : bodyMeasurements.textCharacters;
+        const contentUtf8Bytes = part === "html"
+          ? bodyMeasurements.htmlUtf8Bytes
+          : bodyMeasurements.textUtf8Bytes;
+        for (const [size, viewport] of Object.entries(viewports) as Array<[PreviewSize, typeof viewports[PreviewSize]]>) {
+          for (const mode of ["light", "dark"] as const) {
+            const page = await browser.newPage({ viewport });
+            const requests: string[] = [];
+            page.on("request", (request) => requests.push(request.url()));
+            await page.route("**/*", (route) => route.abort());
+            try {
+              if (part === "html") await prepareHtmlPreview(page, content, mode);
+              else await prepareTextPreview(page, content, mode);
+              await page.emulateMedia({ colorScheme: mode });
+              const measured = await measurePreview(page, part, mode);
+              const document = await measureRenderedDocument(page);
+              const screenshot = await page.screenshot({
+                fullPage: true,
+                animations: "disabled",
+                type: "png",
+              });
+              const image = inspectEvidencePng(screenshot, "capture");
+              if (image.width !== document.width || image.height !== document.height) {
+                throw new Error("email_capture_dimensions_mismatch");
+              }
+              captureBytes += image.fileBytes;
+              assertTotalGeneratedEvidenceBytes(captureBytes);
+              const file = `${kind}-${part}-${size}-${mode}.png`;
+              await writeFile(path.join(evidenceDirectory, file), screenshot);
+              captures.push({
+                kind,
+                part,
+                size,
+                mode,
+                file,
+                viewport,
+                contentCharacters,
+                contentUtf8Bytes,
+                documentWidth: document.width,
+                documentHeight: document.height,
+                imageWidth: image.width,
+                imageHeight: image.height,
+                fileBytes: image.fileBytes,
+                requestId,
+                links,
+                contentSha256: sha256(content),
+                pixelSha256: sha256(screenshot),
+                modeApplied: measured.modeApplied,
+                minimumContrast: Number(measured.minimumContrast.toFixed(2)),
+              });
+            } finally {
+              await page.close();
+            }
+            for (const request of requests) externalRequests.add(request);
           }
-          for (const request of requests) externalRequests.add(request);
         }
       }
     }
-  }
 
-  const contactSheet = await buildContactSheet(browser, captures);
-  const result: EmailAcceptanceResult = {
-    generatorVersion: GENERATOR_VERSION,
-    previewStrategy: DARK_STRATEGY,
-    mailpitLabel: MAILPIT_LABEL,
-    mailpitVersion,
-    kinds: [...messages.keys()].sort(),
-    captures,
-    externalRequests: [...externalRequests].sort(),
-    contactSheet: contactSheet.file,
-  };
-  await writeFile(
-    path.join(evidenceDirectory, "manifest.json"),
-    `${JSON.stringify({ ...result, contactSheetSha256: contactSheet.sha256 }, null, 2)}\n`,
-    "utf8",
-  );
-  return result;
+    const contactSheet = await buildContactSheet(browser, captures, captureBytes);
+    const result: EmailAcceptanceResult = {
+      generatorVersion: GENERATOR_VERSION,
+      previewStrategy: DARK_STRATEGY,
+      mailpitLabel: MAILPIT_LABEL,
+      mailpitVersion,
+      kinds: [...messages.keys()].sort(),
+      captures,
+      externalRequests: [...externalRequests].sort(),
+      limits: EMAIL_EVIDENCE_LIMITS,
+      contactSheet,
+      totalEvidenceBytes: 0,
+    };
+    const binaryBytes = captureBytes + contactSheet.fileBytes;
+    let manifest = "";
+    for (let iteration = 0; iteration < 4; iteration += 1) {
+      manifest = `${JSON.stringify(result, null, 2)}\n`;
+      const nextTotal = binaryBytes + utf8Bytes(manifest);
+      assertTotalGeneratedEvidenceBytes(nextTotal);
+      if (result.totalEvidenceBytes === nextTotal) break;
+      result.totalEvidenceBytes = nextTotal;
+    }
+    manifest = `${JSON.stringify(result, null, 2)}\n`;
+    if (binaryBytes + utf8Bytes(manifest) !== result.totalEvidenceBytes) {
+      throw new Error("email_total_evidence_bytes_unstable");
+    }
+    await writeFile(path.join(evidenceDirectory, "manifest.json"), manifest, "utf8");
+    return result;
+  });
 };
