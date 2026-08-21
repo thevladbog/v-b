@@ -8,6 +8,11 @@ export interface ContactProductionConfig {
   captchaSecret: string;
 }
 
+export interface ContactWorkerConfig {
+  databaseUrl: string;
+  outboxEncryptionKey: Buffer;
+}
+
 const KEY_PATTERN = /^[0-9a-f]{64}$/i;
 
 const required = (environment: NodeJS.ProcessEnv, name: string): string => {
@@ -44,3 +49,10 @@ export const loadContactProductionConfig = (
     captchaSecret: required(environment, "SMARTCAPTCHA_SECRET"),
   };
 };
+
+export const loadContactWorkerConfig = (
+  environment: NodeJS.ProcessEnv = process.env,
+): ContactWorkerConfig => ({
+  databaseUrl: required(environment, "CONTACT_DATABASE_URL"),
+  outboxEncryptionKey: key(environment, "CONTACT_OUTBOX_ENCRYPTION_KEY"),
+});

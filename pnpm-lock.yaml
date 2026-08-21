@@ -20,6 +20,9 @@ importers:
       '@vbtech/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@vbtech/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       '@vbtech/legal-documents':
         specifier: workspace:*
         version: link:../../packages/legal-documents

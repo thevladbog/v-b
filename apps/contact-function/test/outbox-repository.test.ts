@@ -346,10 +346,10 @@ describe("outbox leasing and terminal ownership", () => {
     const [recovered] = await repository.leaseDue(1, "worker-b");
 
     await expect(
-      repository.markDelivered(recovered!.id, "worker-a", recovered!.attemptCount),
+      repository.markDelivered(recovered!.id, "worker-a", recovered!.attemptCount, "stale-message"),
     ).resolves.toBe("lease_lost");
     await expect(
-      repository.markDelivered(recovered!.id, "worker-b", recovered!.attemptCount),
+      repository.markDelivered(recovered!.id, "worker-b", recovered!.attemptCount, "provider-message"),
     ).resolves.toBe("updated");
     const row = await pool.query<{ delivered: boolean }>(
       "SELECT delivered_at IS NOT NULL AS delivered FROM email_outbox WHERE id = $1",
@@ -370,10 +370,10 @@ describe("outbox leasing and terminal ownership", () => {
     const [current] = await repository.leaseDue(1, "worker-a");
 
     await expect(
-      repository.markDelivered(stale!.id, "worker-a", stale!.attemptCount),
+      repository.markDelivered(stale!.id, "worker-a", stale!.attemptCount, "stale-message"),
     ).resolves.toBe("lease_lost");
     await expect(
-      repository.markDelivered(current!.id, "worker-a", current!.attemptCount),
+      repository.markDelivered(current!.id, "worker-a", current!.attemptCount, "provider-message"),
     ).resolves.toBe("updated");
   });
 

@@ -34,6 +34,7 @@ export interface OutboxLeaseRepository {
     jobId: string,
     workerId: string,
     attemptCount: number,
+    providerMessageId: string,
   ): Promise<StateUpdateResult>;
   reschedule(
     jobId: string,
@@ -47,6 +48,8 @@ export interface OutboxLeaseRepository {
     attemptCount: number,
   ): Promise<StateUpdateResult>;
 }
+
+export type OutboxDeliveryRepository = OutboxLeaseRepository;
 
 interface DurableContactRequest {
   locale: ContactRequest["locale"];
@@ -260,14 +263,27 @@ export class OutboxRepository implements OutboxLeaseRepository {
     jobId: string,
     workerId: string,
     attemptCount: number,
+    providerMessageId: string,
   ): Promise<StateUpdateResult> {
+    if (
+      providerMessageId.length < 1 ||
+      providerMessageId.length > 512 ||
+      /\p{Cc}/u.test(providerMessageId)
+    ) {
+      throw new Error("invalid_provider_message_id");
+    }
     return this.updateOwnedLease(
       jobId,
       workerId,
       attemptCount,
       `delivered_at = clock_timestamp(),
+       provider_message_id = $4,
+       payload_ciphertext = NULL,
+       payload_iv = NULL,
+       payload_auth_tag = NULL,
        lease_owner = NULL,
        lease_expires_at = NULL`,
+      [providerMessageId],
     );
   }
 
@@ -287,7 +303,7 @@ export class OutboxRepository implements OutboxLeaseRepository {
       `next_attempt_at = $4,
        lease_owner = NULL,
        lease_expires_at = NULL`,
-      nextAttemptAt,
+      [nextAttemptAt],
     );
   }
 
@@ -301,6 +317,9 @@ export class OutboxRepository implements OutboxLeaseRepository {
       workerId,
       attemptCount,
       `failed_at = clock_timestamp(),
+       payload_ciphertext = NULL,
+       payload_iv = NULL,
+       payload_auth_tag = NULL,
        lease_owner = NULL,
        lease_expires_at = NULL`,
     );
@@ -311,7 +330,7 @@ export class OutboxRepository implements OutboxLeaseRepository {
     workerId: string,
     attemptCount: number,
     assignment: string,
-    value?: Date,
+    values: unknown[] = [],
   ): Promise<StateUpdateResult> {
     assertLeaseInput(1, workerId);
     if (!Number.isInteger(attemptCount) || attemptCount < 1) {
@@ -328,9 +347,7 @@ export class OutboxRepository implements OutboxLeaseRepository {
            AND lease_expires_at > clock_timestamp()
            AND delivered_at IS NULL
            AND failed_at IS NULL`,
-        value === undefined
-          ? [jobId, workerId, attemptCount]
-          : [jobId, workerId, attemptCount, value],
+        [jobId, workerId, attemptCount, ...values],
       );
       return updated.rowCount === 1 ? "updated" : "lease_lost";
     } finally {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isContactSubmissionEnabled,
   loadContactProductionConfig,
+  loadContactWorkerConfig,
 } from "../src/config.js";
 
 const validEnvironment = (): NodeJS.ProcessEnv => ({
@@ -39,5 +40,19 @@ describe("contact production configuration", () => {
     expect(() => loadContactProductionConfig(environment)).toThrow(
       "contact_keys_must_be_distinct",
     );
+  });
+
+  // Catches a privilege/config coupling break that makes the timer require captcha or rate-limit secrets.
+  it("loads only the database and outbox key for the scheduled worker", () => {
+    const environment: NodeJS.ProcessEnv = {
+      CONTACT_DATABASE_URL: "postgresql://contact.invalid/contact",
+      CONTACT_OUTBOX_ENCRYPTION_KEY:
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    };
+
+    expect(loadContactWorkerConfig(environment)).toEqual({
+      databaseUrl: "postgresql://contact.invalid/contact",
+      outboxEncryptionKey: Buffer.from(environment.CONTACT_OUTBOX_ENCRYPTION_KEY!, "hex"),
+    });
   });
 });
