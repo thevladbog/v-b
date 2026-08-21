@@ -13,6 +13,9 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint"
   },
+  "dependencies": {
+    "pg": "8.22.0"
+  },
   "devDependencies": {
     "pnpm": "11.10.0",
     "turbo": "2.10.4"

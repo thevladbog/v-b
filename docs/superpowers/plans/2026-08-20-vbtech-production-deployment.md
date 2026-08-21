@@ -196,9 +196,9 @@ Expected: FAIL because resource definitions are absent.
 
 Reference existing network/cluster identifiers supplied through reviewed inputs. Do not create a VM or PostgreSQL cluster. Function runtime receives secret IDs, never secret values.
 
-- [ ] **Step 4: Implement bounded database bootstrap**
+- [ ] **Step 4: Implement bounded managed-database bootstrap**
 
-Script creates only the approved database, role grants and migrations after confirming target cluster identity. It refuses localhost/unknown cluster, prints object names but not passwords, and supports a read-only `--check` mode used before mutation.
+Provision the dedicated user and database through an explicitly approved Yandex Cloud control-plane workflow; Managed PostgreSQL does not support creating either through SQL. The script connects only as the pre-provisioned application owner, confirms exact cluster/database identity and strict TLS, proves it cannot connect to the protected database before any mutation, prints object names but not credentials, and supports a read-only `--check` mode. The approved `--apply` path changes only schema ownership and application objects inside `vbtech_contact`.
 
 - [ ] **Step 5: Validate offline and plan-only**
 

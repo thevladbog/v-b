@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      pg:
+        specifier: 8.22.0
+        version: 8.22.0
     devDependencies:
       pnpm:
         specifier: 11.10.0
