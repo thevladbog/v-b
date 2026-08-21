@@ -22,18 +22,20 @@ docker compose -f deploy/local/compose.yml ps
 docker compose -f deploy/local/compose.yml exec -T postgres \
   psql -U vbtech_test -d vbtech_contact_test -Atc 'SHOW server_version;'
 curl -fsS http://127.0.0.1:58025/api/v1/info
+curl -fsS http://127.0.0.1:58025/api/v1/webui
 ```
 
 Expected boundaries:
 
 - PostgreSQL is 17.x and is published only as `127.0.0.1:55432`;
 - Mailpit is v1.30.7, SMTP is `127.0.0.1:51025`, and UI/API is `127.0.0.1:58025`;
+- the Mailpit Web UI label is exactly `vbtech-task7-dedicated`; the test fails closed on any other origin, port, hostname alias, path, or label;
 - the local database, role, and password are disposable test-only values declared in Compose;
 - the images are pinned by both version tag and immutable digest.
 
 ## Run the local delivery proof
 
-The test refuses a non-loopback Mailpit origin. The existing database helper separately requires exact role/database identity `vbtech_test@vbtech_contact_test` on loopback before any schema reset.
+The test accepts only `http://127.0.0.1:58025/`, verifies the dedicated instance label, and queries/deletes only messages tagged `vbtech-task7`. It never clears an arbitrary loopback mailbox. A real-Mailpit regression seeds an unrelated untagged message and proves it survives Task 7 setup/cleanup. The existing database helper separately requires exact role/database identity `vbtech_test@vbtech_contact_test` on loopback before any schema reset.
 
 ```bash
 VBTECH_E2E=1 \
@@ -42,7 +44,7 @@ VBTECH_MAILPIT_API_URL='http://127.0.0.1:58025' \
 CI=1 corepack pnpm --filter @vbtech/contact-function test:e2e
 ```
 
-Without `VBTECH_E2E=1`, the two real-service tests are reported as skipped. When the flag is set, missing or unsafe URLs fail before service use.
+Without `VBTECH_E2E=1`, the three real-service tests are reported as skipped. When the flag is set, missing or unsafe URLs fail before service use.
 
 The configured run proves:
 
@@ -53,16 +55,29 @@ The configured run proves:
 - notification HTML and text contain the exact accepted consent ID;
 - delivered rows atomically clear ciphertext, IV, and authentication tag;
 - JSON telemetry contains request IDs and bounded state only, never synthetic visitor fields or captcha tokens.
+- `From`, `Reply-To`, and the outbox-derived deterministic `Message-ID` are exact for email notifications, Telegram notifications, and confirmations.
 
 ## Inspect the actual Mailpit messages
 
-Open `http://127.0.0.1:58025`. Exactly three messages should exist after a clean run:
+Open `http://127.0.0.1:58025`. Exactly four Task 7-tagged messages should exist after a clean run:
 
 1. `Новое обращение с v-b.tech` to `hello@v-b.tech`;
 2. `Ваше обращение с v-b.tech получено` to the synthetic RU visitor address;
 3. `New v-b.tech enquiry` to `hello@v-b.tech`.
+4. `We received your v-b.tech enquiry` to the synthetic EN acceptance address.
 
-For every message, inspect HTML and plain text at a desktop width near 1280 px and a mobile width near 390 px. Repeat with the browser/client colour scheme set to light and dark. Confirm:
+The first three messages are the durable repository/worker routing proof. The fourth is a visual-only EN confirmation rendered by the same shared production renderer and stored through the same Mailpit sender; it does not change the durable rule that Telegram receives no confirmation.
+
+Rebuild the complete ignored evidence set from the actual tagged Mailpit messages with the committed Playwright generator (version `1.0.0`):
+
+```bash
+VBTECH_MAILPIT_API_URL='http://127.0.0.1:58025' \
+CI=1 corepack pnpm --dir tools/browser accept:contact-emails
+```
+
+The bounded output is `.superpowers/sdd/2026-08-20-vbtech-contact-pipeline/task-7-evidence/`: 32 uniquely named captures, `manifest.json`, and `contact-sheet.png`. The generator enforces the exact origin and instance label, four exact subjects, desktop `1280×900` and mobile `390×844`, HTML/plain text, request IDs, confirmation links, no external body requests, and content/pixel SHA-256 hashes.
+
+For every message, inspect HTML and plain text at both sizes and modes. Dark captures use the documented deterministic `controlled-local-email-client-emulation-v1` palette layer. It mechanically proves that the requested mode was applied, that key text contrast is at least 4.5:1, and that every dark pixel hash differs from its light counterpart. It is regression evidence only, not a claim of Gmail, Outlook, Apple Mail, or other real-client acceptance. Confirm:
 
 - no horizontal clipping or unreadable contrast;
 - the RU and EN copy, subject, and footer are appropriate;

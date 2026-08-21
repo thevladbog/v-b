@@ -22,6 +22,7 @@ services:
     image: axllent/mailpit:v1.30.7@sha256:a0ec6df78d03abfa0328c76ccb16ff164eb9e08623ef7ddd6f0fd5a43ab35ed8
     environment:
       MP_DATABASE: /data/mailpit.db
+      MP_LABEL: vbtech-task7-dedicated
     ports:
       - "127.0.0.1:51025:1025"
       - "127.0.0.1:58025:8025"
