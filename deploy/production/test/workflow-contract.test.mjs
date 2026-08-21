@@ -39,6 +39,10 @@ test("CI covers repository, browser, database, and runtime-image gates without P
   assert.match(source, /corepack pnpm run test:db/);
   assert.match(source, /corepack pnpm run test:e2e/);
   assert.match(source, /docker build[\s\S]*deploy\/container\/web\.Dockerfile/);
+  assert.match(
+    source,
+    /curl[^\n]*\/__health[\s\S]*test "\$health_ready" = true[\s\S]*x-vbtech-release-sha/,
+  );
   assert.match(source, /^concurrency:/m);
 });
 
@@ -50,6 +54,7 @@ test("publish is a protected manual exact-SHA build that attests but never deplo
   assert.doesNotMatch(source, /^\s+(push|pull_request|schedule):\s*$/m);
   assert.match(source, /release_sha:[\s\S]*required:\s*true/);
   assert.match(source, /confirm_publish:[\s\S]*type:\s*boolean[\s\S]*default:\s*false/);
+  assert.match(source, /if:\s*github\.event\.inputs\.confirm_publish\s*==\s*'true'/);
   assert.match(source, /environment:\s*release-publish/);
   assert.match(source, /permissions:[\s\S]*contents:\s*read[\s\S]*packages:\s*write/);
   assert.match(source, /id-token:\s*write/);
@@ -58,7 +63,9 @@ test("publish is a protected manual exact-SHA build that attests but never deplo
   assert.match(source, /\[0-9a-f\]\{40\}/);
   assert.match(source, /IMAGE_TAG="\$IMAGE_REPOSITORY:\$RELEASE_SHA"/);
   assert.match(source, /docker manifest inspect "\$IMAGE_TAG"[\s\S]*Refusing to replace/);
-  assert.match(source, /docker image inspect[\s\S]*RepoDigests/);
+  assert.match(source, /docker image inspect[\s\S]*range \.RepoDigests/);
+  assert.match(source, /awk -v repository="\$IMAGE_REPOSITORY"/);
+  assert.doesNotMatch(source, /index \.RepoDigests 0/);
   assert.match(source, /corepack pnpm run build:function-artifact/);
   assert.match(source, /sha256sum[\s\S]*vbtech-contact-function\.zip/);
   assert.match(source, /actions\/attest@/);

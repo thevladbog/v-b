@@ -30,21 +30,26 @@ export function createDeterministicZip(entries) {
     throw new Error("function_archive_entries_required");
   }
   const names = new Set();
+  const stableEntries = entries
+    .map((entry) => {
+      if (
+        !entry ||
+        typeof entry.name !== "string" ||
+        !/^[A-Za-z0-9._-]{1,128}$/.test(entry.name) ||
+        names.has(entry.name) ||
+        !Buffer.isBuffer(entry.data)
+      ) {
+        throw new Error("invalid_function_archive_entry");
+      }
+      names.add(entry.name);
+      return { name: entry.name, data: entry.data };
+    })
+    .sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
   const localParts = [];
   const centralParts = [];
   let localOffset = 0;
 
-  for (const entry of entries) {
-    if (
-      !entry ||
-      typeof entry.name !== "string" ||
-      !/^[A-Za-z0-9._-]{1,128}$/.test(entry.name) ||
-      names.has(entry.name) ||
-      !Buffer.isBuffer(entry.data)
-    ) {
-      throw new Error("invalid_function_archive_entry");
-    }
-    names.add(entry.name);
+  for (const entry of stableEntries) {
     const name = Buffer.from(entry.name, "utf8");
     const checksum = crc32(entry.data);
 
@@ -89,8 +94,8 @@ export function createDeterministicZip(entries) {
   end.writeUInt32LE(0x06054b50, 0);
   end.writeUInt16LE(0, 4);
   end.writeUInt16LE(0, 6);
-  end.writeUInt16LE(entries.length, 8);
-  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt16LE(stableEntries.length, 8);
+  end.writeUInt16LE(stableEntries.length, 10);
   end.writeUInt32LE(centralDirectory.length, 12);
   end.writeUInt32LE(localOffset, 16);
   end.writeUInt16LE(0, 20);

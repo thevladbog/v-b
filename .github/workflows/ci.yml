@@ -62,12 +62,15 @@ jobs:
           docker run --detach --name vbtech-ci --read-only --cap-drop ALL \
             --tmpfs /data --tmpfs /config -p 127.0.0.1:18080:8080 \
             "ghcr.io/thevladbog/vbtech-web:$RELEASE_SHA"
+          health_ready=false
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error http://127.0.0.1:18080/__health >/dev/null; then
+              health_ready=true
               break
             fi
             sleep 1
           done
+          test "$health_ready" = true
           test "$(curl --fail --silent --show-error --head http://127.0.0.1:18080/ | tr -d '\r' | awk -F ': ' 'tolower($1) == "x-vbtech-release-sha" { print $2 }')" = "$RELEASE_SHA"
       - name: Show integration logs after failure
         if: failure()

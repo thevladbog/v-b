@@ -38,6 +38,15 @@ test("function ZIP bytes ignore process timezone and umask", () => {
   }
 });
 
+test("function ZIP bytes ignore caller entry order", () => {
+  const entries = [
+    { name: "package.json", data: Buffer.from('{"type":"commonjs"}\n') },
+    { name: "index.js", data: Buffer.from("exports.httpHandler = () => null;\n") },
+  ];
+
+  assert.deepEqual(createDeterministicZip(entries), createDeterministicZip([...entries].reverse()));
+});
+
 test("complete function builds are reproducible across timezone and umask", async () => {
   const temporary = await mkdtemp(join(tmpdir(), "vbtech-function-repro-"));
   const previousTimezone = process.env.TZ;

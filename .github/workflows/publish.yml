@@ -84,8 +84,11 @@ jobs:
             exit 1
           fi
           docker push "$IMAGE_TAG"
-          IMAGE_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE_TAG")"
-          IMAGE_DIGEST="${IMAGE_DIGEST#*@}"
+          REPOSITORY_DIGEST="$(docker image inspect \
+            --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE_TAG" \
+            | awk -v repository="$IMAGE_REPOSITORY" \
+              'index($0, repository "@") == 1 && !found { print; found = 1 } END { if (!found) exit 1 }')"
+          IMAGE_DIGEST="${REPOSITORY_DIGEST#*@}"
           [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           printf '%s\n' "digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
       - name: Create strict release manifest and checksums
