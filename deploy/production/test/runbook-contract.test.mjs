@@ -13,6 +13,16 @@ async function source(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
+function commandBody(source, title) {
+  const heading = `### Command: ${title}`;
+  const headingStart = source.indexOf(heading);
+  assert.ok(headingStart >= 0, `missing command ${title}`);
+  const fenceStart = source.indexOf("```bash\n", headingStart);
+  const fenceEnd = source.indexOf("\n```", fenceStart);
+  assert.ok(fenceStart >= 0 && fenceEnd > fenceStart, `missing bash body for ${title}`);
+  return source.slice(fenceStart + "```bash\n".length, fenceEnd);
+}
+
 function assertOrdered(source, labels) {
   let previous = -1;
   for (const label of labels) {
@@ -105,6 +115,15 @@ test("route smoke is supplemented by bounded legal-release and direct-contact ev
   const publication = await runbook("publication");
   const rollback = await runbook("rollback");
 
+  const expectedResponseOrder = [
+    "ru-home.html",
+    "en-home.html",
+    "ru-policy.html",
+    "en-policy.html",
+    "ru-consent.html",
+    "en-consent.html",
+  ];
+
   assert.match(publication, /17-check route smoke does not verify[^\n]*legal[^\n]*direct contacts/i);
   assert.match(publication, /### Command: Verify private legal releases and direct contacts/);
   assert.match(publication, /### Command: Verify public legal releases and direct contacts/);
@@ -115,6 +134,24 @@ test("route smoke is supplemented by bounded legal-release and direct-contact ev
     assert.match(document, /VBT-PD-02\/DRAFT/);
     assert.match(document, /mailto:hello@v-b\.tech/);
     assert.match(document, /https:\/\/t\.me\/thevladbog/);
+  }
+  for (const [document, title] of [
+    [publication, "Verify private legal releases and direct contacts"],
+    [publication, "Verify public legal releases and direct contacts"],
+    [rollback, "Verify preserved legal releases and direct contacts"],
+  ]) {
+    const command = commandBody(document, title);
+    const checksStart = command.indexOf("const checks = ");
+    const checksEnd = command.indexOf("; const hashes =", checksStart);
+    assert.ok(checksStart >= 0 && checksEnd > checksStart, `${title} must define hash order`);
+    const responseOrder = [...command.slice(checksStart, checksEnd).matchAll(
+      /"((?:ru|en)-(?:home|policy|consent)\.html)"/g,
+    )].map((match) => match[1]);
+
+    assert.deepEqual(responseOrder, expectedResponseOrder, `${title} hash order must be stable`);
+    assert.match(command, /import \{ createHash \} from "node:crypto"/);
+    assert.match(command, /createHash\("sha256"\)\.update\(body\)\.digest\("hex"\)/);
+    assert.match(command, /responses: hashes/);
   }
   assert.match(rollback, /tabletop[^\n]*legal\/contact evidence[^\n]*passed/i);
 });
