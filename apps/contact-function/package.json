@@ -1,0 +1,24 @@
+{
+  "name": "@vbtech/contact-function",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run test/crypto.test.ts",
+    "test:db": "vitest run test/outbox-repository.test.ts",
+    "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vbtech/contracts": "workspace:*",
+    "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "@types/pg": "8.23.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}
