@@ -35,6 +35,10 @@ const {
   noindex = false,
 } = Astro.props;
 const { skip } = SITE_CONTENT[locale];
+const releaseShaCandidate = import.meta.env.VBTECH_RELEASE_SHA;
+const releaseSha = /^[0-9a-f]{40}$/.test(releaseShaCandidate ?? "")
+  ? releaseShaCandidate
+  : undefined;
 const themeBootstrap = `(() => {
   const root = document.documentElement;
   let stored = null;
@@ -64,6 +68,7 @@ const themeBootstrap = `(() => {
 <html lang={locale}>
   <head>
     <meta charset="utf-8" />
+    {releaseSha && <meta name="vbtech-release-sha" content={releaseSha} />}
     <meta name="theme-color" content={THEME_COLORS.light} />
     <script is:inline set:html={themeBootstrap} />
     <link
