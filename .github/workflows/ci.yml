@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+      - name: Install exact dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: corepack pnpm --dir tools/browser exec playwright install --with-deps chromium
+      - name: Static and deployment contracts
+        run: |
+          corepack pnpm run lint
+          corepack pnpm run typecheck
+          corepack pnpm run test:contracts
+      - name: Unit and browser suites
+        run: corepack pnpm run test
+      - name: Start disposable integration services
+        run: docker compose -f deploy/local/compose.yml up -d --wait --wait-timeout 90
+      - name: Database and contact-pipeline suites
+        env:
+          VBTECH_TEST_DATABASE_URL: postgresql://vbtech_test:vbtech_test_only@127.0.0.1:55432/vbtech_contact_test
+          VBTECH_E2E: "1"
+          VBTECH_MAILPIT_API_URL: http://127.0.0.1:58025/
+        run: |
+          corepack pnpm run test:db
+          corepack pnpm run test:e2e
+      - name: Build the exact local runtime image
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: >-
+          docker build --load --file deploy/container/web.Dockerfile
+          --build-arg VBTECH_RELEASE_SHA="$RELEASE_SHA"
+          --tag "ghcr.io/thevladbog/vbtech-web:$RELEASE_SHA" .
+      - name: Smoke the read-only runtime image
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          docker run --detach --name vbtech-ci --read-only --cap-drop ALL \
+            --tmpfs /data --tmpfs /config -p 127.0.0.1:18080:8080 \
+            "ghcr.io/thevladbog/vbtech-web:$RELEASE_SHA"
+          health_ready=false
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/__health >/dev/null; then
+              health_ready=true
+              break
+            fi
+            sleep 1
+          done
+          test "$health_ready" = true
+          test "$(curl --fail --silent --show-error --head http://127.0.0.1:18080/ | tr -d '\r' | awk -F ': ' 'tolower($1) == "x-vbtech-release-sha" { print $2 }')" = "$RELEASE_SHA"
+      - name: Show integration logs after failure
+        if: failure()
+        run: docker compose -f deploy/local/compose.yml logs --no-color
+      - name: Remove owned containers and volumes
+        if: always()
+        run: |
+          docker rm --force vbtech-ci 2>/dev/null || true
+          docker compose -f deploy/local/compose.yml down --volumes --remove-orphans

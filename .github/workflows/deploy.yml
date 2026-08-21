@@ -1,0 +1,119 @@
+name: Prepare protected production deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_run_id:
+        description: Successful Publish immutable release workflow run ID
+        required: true
+        type: string
+      release_sha:
+        description: Exact 40-character published commit
+        required: true
+        type: string
+      submission_state:
+        description: Contact form state for this handoff
+        required: true
+        type: choice
+        options: [disabled]
+        default: disabled
+
+permissions:
+  actions: read
+  attestations: read
+  contents: read
+  packages: read
+
+concurrency:
+  group: vbtech-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  handoff:
+    name: Verify release and create deployment handoff (no remote mutation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-deploy
+    env:
+      PUBLISH_RUN_ID: ${{ github.event.inputs.publish_run_id }}
+      RELEASE_SHA: ${{ github.event.inputs.release_sha }}
+      VBTECH_SUBMISSION_STATE: disabled
+      IMAGE_REPOSITORY: ghcr.io/thevladbog/vbtech-web
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.inputs.release_sha }}
+          persist-credentials: false
+      - name: Verify the source publication run
+        run: |
+          set -euo pipefail
+          [[ "$PUBLISH_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PUBLISH_RUN_ID")"
+          [[ "$(jq -r '.path' <<<"$run")" == ".github/workflows/publish.yml" ]]
+          [[ "$(jq -r '.event' <<<"$run")" == "workflow_dispatch" ]]
+          [[ "$(jq -r '.conclusion' <<<"$run")" == "success" ]]
+          [[ "$(jq -r '.head_branch' <<<"$run")" == "main" ]]
+          [[ "$(jq -r '.head_sha' <<<"$run")" == "$RELEASE_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$RELEASE_SHA" ]]
+      - name: Download the exact published handoff
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: vbtech-release-${{ github.event.inputs.release_sha }}
+          path: ${{ runner.temp }}/vbtech-release
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.inputs.publish_run_id }}
+      - name: Authenticate for private GHCR verification
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Verify manifest, file checksum, attestations, and image digest
+        working-directory: ${{ runner.temp }}/vbtech-release
+        run: |
+          set -euo pipefail
+          test ! -L release-manifest.json
+          test ! -L vbtech-contact-function.zip
+          node "$GITHUB_WORKSPACE/deploy/production/release-artifact.mjs" validate \
+            release-manifest.json "$RELEASE_SHA" "$PUBLISH_RUN_ID" \
+            vbtech-contact-function.zip >/dev/null
+          sha256sum --check checksums.sha256
+          attestation_policy=(
+            --repo "$GITHUB_REPOSITORY"
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml"
+            --source-digest "$RELEASE_SHA"
+            --source-ref refs/heads/main
+          )
+          gh attestation verify vbtech-contact-function.zip "${attestation_policy[@]}"
+          gh attestation verify release-manifest.json "${attestation_policy[@]}"
+          IMAGE_DIGEST="$(jq -er '.image.digest' release-manifest.json)"
+          docker manifest inspect "$IMAGE_REPOSITORY@$IMAGE_DIGEST" >/dev/null
+          gh attestation verify "oci://$IMAGE_REPOSITORY@$IMAGE_DIGEST" "${attestation_policy[@]}"
+      - name: Create disabled deployment handoff
+        working-directory: ${{ runner.temp }}/vbtech-release
+        run: |
+          set -euo pipefail
+          [[ "$VBTECH_SUBMISSION_STATE" == "disabled" ]]
+          jq -n \
+            --arg releaseSha "$RELEASE_SHA" \
+            --arg publishRunId "$PUBLISH_RUN_ID" \
+            --arg submissionState "$VBTECH_SUBMISSION_STATE" \
+            --slurpfile release release-manifest.json \
+            '{schemaVersion: 1, releaseSha: $releaseSha, publishRunId: $publishRunId, submissionState: $submissionState, remoteMutation: false, executor: "not-configured", release: $release[0]}' \
+            > deployment-handoff.json
+          printf '%s\n' \
+            "### Deployment handoff verified" \
+            "" \
+            "Release: \`$RELEASE_SHA\`" \
+            "Submission: disabled" \
+            "Remote deployment executor is not configured; no server, cloud, DNS, database, or form state was changed." \
+            >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload verified deployment handoff
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vbtech-deployment-handoff-${{ github.event.inputs.release_sha }}
+          path: ${{ runner.temp }}/vbtech-release/deployment-handoff.json
+          if-no-files-found: error
+          retention-days: 7
