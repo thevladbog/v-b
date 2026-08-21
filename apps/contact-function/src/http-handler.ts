@@ -5,7 +5,11 @@ import {
   CURRENT_CONTACT_CONSENT_ID,
   assertContactConsentPublishable,
 } from "@vbtech/legal-documents";
-import { isContactSubmissionEnabled, loadContactProductionConfig } from "./config.js";
+import {
+  isContactSubmissionEnabled,
+  loadContactProductionConfig,
+  type ContactProductionConfig,
+} from "./config.js";
 import { isPublicContactError, publicError } from "./errors.js";
 import type { SubmitContact } from "./submit.js";
 
@@ -161,12 +165,35 @@ export const createHttpHandler = (dependencies: HttpHandlerDependencies) =>
     }
   };
 
-let productionSubmit: Promise<SubmitContact> | undefined;
+const PRODUCTION_CAPTCHA_TIMEOUT_MS = 1_000;
 
-const loadProductionSubmit = (): Promise<SubmitContact> => {
-  productionSubmit ??= (async () => {
-    assertContactConsentPublishable(CURRENT_CONTACT_CONSENT_ID, true);
-    const config = loadContactProductionConfig();
+export interface ProductionSubmitLoaderDependencies {
+  assertPublishable(): void;
+  loadConfig(): ContactProductionConfig;
+  compose(
+    config: ContactProductionConfig,
+    captchaTimeoutMs: number,
+  ): Promise<SubmitContact>;
+}
+
+export const createProductionSubmitLoader = (
+  dependencies: ProductionSubmitLoaderDependencies,
+): (() => Promise<SubmitContact>) => {
+  let cached: Promise<SubmitContact> | undefined;
+  return () => {
+    cached ??= (async () => {
+      dependencies.assertPublishable();
+      const config = dependencies.loadConfig();
+      return dependencies.compose(config, PRODUCTION_CAPTCHA_TIMEOUT_MS);
+    })();
+    return cached;
+  };
+};
+
+const composeProductionSubmit = async (
+  config: ContactProductionConfig,
+  captchaTimeoutMs: number,
+): Promise<SubmitContact> => {
     const [{ Pool }, { OutboxRepository }, { PostgresRateLimitRepository, RateLimiter }, { SmartCaptcha }, { createSubmitContact }] =
       await Promise.all([
         import("pg"),
@@ -184,19 +211,29 @@ const loadProductionSubmit = (): Promise<SubmitContact> => {
       ),
       captcha: new SmartCaptcha({
         secret: config.captchaSecret,
-        timeoutMs: config.captchaTimeoutMs,
+        timeoutMs: captchaTimeoutMs,
       }),
       repository: new OutboxRepository(pool, config.outboxEncryptionKey),
     });
-  })();
-  return productionSubmit;
 };
+
+const loadProductionSubmit = createProductionSubmitLoader({
+  assertPublishable: () =>
+    assertContactConsentPublishable(CURRENT_CONTACT_CONSENT_ID, true),
+  loadConfig: loadContactProductionConfig,
+  compose: composeProductionSubmit,
+});
 
 export const httpHandler = async (
   event: YandexHttpEvent,
   _context?: unknown,
 ): Promise<YandexHttpResponse> => {
   if (!isContactSubmissionEnabled()) return neutralNotFound();
+  try {
+    assertContactConsentPublishable(CURRENT_CONTACT_CONSENT_ID, true);
+  } catch {
+    return neutralNotFound();
+  }
   if (!exactRoute(event)) return neutralNotFound();
   try {
     const submitContact = await loadProductionSubmit();

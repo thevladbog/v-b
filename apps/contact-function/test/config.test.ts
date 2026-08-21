@@ -22,26 +22,22 @@ describe("contact production configuration", () => {
     );
   });
 
-  it("loads exact 32-byte distinct keys and the 1000 ms captcha default", () => {
-    const config = loadContactProductionConfig(validEnvironment());
+  it("loads exact 32-byte distinct keys without accepting a captcha timeout override", () => {
+    const environment = validEnvironment();
+    environment.SMARTCAPTCHA_TIMEOUT_MS = "100";
+    const config = loadContactProductionConfig(environment);
 
     expect(config.outboxEncryptionKey).toHaveLength(32);
     expect(config.rateLimitHmacKey).toHaveLength(32);
     expect(config.outboxEncryptionKey.equals(config.rateLimitHmacKey)).toBe(false);
-    expect(config.captchaTimeoutMs).toBe(1_000);
+    expect(config).not.toHaveProperty("captchaTimeoutMs");
   });
 
-  it("rejects key reuse and unbounded captcha timeouts", () => {
+  it("rejects key reuse", () => {
     const environment = validEnvironment();
     environment.CONTACT_RATE_LIMIT_HMAC_KEY = environment.CONTACT_OUTBOX_ENCRYPTION_KEY;
     expect(() => loadContactProductionConfig(environment)).toThrow(
       "contact_keys_must_be_distinct",
-    );
-
-    const timeoutEnvironment = validEnvironment();
-    timeoutEnvironment.SMARTCAPTCHA_TIMEOUT_MS = "60000";
-    expect(() => loadContactProductionConfig(timeoutEnvironment)).toThrow(
-      "invalid_smartcaptcha_timeout_ms",
     );
   });
 });

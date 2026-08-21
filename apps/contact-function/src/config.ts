@@ -6,13 +6,9 @@ export interface ContactProductionConfig {
   outboxEncryptionKey: Buffer;
   rateLimitHmacKey: Buffer;
   captchaSecret: string;
-  captchaTimeoutMs: number;
 }
 
 const KEY_PATTERN = /^[0-9a-f]{64}$/i;
-const DEFAULT_CAPTCHA_TIMEOUT_MS = 1_000;
-const MIN_CAPTCHA_TIMEOUT_MS = 100;
-const MAX_CAPTCHA_TIMEOUT_MS = 5_000;
 
 const required = (environment: NodeJS.ProcessEnv, name: string): string => {
   const value = environment[name];
@@ -26,17 +22,6 @@ const key = (environment: NodeJS.ProcessEnv, name: string): Buffer => {
   const value = required(environment, name);
   if (!KEY_PATTERN.test(value)) throw new Error(`invalid_${name.toLowerCase()}`);
   return Buffer.from(value, "hex");
-};
-
-const timeout = (environment: NodeJS.ProcessEnv): number => {
-  const raw = environment.SMARTCAPTCHA_TIMEOUT_MS;
-  if (raw === undefined) return DEFAULT_CAPTCHA_TIMEOUT_MS;
-  if (!/^\d+$/.test(raw)) throw new Error("invalid_smartcaptcha_timeout_ms");
-  const value = Number(raw);
-  if (value < MIN_CAPTCHA_TIMEOUT_MS || value > MAX_CAPTCHA_TIMEOUT_MS) {
-    throw new Error("invalid_smartcaptcha_timeout_ms");
-  }
-  return value;
 };
 
 export const isContactSubmissionEnabled = (
@@ -57,6 +42,5 @@ export const loadContactProductionConfig = (
     outboxEncryptionKey,
     rateLimitHmacKey,
     captchaSecret: required(environment, "SMARTCAPTCHA_SECRET"),
-    captchaTimeoutMs: timeout(environment),
   };
 };

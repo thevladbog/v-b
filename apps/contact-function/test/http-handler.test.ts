@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { PublicContactError } from "../src/errors.js";
-import { createHttpHandler, httpHandler, type YandexHttpEvent } from "../src/http-handler.js";
+import {
+  createHttpHandler,
+  createProductionSubmitLoader,
+  httpHandler,
+  type YandexHttpEvent,
+} from "../src/http-handler.js";
 
 const request = {
   requestId: "11111111-1111-4111-8111-111111111111",
@@ -65,6 +70,92 @@ describe("Yandex HTTP contact boundary", () => {
       if (previous === undefined) delete process.env.CONTACT_SUBMISSION_ENABLED;
       else process.env.CONTACT_SUBMISSION_ENABLED = previous;
     }
+  });
+
+  it("keeps every production route neutral when the flag is true but consent remains draft", async () => {
+    const previous = process.env.CONTACT_SUBMISSION_ENABLED;
+    process.env.CONTACT_SUBMISSION_ENABLED = "true";
+    try {
+      const responses = await Promise.all([
+        httpHandler(event()),
+        httpHandler(event({ path: "/not-contact" })),
+        httpHandler(event({ httpMethod: "GET" })),
+      ]);
+
+      expect(responses).toEqual([
+        {
+          statusCode: 404,
+          headers: {
+            "cache-control": "no-store",
+            "content-type": "text/plain; charset=utf-8",
+          },
+          body: "Not Found",
+          isBase64Encoded: false,
+        },
+        {
+          statusCode: 404,
+          headers: {
+            "cache-control": "no-store",
+            "content-type": "text/plain; charset=utf-8",
+          },
+          body: "Not Found",
+          isBase64Encoded: false,
+        },
+        {
+          statusCode: 404,
+          headers: {
+            "cache-control": "no-store",
+            "content-type": "text/plain; charset=utf-8",
+          },
+          body: "Not Found",
+          isBase64Encoded: false,
+        },
+      ]);
+    } finally {
+      if (previous === undefined) delete process.env.CONTACT_SUBMISSION_ENABLED;
+      else process.env.CONTACT_SUBMISSION_ENABLED = previous;
+    }
+  });
+
+  it("asserts legal readiness before composing production with exactly a 1000 ms captcha timeout", async () => {
+    const order: string[] = [];
+    let receivedTimeout: number | undefined;
+    const submit = vi.fn(async () => ({ accepted: true as const, requestId: request.requestId }));
+    const load = createProductionSubmitLoader({
+      assertPublishable: () => { order.push("legal"); },
+      loadConfig: () => {
+        order.push("config");
+        return {
+          databaseUrl: "postgresql://contact.invalid/contact",
+          outboxEncryptionKey: Buffer.alloc(32, 1),
+          rateLimitHmacKey: Buffer.alloc(32, 2),
+          captchaSecret: "server-secret",
+        };
+      },
+      compose: async (_config, timeoutMs) => {
+        order.push("compose");
+        receivedTimeout = timeoutMs;
+        return submit;
+      },
+    });
+
+    await expect(load()).resolves.toBe(submit);
+    expect(order).toEqual(["legal", "config", "compose"]);
+    expect(receivedTimeout).toBe(1_000);
+  });
+
+  it("does not read secrets or construct adapters when production legal readiness fails", async () => {
+    const loadConfig = vi.fn(() => { throw new Error("secrets_were_read"); });
+    const compose = vi.fn(async () => { throw new Error("adapters_were_constructed"); });
+    const load = createProductionSubmitLoader({
+      assertPublishable: () => { throw new Error("draft_consent"); },
+      loadConfig,
+      compose,
+    });
+
+    await expect(load()).rejects.toThrow("draft_consent");
+    expect(loadConfig).not.toHaveBeenCalled();
+    expect(compose).not.toHaveBeenCalled();
   });
 
   it.each([

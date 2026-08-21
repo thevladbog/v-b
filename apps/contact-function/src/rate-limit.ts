@@ -30,10 +30,18 @@ export class PostgresRateLimitRepository implements RateLimitRepository {
                     timestamptz '1970-01-01 00:00:00+00'
                   ) AS window_start
            FROM instant
+         ), expired_candidates AS MATERIALIZED (
+           SELECT network_source_hmac, window_start
+           FROM contact_rate_limits
+           WHERE window_expires_at <= (SELECT now FROM instant)
+           ORDER BY window_expires_at, network_source_hmac, window_start
+           FOR UPDATE SKIP LOCKED
+           LIMIT 100
          ), expired AS (
-           DELETE FROM contact_rate_limits
-           WHERE network_source_hmac = $1
-             AND window_expires_at <= (SELECT now FROM instant)
+           DELETE FROM contact_rate_limits AS rate_limit
+           USING expired_candidates AS candidate
+           WHERE rate_limit.network_source_hmac = candidate.network_source_hmac
+             AND rate_limit.window_start = candidate.window_start
          )
          INSERT INTO contact_rate_limits (
            network_source_hmac,
