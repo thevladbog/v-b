@@ -1,5 +1,6 @@
 import { render } from "@react-email/render";
 import { isEmailContact } from "@vbtech/contracts";
+import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import type { ReactElement } from "react";
 import { ContactConfirmation } from "./confirmation.js";
 import { ContactNotification } from "./notification.js";
@@ -25,13 +26,21 @@ async function renderEmail(subject: string, component: ReactElement): Promise<Re
   return { subject, html, text };
 }
 
-export function renderContactNotification(input: ContactEmailInput): Promise<RenderedEmail> {
+const assertCurrentConsent = (input: ContactEmailInput): void => {
+  if (input.consentId !== CURRENT_CONTACT_CONSENT_ID) {
+    throw new TypeError("Contact email consent identity is not current");
+  }
+};
+
+export async function renderContactNotification(input: ContactEmailInput): Promise<RenderedEmail> {
+  assertCurrentConsent(input);
   return renderEmail(subjects.notification[input.locale], <ContactNotification input={input} />);
 }
 
-export function renderContactConfirmation(input: ContactEmailInput): Promise<RenderedEmail> {
+export async function renderContactConfirmation(input: ContactEmailInput): Promise<RenderedEmail> {
+  assertCurrentConsent(input);
   if (!isEmailContact(input.contact)) {
-    return Promise.reject(new TypeError("Contact confirmation requires a valid email contact"));
+    throw new TypeError("Contact confirmation requires a valid email contact");
   }
 
   return renderEmail(subjects.confirmation[input.locale], <ContactConfirmation input={input} />);

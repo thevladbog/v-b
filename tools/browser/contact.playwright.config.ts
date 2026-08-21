@@ -2,14 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const port = 43_218;
-const baseURL = `http://127.0.0.1:${port}`;
+const baseURL = "http://127.0.0.1:43219";
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "**/*.spec.ts",
-  testIgnore: "**/contact.spec.ts",
-  outputDir: join(tmpdir(), "vbtech-task-8-playwright"),
+  testMatch: "**/contact.spec.ts",
+  outputDir: join(tmpdir(), "vbtech-contact-fixture-playwright"),
   fullyParallel: true,
   workers: 2,
   forbidOnly: Boolean(process.env.CI),
@@ -26,18 +24,12 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   projects: [
-    {
-      name: "Desktop Chrome",
-      use: { ...devices["Desktop Chrome"] },
-    },
-    {
-      name: "Pixel 7",
-      use: { ...devices["Pixel 7"] },
-    },
+    { name: "Desktop Chrome", use: { ...devices["Desktop Chrome"] } },
+    { name: "Pixel 7", use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
     command:
-      "corepack pnpm --dir ../../apps/web build && corepack pnpm --dir ../../apps/web exec astro preview --host 127.0.0.1 --port 43218",
+      "corepack pnpm --dir ../../apps/web build:contact-fixture && corepack pnpm --dir ../../apps/web preview:contact-fixture",
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

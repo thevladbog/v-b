@@ -117,11 +117,12 @@ describe("disabled contact shell", () => {
 
     expect(forms).toHaveLength(1);
     const form = forms[0]!;
-    expect(attr(form, "method")).toBe("post");
-    expect(attr(form, "action")).toBe("/api/contact");
+    expect(attr(form, "method")).toBeUndefined();
+    expect(attr(form, "action")).toBeUndefined();
     expect(attr(form, "novalidate")).toBe("");
     expect(attr(form, "data-submission-enabled")).toBe("false");
-    expect(attr(form, "data-consent-identity")).toBe(CURRENT_CONTACT_CONSENT_ID);
+    expect(attr(form, "data-consent-id")).toBe(CURRENT_CONTACT_CONSENT_ID);
+    expect(attr(form, "aria-busy")).toBe("false");
 
     const fieldset = elements(form, (node) => node.tagName === "fieldset")[0]!;
     expect(attr(fieldset, "disabled")).toBe("");
@@ -207,21 +208,22 @@ describe("disabled contact shell", () => {
   });
 
   it("ships no captcha or request-capable client runtime in the default build", async () => {
-    const directory = new URL("../dist/_astro/", import.meta.url);
-    const files = (await readdir(directory)).filter((file) => file.endsWith(".js"));
-    const externalJavascript = (
-      await Promise.all(files.map((file) => readFile(new URL(file, directory), "utf8")))
-    ).join("\n");
-    const html = `${await readBuilt("dist/index.html")}\n${await readBuilt("dist/en/index.html")}`;
-    const inlineJavascript = [...html.matchAll(/<script type="module"(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
-      .map((match) => match[1])
-      .join("\n");
-    const javascript = `${externalJavascript}\n${inlineJavascript}`;
+    const directory = new URL("../dist/", import.meta.url);
+    const emitted = (await readdir(directory, { recursive: true }))
+      .filter((file) => file.endsWith(".html") || file.endsWith(".js"));
+    const entries = await Promise.all(emitted.map(async (file) => ({
+      file,
+      body: await readFile(new URL(file, directory), "utf8"),
+    })));
+    const artifact = entries.map(({ body }) => body).join("\n");
+    const javascript = entries.filter(({ file }) => file.endsWith(".js")).map(({ body }) => body).join("\n");
 
-    expect(`${html}\n${javascript}`).not.toMatch(/smartcaptcha|captcha\.yandex|grecaptcha/i);
+    expect(artifact).not.toMatch(/\/api\/contact/i);
+    expect(artifact).not.toMatch(/smartcaptcha\.cloud\.yandex\.ru|captcha\.js|window\.smartCaptcha|grecaptcha/i);
     expect(javascript).not.toMatch(/\bfetch\s*\(|\bXMLHttpRequest\b|\.sendBeacon\s*\(/);
     expect(javascript).not.toContain(CURRENT_CONTACT_CONSENT_ID);
-    expect(html).not.toContain('data-submission-enabled="true"');
+    expect(artifact).not.toContain('data-submission-enabled="true"');
+    expect(artifact).not.toContain("vbtech-internal-fixture-site-key");
   });
 });
 

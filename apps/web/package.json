@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "build": "astro build",
+    "build:contact-fixture": "VBTECH_INTERNAL_CONTACT_FIXTURE=1 astro build --config test-fixture/astro.config.mjs",
+    "preview:contact-fixture": "VBTECH_INTERNAL_CONTACT_FIXTURE=1 astro preview --config test-fixture/astro.config.mjs --host 127.0.0.1 --port 43219",
     "test": "astro build && vitest run",
     "package-manager:contract": "node ../../scripts/assert-pnpm-runtime.mjs",
     "typecheck": "astro check",
@@ -11,11 +13,14 @@
   },
   "dependencies": {
     "@vbtech/content": "workspace:*",
+    "@vbtech/contracts": "workspace:*",
     "@vbtech/legal-documents": "workspace:*",
     "astro": "7.1.6"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.4",
+    "@vbtech/contact-function": "workspace:*",
+    "@vbtech/email": "workspace:*",
     "parse5": "7.3.0",
     "typescript": "5.9.3",
     "vitest": "4.1.10"

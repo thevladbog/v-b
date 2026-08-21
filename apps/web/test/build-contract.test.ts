@@ -48,4 +48,25 @@ describe("root acceptance gate contract", () => {
     expect(source).toContain("assertSharedChromeStyles");
     expect(source).toContain("assertLocalRequests");
   });
+
+  it("keeps the enabled contact harness private, loopback-only, and outside deploy output", async () => {
+    const [fixtureConfig, fixturePage, webPackage, browserPackage] = await Promise.all([
+      readFile(new URL("../test-fixture/astro.config.mjs", import.meta.url), "utf8"),
+      readFile(new URL("../test-fixture/src/FixturePage.astro", import.meta.url), "utf8"),
+      readFile(new URL("../package.json", import.meta.url), "utf8"),
+      readFile(new URL("../../../tools/browser/package.json", import.meta.url), "utf8"),
+    ]);
+
+    expect(fixtureConfig).toContain('process.env.VBTECH_INTERNAL_CONTACT_FIXTURE !== "1"');
+    expect(fixtureConfig).toContain('outDir: join(tmpdir(), "vbtech-contact-fixture-dist")');
+    expect(fixtureConfig).toContain('site: "http://127.0.0.1:43219"');
+    expect(fixturePage).toContain('siteKey: "vbtech-internal-fixture-site-key"');
+    expect(JSON.parse(webPackage).scripts).toMatchObject({
+      build: "astro build",
+      "build:contact-fixture": "VBTECH_INTERNAL_CONTACT_FIXTURE=1 astro build --config test-fixture/astro.config.mjs",
+    });
+    expect(JSON.parse(browserPackage).scripts.test).toBe(
+      "playwright test --config playwright.config.ts && playwright test --config contact.playwright.config.ts",
+    );
+  });
 });

@@ -1,0 +1,44 @@
+---
+import { SITE_CONTENT, type Locale } from "@vbtech/content";
+import ContactForm from "../../src/components/ContactForm.astro";
+import "../../src/styles/global.css";
+import "../../src/styles/landing.css";
+
+interface Props { locale: Locale }
+const { locale } = Astro.props;
+const content = SITE_CONTENT[locale].contact;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Internal contact fixture</title>
+  </head>
+  <body>
+    <main id="main-content">
+      <section class="contact-panel" aria-label={content.formTitle}>
+        <ContactForm
+          locale={locale}
+          content={content}
+          internalContactFixture={{
+            siteKey: "vbtech-internal-fixture-site-key",
+            loadTimeoutMs: 300,
+          }}
+        />
+      </section>
+    </main>
+    <script>
+      import { initializeContactForms } from "../../src/scripts/contact-form";
+      initializeContactForms();
+    </script>
+  </body>
+</html>
+
+<style>
+  body { min-height: 100vh; padding: 2rem 1rem; }
+  main { width: min(100%, 48rem); margin-inline: auto; }
+  .contact-panel { scroll-margin-top: 1rem; }
+</style>

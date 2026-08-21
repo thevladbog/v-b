@@ -48,6 +48,9 @@ importers:
       '@vbtech/content':
         specifier: workspace:*
         version: link:../../packages/content
+      '@vbtech/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@vbtech/legal-documents':
         specifier: workspace:*
         version: link:../../packages/legal-documents
@@ -58,6 +61,12 @@ importers:
       '@astrojs/check':
         specifier: 0.9.4
         version: 0.9.4(prettier@3.9.6)(typescript@5.9.3)
+      '@vbtech/contact-function':
+        specifier: workspace:*
+        version: link:../contact-function
+      '@vbtech/email':
+        specifier: workspace:*
+        version: link:../../packages/email
       parse5:
         specifier: 7.3.0
         version: 7.3.0

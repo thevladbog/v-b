@@ -6,9 +6,9 @@ import {
 } from "../src/lib/form-state.js";
 
 describe("contact form state", () => {
-  it("normalizes surrounding whitespace without changing contact casing", () => {
+  it("normalizes surrounding whitespace, lower-cases email, and preserves Telegram casing", () => {
     expect(normalizeContact("  @TheVlad_Bog  ")).toBe("@TheVlad_Bog");
-    expect(normalizeContact("  Person@Example.COM  ")).toBe("Person@Example.COM");
+    expect(normalizeContact("  Person@Example.COM  ")).toBe("person@example.com");
   });
 
   it.each(["ru", "en"] as const)(

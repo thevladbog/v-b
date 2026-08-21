@@ -4,28 +4,49 @@ import type { Locale, SiteContent } from "@vbtech/content";
 import { localizedPath } from "../lib/locale.js";
 import { resolveContactSubmissionReadiness } from "../lib/form-state.js";
 
+interface InternalContactFixture {
+  siteKey: string;
+  loadTimeoutMs: number;
+}
+
 interface Props {
   locale: Locale;
   content: SiteContent["contact"];
+  internalContactFixture?: InternalContactFixture;
 }
 
-const { locale, content } = Astro.props;
-const readiness = resolveContactSubmissionReadiness(PUBLIC_CONTACT_SUBMISSION_ENABLED);
+const { locale, content, internalContactFixture } = Astro.props;
+const fixtureRequested = internalContactFixture !== undefined;
+if (fixtureRequested && Astro.site?.origin !== "http://127.0.0.1:43219") {
+  throw new Error("The internal contact fixture is restricted to its loopback-only build");
+}
+const defaultReadiness = resolveContactSubmissionReadiness(PUBLIC_CONTACT_SUBMISSION_ENABLED);
+const readiness = fixtureRequested
+  ? { ...defaultReadiness, submissionEnabled: true }
+  : defaultReadiness;
 const disabled = !readiness.submissionEnabled;
+const fixtureNotice = locale === "ru"
+  ? `ВНУТРЕННИЙ ТЕСТОВЫЙ СТЕНД — ${readiness.consentIdentity} не действует; эта страница не предназначена для публикации.`
+  : `INTERNAL TEST FIXTURE — ${readiness.consentIdentity} is not active; this page is not deployable.`;
 ---
 
 <div class="contact-form-shell">
   <h3 id="contact-form-title">{content.formTitle}</h3>
-  <p class="contact-form-disabled" id="contact-form-disabled">{content.formDisabled}</p>
+  <p class="contact-form-disabled" id="contact-form-disabled">{fixtureRequested ? fixtureNotice : content.formDisabled}</p>
 
   <form
-    method="post"
-    action="/api/contact"
+    method={readiness.submissionEnabled ? "post" : undefined}
+    action={readiness.submissionEnabled ? "/api/contact" : undefined}
     novalidate
     data-contact-form
     data-submission-enabled={String(readiness.submissionEnabled)}
-    data-consent-identity={readiness.consentIdentity}
+    data-consent-id={readiness.consentIdentity}
+    data-source-path={locale === "ru" ? "/" : "/en/"}
+    data-captcha-site-key={internalContactFixture?.siteKey}
+    data-captcha-load-timeout-ms={internalContactFixture?.loadTimeoutMs}
+    data-internal-test-fixture={fixtureRequested ? "true" : undefined}
     data-error-summary-message={content.errorSummary}
+    aria-busy="false"
     aria-labelledby="contact-form-title"
     aria-describedby="contact-form-disabled contact-form-note"
   >
@@ -117,6 +138,7 @@ const disabled = !readiness.submissionEnabled;
       <button class="contact-submit" type="submit" disabled={disabled}>{content.formSubmit}</button>
     </fieldset>
 
+    <div class="contact-captcha" data-contact-captcha></div>
     <p id="contact-form-note" class="contact-form-note">{content.formNote}</p>
     <p data-contact-status role="status" aria-live="polite" aria-atomic="true"></p>
   </form>
