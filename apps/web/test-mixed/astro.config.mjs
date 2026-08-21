@@ -5,24 +5,25 @@ import { defineConfig, envField } from "astro/config";
 import { createContactRuntimeIntegration } from "../src/integrations/contact-runtime.ts";
 import { CURRENT_PERSONAL_DATA_LEGAL_CONTOUR } from "./legal-documents.ts";
 
-const activeOrigin = "http://127.0.0.1:43229";
-const activeOutDir = join(tmpdir(), "vbtech-contact-active-dist");
-const publicSiteKey = process.env.VBTECH_PRIVATE_ACTIVE_PUBLIC_SITE_KEY ??
-  "vbtech-reviewed-active-public-site-key";
-
-if (process.env.VBTECH_PRIVATE_ACTIVE_LEGAL_ARTIFACT !== "1") {
-  throw new Error("The production-shaped contact contour requires its explicit private ACTIVE legal-artifact guard");
+const direction = process.env.VBTECH_PRIVATE_MIXED_LEGAL_CONTOUR;
+if (direction !== "policy-active" && direction !== "consent-active") {
+  throw new Error("The mixed legal contour requires an explicit private direction guard");
 }
 
+const origin = "http://127.0.0.1:43239";
+const outDir = join(tmpdir(), `vbtech-contact-mixed-${direction}-dist`);
+const submissionRequested = process.env.PUBLIC_CONTACT_SUBMISSION_ENABLED === "true";
+const publicSiteKey = process.env.PUBLIC_SMARTCAPTCHA_SITE_KEY ?? "";
+
 const exactPrivateContour = {
-  name: "vbtech-private-active-contact-contour",
+  name: "vbtech-private-mixed-legal-contour",
   hooks: {
     "astro:config:done": ({ config }) => {
-      if (String(config.site).replace(/\/$/, "") !== activeOrigin) {
-        throw new Error("The private ACTIVE contact artifact is restricted to its exact loopback origin");
+      if (String(config.site).replace(/\/$/, "") !== origin) {
+        throw new Error("The mixed legal contour is restricted to its exact loopback origin");
       }
-      if (fileURLToPath(config.outDir).replace(/\/$/, "") !== activeOutDir) {
-        throw new Error("The private ACTIVE contact artifact is restricted to its OS-temporary output");
+      if (fileURLToPath(config.outDir).replace(/\/$/, "") !== outDir) {
+        throw new Error("The mixed legal contour is restricted to its OS-temporary output");
       }
     },
   },
@@ -30,14 +31,14 @@ const exactPrivateContour = {
 
 export default defineConfig({
   root: fileURLToPath(new URL("../", import.meta.url)),
-  outDir: activeOutDir,
-  site: activeOrigin,
+  outDir,
+  site: origin,
   output: "static",
   trailingSlash: "always",
   integrations: [
     exactPrivateContour,
     createContactRuntimeIntegration({
-      submissionRequested: true,
+      submissionRequested,
       legalReady: CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.status === "active",
       publicSiteKey,
     }),
@@ -47,7 +48,7 @@ export default defineConfig({
       PUBLIC_CONTACT_SUBMISSION_ENABLED: envField.boolean({
         context: "client",
         access: "public",
-        default: true,
+        default: submissionRequested,
       }),
       PUBLIC_SMARTCAPTCHA_SITE_KEY: envField.string({
         context: "client",

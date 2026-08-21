@@ -1,5 +1,5 @@
 import {
-  CURRENT_CONTACT_CONSENT_ID,
+  CURRENT_PERSONAL_DATA_LEGAL_CONTOUR,
   assertContactConsentPublishable,
 } from "@vbtech/legal-documents";
 export {
@@ -20,9 +20,10 @@ export interface ContactSubmissionReadiness {
 export function resolveContactSubmissionReadiness(
   submissionEnabled: boolean,
 ): ContactSubmissionReadiness {
-  assertContactConsentPublishable(CURRENT_CONTACT_CONSENT_ID, submissionEnabled);
+  const consentIdentity = CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.consent.identity;
+  assertContactConsentPublishable(consentIdentity, submissionEnabled);
   return {
     submissionEnabled,
-    consentIdentity: CURRENT_CONTACT_CONSENT_ID,
+    consentIdentity,
   };
 }

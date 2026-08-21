@@ -149,10 +149,10 @@ describe("private production-shaped ACTIVE contact artifact", () => {
     for (const phrase of forbiddenActivePhrases) expect(artifact).not.toContain(phrase);
   });
 
-  it("contains no DRAFT, disabled, or no-transmission copy on any ACTIVE RU/EN landing or legal route", async () => {
-    const htmlFiles = (await readdir(activeOutDir, { recursive: true }))
-      .filter((file) => file.endsWith(".html"));
-    const artifact = (await Promise.all(htmlFiles.map((file) => readFile(join(activeOutDir, file), "utf8")))).join("\n");
+  it("contains no DRAFT, disabled, or no-transmission material in ACTIVE HTML or client output", async () => {
+    const emitted = (await readdir(activeOutDir, { recursive: true }))
+      .filter((file) => /\.(?:html|js|mjs)$/.test(file));
+    const artifact = (await Promise.all(emitted.map((file) => readFile(join(activeOutDir, file), "utf8")))).join("\n");
     for (const phrase of forbiddenActivePhrases) expect(artifact).not.toContain(phrase);
   });
 

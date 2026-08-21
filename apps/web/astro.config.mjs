@@ -1,10 +1,10 @@
 import { defineConfig, envField } from "astro/config";
-import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
+import { CURRENT_PERSONAL_DATA_LEGAL_CONTOUR } from "@vbtech/legal-documents";
 import { createContactRuntimeIntegration } from "./src/integrations/contact-runtime.ts";
 
 const submissionRequested = process.env.PUBLIC_CONTACT_SUBMISSION_ENABLED === "true";
 const publicSiteKey = process.env.PUBLIC_SMARTCAPTCHA_SITE_KEY ?? "";
-const legalReady = !CURRENT_CONTACT_CONSENT_ID.endsWith("/DRAFT");
+const legalReady = CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.status === "active";
 
 export default defineConfig({
   site: "https://v-b.tech",

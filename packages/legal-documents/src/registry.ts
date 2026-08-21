@@ -2,6 +2,10 @@ import { CONSENT_CONTENT } from "./documents/consent.js";
 import { PRIVACY_CONTENT } from "./documents/privacy.js";
 import { LEGAL_DOCUMENT_CONTRACTS, LEGAL_REQUIREMENT_EVIDENCE } from "./contracts.js";
 import { isValidIsoDate, isValidLegalRevision } from "./identity.js";
+import {
+  deriveCurrentLegalReleases,
+  derivePersonalDataLegalContour,
+} from "./contour.js";
 import type {
   LegalDocumentCode,
   LegalDocumentRelease,
@@ -11,6 +15,8 @@ import type {
   LegalLocale,
   LegalBlock,
 } from "./types.js";
+
+export { deriveCurrentLegalReleases, derivePersonalDataLegalContour } from "./contour.js";
 
 export const LEGAL_SOURCE_REVIEW = {
   reviewedOn: "2026-08-20",
@@ -41,7 +47,7 @@ export const LEGAL_ACTIVATION_CHECKLIST = [
   "Reverify provider contracting entities, roles, regions, and current terms.",
   "Confirm the complete production data, retention, security, and localization inventory.",
   "Assign a valid public revision and effective date only after approvals.",
-  "Replace draft identities atomically and rerun all lifecycle and generated-page gates.",
+  "Publish current PD01 policy and PD02 consent identities atomically; the shared contour rejects either mixed direction.",
   "Keep submission disabled until the active consent identity is deployed across site and function.",
 ] as const;
 
@@ -75,77 +81,6 @@ const CODES = ["VBT-PD-01", "VBT-PD-02"] as const;
 const STATUSES = ["draft", "active", "superseded", "withdrawn"] as const;
 const ROUTE_PATTERN = /^\/(?:en\/)?[a-z0-9-]+(?:\/[a-z0-9-]+)*\/$/;
 const SECTION_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-
-export function deriveCurrentLegalReleases(
-  releases: readonly LegalDocumentRelease[],
-): readonly LegalDocumentRelease[] {
-  const byIdentity = new Map(releases.map((release) => [release.identity, release]));
-  if (byIdentity.size !== releases.length) {
-    throw new Error("Duplicate release identity prevents current legal release derivation");
-  }
-  const incomingSupersedes = new Map<string, string>();
-
-  for (const release of releases) {
-    if (release.status === "draft" || !release.supersedes) continue;
-    const target = byIdentity.get(release.supersedes);
-    if (!target) {
-      throw new Error(
-        `Supersedes target ${release.supersedes} for ${release.identity} does not exist`,
-      );
-    }
-    if (target.code !== release.code) {
-      throw new Error(
-        `Supersedes target ${target.identity} must use the same document code as ${release.identity}`,
-      );
-    }
-    if (target.status !== "superseded") {
-      throw new Error(`Supersedes target ${target.identity} must have status superseded`);
-    }
-    const existingSuccessor = incomingSupersedes.get(target.identity);
-    if (existingSuccessor) {
-      throw new Error(
-        `Multiple releases supersede ${target.identity}: ${existingSuccessor} and ${release.identity}`,
-      );
-    }
-    incomingSupersedes.set(target.identity, release.identity);
-  }
-
-  for (const release of releases) {
-    if (release.status === "superseded" && !incomingSupersedes.has(release.identity)) {
-      throw new Error(
-        `Superseded release ${release.identity} must be referenced by exactly one successor`,
-      );
-    }
-  }
-
-  const visited = new Set<string>();
-  const visiting = new Set<string>();
-  const visit = (release: LegalDocumentRelease): void => {
-    if (visited.has(release.identity)) return;
-    if (visiting.has(release.identity)) {
-      throw new Error(`Legal supersedes graph contains a cycle at ${release.identity}`);
-    }
-    visiting.add(release.identity);
-    if (release.status !== "draft" && release.supersedes) {
-      const target = byIdentity.get(release.supersedes);
-      if (target) visit(target);
-    }
-    visiting.delete(release.identity);
-    visited.add(release.identity);
-  };
-  releases.forEach(visit);
-
-  return CODES.map((code) => {
-    const releasesForCode = releases.filter((release) => release.code === code);
-    const active = releasesForCode.filter((release) => release.status === "active");
-    const drafts = releasesForCode.filter((release) => release.status === "draft");
-    if (active.length > 1) throw new Error(`Multiple active releases for ${code}`);
-    if (drafts.length > 1) throw new Error(`Multiple draft releases for ${code}`);
-    const current = active[0] ?? drafts[0];
-    if (!current) throw new Error(`No current active or draft legal release for ${code}`);
-    return current;
-  });
-}
 
 function assertLocaleRoutes(release: LegalDocumentRelease): void {
   const routes = release.routes as Partial<Record<LegalLocale, string>>;
@@ -391,14 +326,12 @@ export function validateLegalRegistry(
 
 validateLegalRegistry(LEGAL_RELEASES, LEGAL_DOCUMENTS);
 
-const CURRENT_RELEASES = deriveCurrentLegalReleases(LEGAL_RELEASES);
-const CURRENT_CONTACT_CONSENT_CANDIDATE = CURRENT_RELEASES.find(
-  ({ code }) => code === "VBT-PD-02",
-);
-if (!CURRENT_CONTACT_CONSENT_CANDIDATE) {
-  throw new Error("Current contact consent candidate is missing");
-}
-export const CURRENT_CONTACT_CONSENT_ID = CURRENT_CONTACT_CONSENT_CANDIDATE.identity;
+export const CURRENT_PERSONAL_DATA_LEGAL_CONTOUR = derivePersonalDataLegalContour(LEGAL_RELEASES);
+const CURRENT_RELEASES = [
+  CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.policy,
+  CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.consent,
+] as const;
+export const CURRENT_CONTACT_CONSENT_ID = CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.consent.identity;
 
 function viewFor(release: LegalDocumentRelease, locale: LegalLocale): LegalDocumentView {
   const source = LEGAL_DOCUMENTS.find(({ releaseIdentity }) => releaseIdentity === release.identity);
@@ -441,14 +374,10 @@ export function assertContactConsentPublishable(
   submissionEnabled: boolean,
 ): void {
   if (!submissionEnabled) return;
-  if (consentIdentity.endsWith("/DRAFT")) {
+  if (CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.status === "draft") {
     throw new Error(`Draft consent ${consentIdentity} cannot be used when submission is enabled`);
   }
-  const activeConsent = CURRENT_RELEASES.find(
-    ({ code, status, identity }) =>
-      code === "VBT-PD-02" && status === "active" && identity === consentIdentity,
-  );
-  if (!activeConsent) {
+  if (CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.consent.identity !== consentIdentity) {
     throw new Error(`Consent ${consentIdentity} is not an active publishable consent`);
   }
 }

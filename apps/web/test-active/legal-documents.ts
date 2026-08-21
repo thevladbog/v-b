@@ -1,6 +1,8 @@
+import { derivePersonalDataLegalContour } from "../../../packages/legal-documents/src/contour.ts";
 import type {
   LegalDocumentCode,
   LegalDocumentLocaleContent,
+  LegalDocumentRelease,
   LegalDocumentView,
   LegalLocale,
   LegalPublishedIdentity,
@@ -12,12 +14,24 @@ const revision = "2099.01/01" as const;
 const effectiveDate = "2099-01-01" as const;
 const identity = (code: LegalDocumentCode): LegalPublishedIdentity => `${code}/${revision}`;
 
-export const CURRENT_CONTACT_CONSENT_ID = identity("VBT-PD-02");
-
 const routes = {
   "VBT-PD-01": { ru: "/privacy/", en: "/en/privacy/" },
   "VBT-PD-02": { ru: "/personal-data-consent/", en: "/en/personal-data-consent/" },
 } as const;
+
+const currentReleases = (["VBT-PD-01", "VBT-PD-02"] as const).map((code) => ({
+  code,
+  identity: identity(code),
+  revision,
+  effectiveDate,
+  status: "active",
+  operatorProfileId: "operator-vbtech-2026-08-20",
+  routes: routes[code],
+})) satisfies readonly LegalDocumentRelease[];
+
+export const CURRENT_PERSONAL_DATA_LEGAL_CONTOUR =
+  derivePersonalDataLegalContour(currentReleases);
+export const CURRENT_CONTACT_CONSENT_ID = CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.consent.identity;
 
 const copy = {
   ru: {
@@ -78,23 +92,21 @@ const contentFor = (
 const documentFor = (
   code: LegalDocumentCode,
   locale: LegalLocale,
-): LegalDocumentView => ({
-  code,
-  identity: identity(code),
-  revision,
-  effectiveDate,
-  status: "active",
-  operatorProfileId: "operator-vbtech-2026-08-20",
-  routes: routes[code],
-  content: contentFor(code, locale),
-});
+): LegalDocumentView => {
+  const release = currentReleases.find((candidate) => candidate.code === code);
+  if (!release) throw new Error(`Missing private active legal release for ${code}`);
+  return { ...release, content: contentFor(code, locale) };
+};
 
 export function assertContactConsentPublishable(
   consentIdentity: string,
   submissionEnabled: boolean,
 ): void {
   if (!submissionEnabled) return;
-  if (consentIdentity !== CURRENT_CONTACT_CONSENT_ID) {
+  if (
+    CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.status !== "active" ||
+    consentIdentity !== CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.consent.identity
+  ) {
     throw new Error(`Consent ${consentIdentity} is not the private active test consent`);
   }
 }

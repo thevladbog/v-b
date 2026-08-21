@@ -1,10 +1,13 @@
 ---
-import { listCurrentLegalDocuments } from "@vbtech/legal-documents";
+import {
+  CURRENT_PERSONAL_DATA_LEGAL_CONTOUR,
+  listCurrentLegalDocuments,
+} from "@vbtech/legal-documents";
 import LegalLayout from "../../../layouts/LegalLayout.astro";
 
 const locale = "en";
 const documents = listCurrentLegalDocuments(locale);
-const registryStatus = documents.every((document) => document.status === "draft") ? "draft" : "active";
+const registryStatus = CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.status;
 const title = registryStatus === "draft" ? "v-b.tech legal documents — drafts" : "v-b.tech legal documents";
 const description = registryStatus === "draft"
   ? "Register of v-b.tech draft documents: the personal data processing policy and consent for the future enquiry form."
