@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -145,6 +146,10 @@ test("route smoke is supplemented by bounded legal-release and direct-contact ev
     ["ru-consent.html", "RU VBT-PD-02/DRAFT body-canary-ru-consent"],
     ["en-consent.html", "EN VBT-PD-02/DRAFT body-canary-en-consent"],
   ]);
+  const expectedResponses = [...fixtures].map(([file, body]) => ({
+    file,
+    sha256: createHash("sha256").update(body, "utf8").digest("hex"),
+  }));
 
   assert.match(publication, /17-check route smoke does not verify[^\n]*legal[^\n]*direct contacts/i);
   assert.match(publication, /### Command: Verify private legal releases and direct contacts/);
@@ -184,6 +189,7 @@ test("route smoke is supplemented by bounded legal-release and direct-contact ev
         assert.deepEqual(Object.keys(response), ["file", "sha256"]);
         assert.match(response.sha256, /^[0-9a-f]{64}$/);
       }
+      assert.deepEqual(output.responses, expectedResponses, `${title} hashes exact response bytes`);
       assert.doesNotMatch(stdout, /body-canary/);
     }
   } finally {
