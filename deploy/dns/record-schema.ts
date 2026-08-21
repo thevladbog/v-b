@@ -50,6 +50,19 @@ export interface ReplaceRecordMergeRule {
   readonly currentValues: readonly string[];
 }
 
+export interface CurrentOwnerRecord {
+  readonly type: DnsRecordType;
+  readonly value: string;
+}
+
+export interface ReplaceCnameOwnerRecordsRule {
+  readonly id: string;
+  readonly kind: "replace-cname-owner-records";
+  readonly name: string;
+  readonly type: DnsRecordType;
+  readonly currentRecords: readonly CurrentOwnerRecord[];
+}
+
 export interface AppendSpfMechanismMergeRule {
   readonly id: string;
   readonly kind: "append-spf-mechanism";
@@ -59,7 +72,7 @@ export interface AppendSpfMechanismMergeRule {
   readonly providerValue: string;
 }
 
-export type DnsMergeRule = ReplaceRecordMergeRule | AppendSpfMechanismMergeRule;
+export type DnsMergeRule = ReplaceRecordMergeRule | ReplaceCnameOwnerRecordsRule | AppendSpfMechanismMergeRule;
 
 export interface DnsHandoffInput {
   readonly asOf: string;
@@ -75,8 +88,11 @@ export interface DnsHandoffRecord extends DnsRecord {
   readonly purpose: string;
   readonly currentValue: string | null;
   readonly action: DnsHandoffAction;
+  readonly mergeRule: string | null;
   readonly verification: string;
+  readonly verificationCommand: string;
   readonly rollback: string;
+  readonly rollbackValue: string | null;
 }
 
 export interface DnsHandoff {

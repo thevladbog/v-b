@@ -2,7 +2,7 @@
 
 ## Scope and approval boundary
 
-`deploy/dns/build-handoff.ts` is a local, deterministic record-sheet builder. It has no DNS client, does not resolve names, and does not create, update, or delete provider records. A generated sheet is an approval artifact, not permission to make a DNS change.
+`deploy/dns/build-handoff.ts` and `deploy/dns/cli.ts` are local, deterministic record-sheet tools. They have no DNS client, do not resolve names, and do not create, update, or delete provider records. A generated sheet is an approval artifact, not permission to make a DNS change.
 
 Do not create `docs/reviews/YYYY-MM-DD-vbtech-dns-handoff.md` until all of the following are available for the same planned release:
 
@@ -32,13 +32,24 @@ The builder rejects pending/failed Postbox output and rejects any record value t
 
 The normal result is additive. If an existing A, AAAA, CNAME, or other non-TXT RRset would be replaced, add a `replace-record` merge rule that names the exact owner/type and every current value. The builder rejects the sheet when that rule does not match the current-zone export exactly.
 
-If the zone already has one SPF TXT record, add an `append-spf-mechanism` merge rule that repeats the exact current SPF value and the exact Postbox SPF value. The builder preserves the current terminal policy and adds only the provider mechanisms. It refuses two current SPF records and never emits two SPF records.
+A CNAME is stricter: it cannot coexist with any other owner data. If a desired CNAME has any current record at the same owner, use a `replace-cname-owner-records` rule. Its `currentRecords` must list the exact type/value pair for every current record at that owner; a missing or extra record fails the build. The resulting row contains the rule ID and complete rollback value.
+
+If the zone already has one SPF TXT record at the same owner as the Postbox SPF record, add an `append-spf-mechanism` merge rule that repeats the exact current SPF value and the exact Postbox SPF value. The builder preserves the current terminal policy and adds only the provider mechanisms. It refuses two current SPF records at that owner; SPF records at other owners are preserved unchanged.
 
 Do not write a merge rule to "clean up" MX, unrelated TXT, or DMARC. The handoff preserves existing MX and unrelated TXT records. Existing DMARC is emitted only as a `review` row; no DMARC replacement is proposed.
 
 ## 3. Generate and review the local sheet
 
-Call `buildDnsHandoff(input)` with the dated evidence object and pass the result to `renderMarkdownHandoff(handoff)`. Save the rendered output as `docs/reviews/YYYY-MM-DD-vbtech-dns-handoff.md`, outside this pre-release change set. The table contains the required name, type, value, TTL, purpose, current value, action, verification, and rollback columns.
+Create a local JSON input with the `DnsHandoffInput` shape: `asOf`, complete `currentZone`, edge address plus matching `edge.evidence`, Postbox records plus exact `postbox.evidence`, and any explicit `mergeRules`. The CLI rejects malformed JSON/shape, unsafe provider records, absent evidence, and an existing output file. It never opens the network.
+
+Use only the repository-pinned compiler and this exact local generation sequence; replace the two path arguments with the release-time local evidence file and new dated review path:
+
+```bash
+corepack pnpm exec esbuild deploy/dns/cli.ts --bundle --platform=node --format=cjs --outfile=/tmp/vbtech-dns-handoff.cjs
+node /tmp/vbtech-dns-handoff.cjs /absolute/path/to/current-release-evidence.json /absolute/path/to/docs/reviews/YYYY-MM-DD-vbtech-dns-handoff.md
+```
+
+The output path is created with exclusive-write semantics: choose a new dated artifact rather than overwriting an existing approval sheet. The rendered table contains name, type, value, TTL, purpose, current value, action, explicit replacement/merge rule, verification, shell-quoted read-only verification command, rollback instruction, and rollback value. The generated `dig` command quotes each DNS argument and never interpolates a record value into a shell command.
 
 Before requesting DNS approval, confirm all of these in the generated table:
 
@@ -48,7 +59,7 @@ Before requesting DNS approval, confirm all of these in the generated table:
 4. There is exactly one SPF row and it is either an evidence-backed add or an explicit merge.
 5. Existing MX and unrelated TXT rows have action `keep`.
 6. Existing DMARC has action `review` and no proposed replacement.
-7. Every `replace` or `merge` row has a concrete rollback that restores its captured current value.
+7. Every `replace` or `merge` row has an explicit rule ID, row-specific read-only verification command, and concrete rollback value.
 
 Run the local contract check before presenting the sheet:
 
@@ -66,7 +77,7 @@ Use the provider's shortest safe migration TTL for changed records as shown in t
 
 ## 5. Verify propagation and TLS
 
-After the provider change, use read-only authoritative DNS queries to compare every changed owner/type/value/TTL with the approved sheet. Verify both the apex and `www` resolution paths before browser testing.
+After the provider change, run the approved row-specific read-only verification command for every changed row and compare the answer with its name/type/value/TTL. Verify both the apex and `www` resolution paths before browser testing.
 
 Then verify Caddy TLS against the public canonical host: the certificate chain must be valid for `v-b.tech`, `www` must follow the reviewed canonical behavior, and the expected release header/routes must resolve. This is a verification step only; it does not authorize public-form activation.
 
@@ -74,6 +85,6 @@ Once propagation is stable, restore the normal approved TTL using another explic
 
 ## 6. Roll back a failed DNS change
 
-If any approved record does not propagate as reviewed, restore the pre-change values from the sheet's `Current value` and `Rollback` columns. Remove only records whose approved action was `add`; restore the complete captured RRset for `replace` and the original one SPF value for `merge`.
+If any approved record does not propagate as reviewed, restore the pre-change values from the sheet's `Rollback value` and `Rollback` columns. Remove only records whose approved action was `add`; restore the complete captured owner data for a CNAME replacement, the complete captured RRset for `replace`, and the original one SPF value for `merge`.
 
 Do not remove existing MX, unrelated TXT, or DMARC to roll back the website. Re-run authoritative read-only checks after rollback and record the result in the dated review artifact.
