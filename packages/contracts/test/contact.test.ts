@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import {
   CONTACT_ERROR_CODES,
+  CONTACT_FIELD_LIMITS,
   contactRequestSchema,
   isEmailContact,
   type ContactAcceptedResponse,
@@ -21,6 +22,30 @@ const validRequest = {
 } as const;
 
 describe("contact request contract", () => {
+  it("exports one immutable set of field limits used by the request schema", () => {
+    expect(Object.isFrozen(CONTACT_FIELD_LIMITS)).toBe(true);
+    expect(CONTACT_FIELD_LIMITS).toEqual({
+      name: 100,
+      contact: 254,
+      message: 4_000,
+      consentId: 64,
+      captchaToken: 4_096,
+      website: 200,
+    });
+
+    for (const field of ["name", "message", "consentId", "captchaToken"] as const) {
+      const maximum = CONTACT_FIELD_LIMITS[field];
+      expect(() => contactRequestSchema.parse({ ...validRequest, [field]: "x".repeat(maximum) })).not.toThrow();
+      expect(() => contactRequestSchema.parse({ ...validRequest, [field]: "x".repeat(maximum + 1) })).toThrow();
+    }
+    const emailSuffix = "@example.com";
+    const maximumEmail = `${"a".repeat(CONTACT_FIELD_LIMITS.contact - emailSuffix.length)}${emailSuffix}`;
+    expect(() => contactRequestSchema.parse({ ...validRequest, contact: maximumEmail })).not.toThrow();
+    expect(() => contactRequestSchema.parse({ ...validRequest, contact: `a${maximumEmail}` })).toThrow();
+    expect(() => contactRequestSchema.parse({ ...validRequest, website: "x".repeat(CONTACT_FIELD_LIMITS.website) })).not.toThrow();
+    expect(() => contactRequestSchema.parse({ ...validRequest, website: "x".repeat(CONTACT_FIELD_LIMITS.website + 1) })).toThrow();
+  });
+
   // Catches a production break that stops the handler from receiving normalized valid requests.
   it("accepts a valid Telegram request and trims bounded user fields", () => {
     const parsed = contactRequestSchema.parse({

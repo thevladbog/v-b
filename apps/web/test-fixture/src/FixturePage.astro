@@ -4,8 +4,8 @@ import ContactForm from "../../src/components/ContactForm.astro";
 import "../../src/styles/global.css";
 import "../../src/styles/landing.css";
 
-interface Props { locale: Locale }
-const { locale } = Astro.props;
+interface Props { locale: Locale; prefixes: readonly string[] }
+const { locale, prefixes } = Astro.props;
 const content = SITE_CONTENT[locale].contact;
 ---
 
@@ -19,20 +19,35 @@ const content = SITE_CONTENT[locale].contact;
   </head>
   <body>
     <main id="main-content">
-      <section class="contact-panel" aria-label={content.formTitle}>
-        <ContactForm
-          locale={locale}
-          content={content}
-          internalContactFixture={{
-            siteKey: "vbtech-internal-fixture-site-key",
-            loadTimeoutMs: 300,
-          }}
-        />
-      </section>
+      {prefixes.map((idPrefix) => (
+        <section class="contact-panel" aria-label={`${content.formTitle} ${idPrefix}`}>
+          <ContactForm
+            idPrefix={idPrefix}
+            locale={locale}
+            content={content}
+            internalContactFixture={{
+              siteKey: "vbtech-internal-fixture-site-key",
+              loadTimeoutMs: prefixes.length > 1 ? 2_000 : 300,
+            }}
+          />
+        </section>
+      ))}
     </main>
     <script>
-      import { initializeContactForms } from "../../src/scripts/contact-form";
-      initializeContactForms();
+      import { disposeContactForm, initializeContactForms } from "../../src/scripts/contact-form";
+      let disposeAll = initializeContactForms();
+      Object.assign(window, {
+        __vbtechInitializeContactForms: () => initializeContactForms(),
+        __vbtechDisposeContactForms: () => disposeAll(),
+        __vbtechRemountContactForms: () => {
+          disposeAll();
+          disposeAll = initializeContactForms();
+        },
+        __vbtechDisposeContactForm: (instance) => {
+          const form = document.querySelector(`[data-contact-instance="${instance}"]`);
+          if (form instanceof HTMLFormElement) disposeContactForm(form);
+        },
+      });
     </script>
   </body>
 </html>
@@ -40,5 +55,5 @@ const content = SITE_CONTENT[locale].contact;
 <style>
   body { min-height: 100vh; padding: 2rem 1rem; }
   main { width: min(100%, 48rem); margin-inline: auto; }
-  .contact-panel { scroll-margin-top: 1rem; }
+  .contact-panel { scroll-margin-top: 1rem; margin-block-end: 3rem; }
 </style>

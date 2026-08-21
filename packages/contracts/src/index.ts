@@ -1,5 +1,6 @@
 export {
   CONTACT_LOCALES,
+  CONTACT_FIELD_LIMITS,
   CONTACT_SOURCE_PATHS,
   contactRequestSchema,
   isEmailContact,

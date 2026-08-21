@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
+import { CONTACT_FIELD_LIMITS } from "@vbtech/contracts";
 import { parse } from "parse5";
 import { describe, expect, it } from "vitest";
 
@@ -122,6 +123,7 @@ describe("disabled contact shell", () => {
     expect(attr(form, "novalidate")).toBe("");
     expect(attr(form, "data-submission-enabled")).toBe("false");
     expect(attr(form, "data-consent-id")).toBe(CURRENT_CONTACT_CONSENT_ID);
+    expect(attr(form, "data-contact-instance")).toBe("home-contact");
     expect(attr(form, "aria-busy")).toBe("false");
 
     const fieldset = elements(form, (node) => node.tagName === "fieldset")[0]!;
@@ -135,9 +137,9 @@ describe("disabled contact shell", () => {
     expect([...named.keys()]).toEqual(["name", "contact", "message", "consent"]);
 
     const expected = {
-      name: { tag: "input", type: "text", autocomplete: "name", maxlength: "100" },
-      contact: { tag: "input", type: "text", autocomplete: "email", maxlength: "254" },
-      message: { tag: "textarea", type: undefined, autocomplete: "off", maxlength: "4000" },
+      name: { tag: "input", type: "text", autocomplete: "name", maxlength: String(CONTACT_FIELD_LIMITS.name) },
+      contact: { tag: "input", type: "text", autocomplete: "email", maxlength: String(CONTACT_FIELD_LIMITS.contact) },
+      message: { tag: "textarea", type: undefined, autocomplete: "off", maxlength: String(CONTACT_FIELD_LIMITS.message) },
       consent: { tag: "input", type: "checkbox", autocomplete: undefined, maxlength: undefined },
     } as const;
 
@@ -148,22 +150,23 @@ describe("disabled contact shell", () => {
       expect(attr(control, "autocomplete")).toBe(contract.autocomplete);
       expect(attr(control, "maxlength")).toBe(contract.maxlength);
       expect(attr(control, "required")).toBe("");
-      expect(attr(control, "id")).toBe(`contact-${name}`);
+      expect(attr(control, "id")).toBe(`home-contact-${name}`);
       expect(attr(control, "checked")).toBeUndefined();
 
       const label = elements(form, (node) =>
-        node.tagName === "label" && attr(node, "for") === `contact-${name}`,
+        node.tagName === "label" && attr(node, "for") === `home-contact-${name}`,
       );
       expect(label).toHaveLength(1);
 
       const describedBy = attr(control, "aria-describedby")?.split(/\s+/) ?? [];
       expect(describedBy).toEqual([
-        `contact-${name}-instruction`,
-        `contact-${name}-error`,
+        `home-contact-${name}-instruction`,
+        `home-contact-${name}-error`,
       ]);
       describedBy.forEach((id) => expect(byId(document, id)).toBeDefined());
-      expect(attr(byId(document, `contact-${name}-error`)!, "data-error-message")).toBeTruthy();
-      expect(text(byId(document, `contact-${name}-error`)!)).toBe("");
+      expect(attr(byId(document, `home-contact-${name}-error`)!, "data-error-message")).toBeTruthy();
+      expect(attr(byId(document, `home-contact-${name}-error`)!, "data-contact-error")).toBe(name);
+      expect(text(byId(document, `home-contact-${name}-error`)!)).toBe("");
     }
 
     const legalLinks = elements(form, (node) => node.tagName === "a").map((node) => attr(node, "href"));
@@ -190,7 +193,7 @@ describe("disabled contact shell", () => {
     expect(text(consentIdentity[0]!)).toBe(CURRENT_CONTACT_CONSENT_ID);
     expect(text(form)).toContain(page.draftContext);
     const consentLabel = elements(form, (node) =>
-      node.tagName === "label" && attr(node, "for") === "contact-consent",
+      node.tagName === "label" && attr(node, "for") === "home-contact-consent",
     )[0]!;
     const consentCopy = elements(consentLabel, (node) => node.tagName === "span")[0]!;
     expect(contiguousText(consentCopy)).toBe(page.consentPhrase);

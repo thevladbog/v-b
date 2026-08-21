@@ -84,6 +84,35 @@ describe("contact client boundary", () => {
     expect(ids).toEqual([firstId, firstId]);
   });
 
+  it("posts, echoes, and returns the canonical shared-schema UUID after uppercase input", async () => {
+    const uppercaseId = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+    const canonicalId = uppercaseId.toLowerCase();
+    const bodies: string[] = [];
+
+    const accepted = await submitContactDraft(draft, {
+      requestId: uppercaseId,
+      createRequestId: () => secondId,
+      captchaToken: "token-1",
+      fetch: async (_input, init) => {
+        bodies.push((JSON.parse(String(init?.body)) as { requestId: string }).requestId);
+        return jsonResponse(202, { accepted: true, requestId: canonicalId });
+      },
+    });
+    const recoverable = await submitContactDraft(draft, {
+      requestId: uppercaseId,
+      createRequestId: () => secondId,
+      captchaToken: "token-2",
+      fetch: async (_input, init) => {
+        bodies.push((JSON.parse(String(init?.body)) as { requestId: string }).requestId);
+        return jsonResponse(503, { error: "temporarily_unavailable" });
+      },
+    });
+
+    expect(bodies).toEqual([canonicalId, canonicalId]);
+    expect(accepted).toEqual({ accepted: true, requestId: canonicalId });
+    expect(recoverable).toEqual({ accepted: false, code: "temporarily_unavailable", requestId: canonicalId });
+  });
+
   it.each([
     [400, "invalid_request"],
     [400, "captcha_required"],

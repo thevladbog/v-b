@@ -28,6 +28,10 @@ class ContactFailureRegistry {
     this.#add(this.#expectedRequestFailures, "net::ERR_FAILED", count);
   }
 
+  expectClientAbort(count = 1) {
+    this.#add(this.#expectedRequestFailures, "net::ERR_ABORTED", count);
+  }
+
   consumeConsole(message: ConsoleMessage) {
     if (message.location().url !== contactApiUrl) return false;
     return this.#consume(this.#expectedConsole, message.text());

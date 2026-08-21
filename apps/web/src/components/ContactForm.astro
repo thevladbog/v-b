@@ -1,6 +1,7 @@
 ---
 import { PUBLIC_CONTACT_SUBMISSION_ENABLED } from "astro:env/client";
 import type { Locale, SiteContent } from "@vbtech/content";
+import { CONTACT_FIELD_LIMITS } from "@vbtech/contracts";
 import { localizedPath } from "../lib/locale.js";
 import { resolveContactSubmissionReadiness } from "../lib/form-state.js";
 
@@ -10,12 +11,17 @@ interface InternalContactFixture {
 }
 
 interface Props {
+  idPrefix: string;
   locale: Locale;
   content: SiteContent["contact"];
   internalContactFixture?: InternalContactFixture;
 }
 
-const { locale, content, internalContactFixture } = Astro.props;
+const { idPrefix, locale, content, internalContactFixture } = Astro.props;
+if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(idPrefix)) {
+  throw new Error("ContactForm idPrefix must be a deterministic lower-case HTML ID prefix");
+}
+const id = (suffix: string) => `${idPrefix}-${suffix}`;
 const fixtureRequested = internalContactFixture !== undefined;
 if (fixtureRequested && Astro.site?.origin !== "http://127.0.0.1:43219") {
   throw new Error("The internal contact fixture is restricted to its loopback-only build");
@@ -31,14 +37,16 @@ const fixtureNotice = locale === "ru"
 ---
 
 <div class="contact-form-shell">
-  <h3 id="contact-form-title">{content.formTitle}</h3>
-  <p class="contact-form-disabled" id="contact-form-disabled">{fixtureRequested ? fixtureNotice : content.formDisabled}</p>
+  <h3 id={id("title")}>{content.formTitle}</h3>
+  <p class="contact-form-disabled" id={id("disabled")}>{fixtureRequested ? fixtureNotice : content.formDisabled}</p>
 
   <form
+    id={id("form")}
     method={readiness.submissionEnabled ? "post" : undefined}
     action={readiness.submissionEnabled ? "/api/contact" : undefined}
     novalidate
     data-contact-form
+    data-contact-instance={idPrefix}
     data-submission-enabled={String(readiness.submissionEnabled)}
     data-consent-id={readiness.consentIdentity}
     data-source-path={locale === "ru" ? "/" : "/en/"}
@@ -47,99 +55,101 @@ const fixtureNotice = locale === "ru"
     data-internal-test-fixture={fixtureRequested ? "true" : undefined}
     data-error-summary-message={content.errorSummary}
     aria-busy="false"
-    aria-labelledby="contact-form-title"
-    aria-describedby="contact-form-disabled contact-form-note"
+    aria-labelledby={id("title")}
+    aria-describedby={`${id("disabled")} ${id("note")}`}
   >
-    <p class="contact-form-warning" data-contact-warning>{content.formWarning}</p>
-    <div class="contact-error-summary" data-contact-errors role="alert" hidden></div>
+    <p id={id("warning")} class="contact-form-warning" data-contact-warning>{content.formWarning}</p>
+    <div id={id("error-summary")} class="contact-error-summary" data-contact-errors role="alert" hidden></div>
 
-    <fieldset disabled={disabled} aria-describedby="contact-form-disabled">
-      <legend class="sr-only">{content.formTitle}</legend>
+    <fieldset id={id("fields")} data-contact-fields disabled={disabled} aria-describedby={id("disabled")}>
+      <legend id={id("legend")} class="sr-only">{content.formTitle}</legend>
 
       <div class="contact-field">
-        <label for="contact-name">{content.formName}</label>
-        <p id="contact-name-instruction">{content.formNameInstruction}</p>
+        <label for={id("name")}>{content.formName}</label>
+        <p id={id("name-instruction")}>{content.formNameInstruction}</p>
         <input
-          id="contact-name"
+          id={id("name")}
           name="name"
           type="text"
           autocomplete="name"
-          maxlength="100"
+          maxlength={CONTACT_FIELD_LIMITS.name}
           required
-          aria-describedby="contact-name-instruction contact-name-error"
+          aria-describedby={`${id("name-instruction")} ${id("name-error")}`}
         />
-        <p id="contact-name-error" class="contact-field-error" data-error-message={content.errors.name}></p>
+        <p id={id("name-error")} class="contact-field-error" data-contact-error="name" data-error-message={content.errors.name}></p>
       </div>
 
       <div class="contact-field">
-        <label for="contact-contact">{content.formContact}</label>
-        <p id="contact-contact-instruction">{content.formContactInstruction}</p>
+        <label for={id("contact")}>{content.formContact}</label>
+        <p id={id("contact-instruction")}>{content.formContactInstruction}</p>
         <input
-          id="contact-contact"
+          id={id("contact")}
           name="contact"
           type="text"
           inputmode="email"
           autocomplete="email"
-          maxlength="254"
+          maxlength={CONTACT_FIELD_LIMITS.contact}
           required
-          aria-describedby="contact-contact-instruction contact-contact-error"
+          aria-describedby={`${id("contact-instruction")} ${id("contact-error")}`}
         />
-        <p id="contact-contact-error" class="contact-field-error" data-error-message={content.errors.contact}></p>
+        <p id={id("contact-error")} class="contact-field-error" data-contact-error="contact" data-error-message={content.errors.contact}></p>
       </div>
 
       <div class="contact-field">
-        <label for="contact-message">{content.formMessage}</label>
-        <p id="contact-message-instruction">{content.formMessageInstruction}</p>
+        <label for={id("message")}>{content.formMessage}</label>
+        <p id={id("message-instruction")}>{content.formMessageInstruction}</p>
         <textarea
-          id="contact-message"
+          id={id("message")}
           name="message"
           rows="7"
           autocomplete="off"
-          maxlength="4000"
+          maxlength={CONTACT_FIELD_LIMITS.message}
           required
-          aria-describedby="contact-message-instruction contact-message-error"
+          aria-describedby={`${id("message-instruction")} ${id("message-error")}`}
         ></textarea>
-        <p id="contact-message-error" class="contact-field-error" data-error-message={content.errors.message}></p>
+        <p id={id("message-error")} class="contact-field-error" data-contact-error="message" data-error-message={content.errors.message}></p>
       </div>
 
       <div class="contact-field contact-consent">
-        <label for="contact-consent">
+        <label for={id("consent")}>
           <input
-            id="contact-consent"
+            id={id("consent")}
             name="consent"
             type="checkbox"
             value="accepted"
             required
-            aria-describedby="contact-consent-instruction contact-consent-error"
+            aria-describedby={`${id("consent-instruction")} ${id("consent-error")}`}
           />
           <span>
             {content.consentBeforePolicy}{" "}
             <a
               class="contact-consent-action"
+              id={id("policy-link")}
               data-contact-consent-link="policy"
               href={localizedPath(locale, "privacy-policy")}
             >{content.policyLinkLabel}</a>
             {" "}{content.consentBetweenLinks}{" "}
             <a
               class="contact-consent-action"
+              id={id("consent-link")}
               data-contact-consent-link="consent"
               href={localizedPath(locale, "personal-data-consent")}
             >{content.consentLinkLabel}</a>{content.consentAfterLinks}
           </span>
         </label>
-        <p id="contact-consent-instruction">
+        <p id={id("consent-instruction")}>
           {content.formConsentInstruction}{" "}
           <span class="contact-consent-identity" data-contact-consent-identity>{readiness.consentIdentity}</span>{" "}
           {content.consentDraftContext}
         </p>
-        <p id="contact-consent-error" class="contact-field-error" data-error-message={content.errors.consent}></p>
+        <p id={id("consent-error")} class="contact-field-error" data-contact-error="consent" data-error-message={content.errors.consent}></p>
       </div>
 
-      <button class="contact-submit" type="submit" disabled={disabled}>{content.formSubmit}</button>
+      <button id={id("submit")} class="contact-submit" type="submit" disabled={disabled}>{content.formSubmit}</button>
     </fieldset>
 
-    <div class="contact-captcha" data-contact-captcha></div>
-    <p id="contact-form-note" class="contact-form-note">{content.formNote}</p>
-    <p data-contact-status role="status" aria-live="polite" aria-atomic="true"></p>
+    <div id={id("captcha")} class="contact-captcha" data-contact-captcha></div>
+    <p id={id("note")} class="contact-form-note">{content.formNote}</p>
+    <p id={id("status")} data-contact-status role="status" aria-live="polite" aria-atomic="true"></p>
   </form>
 </div>

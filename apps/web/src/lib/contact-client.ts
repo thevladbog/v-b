@@ -69,12 +69,12 @@ const errors = {
 export const CONTACT_SUBMISSION_COPY = {
   ru: {
     busy: "Отправляем обращение…",
-    accepted: "Обращение получено. Идентификатор сохранён для подтверждения доставки.",
+    accepted: "Обращение получено. Номер для справки:",
     errors: errors.ru,
   },
   en: {
     busy: "Sending the enquiry…",
-    accepted: "Your enquiry was received. Its request ID is available for delivery confirmation.",
+    accepted: "Your enquiry was received. Reference:",
     errors: errors.en,
   },
 } as const;
@@ -197,6 +197,7 @@ export async function submitContactDraft(
   if (!draft.consentAccepted || !parsed.success) {
     return { accepted: false, code: "invalid_request", requestId };
   }
+  const canonicalRequestId = parsed.data.requestId;
 
   try {
     const response = await dependencies.fetch("/api/contact", {
@@ -206,8 +207,8 @@ export async function submitContactDraft(
       body: JSON.stringify(parsed.data),
       signal: dependencies.signal,
     });
-    return await parsePublicResponse(response, requestId);
+    return await parsePublicResponse(response, canonicalRequestId);
   } catch {
-    return temporaryFailure(requestId);
+    return temporaryFailure(canonicalRequestId);
   }
 }

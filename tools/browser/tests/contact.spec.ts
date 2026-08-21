@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Page, Route } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 
 declare global {
@@ -7,7 +7,15 @@ declare global {
     __vbtechCaptchaMode: CaptchaMode;
     __vbtechCaptchaExecuteCount: number;
     __vbtechCaptchaResetCount: number;
+    __vbtechCaptchaDestroyedWidgets: number[];
+    __vbtechCaptchaTokenWidgets: Record<string, number>;
+    __vbtechHoldCaptchaLoad: boolean;
+    __vbtechReleaseCaptchaLoad?: () => void;
     __vbtechRequestIdCount?: number;
+    __vbtechInitializeContactForms(): () => void;
+    __vbtechDisposeContactForms(): void;
+    __vbtechRemountContactForms(): void;
+    __vbtechDisposeContactForm(instance: string): void;
   }
 }
 
@@ -49,14 +57,17 @@ const locales = [
 
 type CaptchaMode = "token" | "empty" | "javascript-error" | "load-error" | "timeout";
 
-async function mockCaptcha(page: Page, mode: CaptchaMode = "token") {
-  await page.addInitScript((initialMode) => {
+async function mockCaptcha(page: Page, mode: CaptchaMode = "token", holdLoad = false) {
+  await page.addInitScript(({ initialMode, hold }) => {
     Object.assign(window, {
       __vbtechCaptchaMode: initialMode,
       __vbtechCaptchaExecuteCount: 0,
       __vbtechCaptchaResetCount: 0,
+      __vbtechCaptchaDestroyedWidgets: [],
+      __vbtechCaptchaTokenWidgets: {},
+      __vbtechHoldCaptchaLoad: hold,
     });
-  }, mode);
+  }, { initialMode: mode, hold: holdLoad });
   await page.route(`${captchaScript}**`, async (route) => {
     await route.fulfill({
       status: 200,
@@ -69,24 +80,30 @@ async function mockCaptcha(page: Page, mode: CaptchaMode = "token") {
           return;
         }
         if (window.__vbtechCaptchaMode === "timeout") return;
-        let options;
-        window.smartCaptcha = {
+        const completeLoad = () => {
+          let nextWidgetId = 16;
+          const optionsByWidget = new Map();
+          window.smartCaptcha = {
           render(container, nextOptions) {
-            options = nextOptions;
+            const widgetId = ++nextWidgetId;
+            optionsByWidget.set(widgetId, nextOptions);
             const disclosure = document.createElement("div");
             disclosure.setAttribute("data-smartcaptcha-disclosure", "");
+            disclosure.setAttribute("data-smartcaptcha-widget", String(widgetId));
             disclosure.textContent = "SmartCaptcha";
             disclosure.style.minHeight = "24px";
             container.append(disclosure);
-            return 17;
+            return widgetId;
           },
           reset(widgetId) {
-            if (widgetId !== 17) throw new Error("unexpected widget");
+            if (!optionsByWidget.has(widgetId)) throw new Error("unexpected widget");
             window.__vbtechCaptchaResetCount += 1;
           },
           execute(widgetId) {
-            if (widgetId !== 17) throw new Error("unexpected widget");
+            const options = optionsByWidget.get(widgetId);
+            if (!options) throw new Error("unexpected widget");
             window.__vbtechCaptchaExecuteCount += 1;
+            const executeCount = window.__vbtechCaptchaExecuteCount;
             queueMicrotask(() => {
               if (window.__vbtechCaptchaMode === "javascript-error") {
                 options["error-callback"]();
@@ -94,12 +111,24 @@ async function mockCaptcha(page: Page, mode: CaptchaMode = "token") {
               }
               const token = window.__vbtechCaptchaMode === "empty"
                 ? ""
-                : "fixture-token-" + window.__vbtechCaptchaExecuteCount;
+                : "fixture-token-" + executeCount;
+              window.__vbtechCaptchaTokenWidgets[token] = widgetId;
               options.callback(token);
             });
           },
+          destroy(widgetId) {
+            if (!optionsByWidget.has(widgetId)) throw new Error("unexpected widget");
+            optionsByWidget.delete(widgetId);
+            window.__vbtechCaptchaDestroyedWidgets.push(widgetId);
+          },
+          };
+          window[url.searchParams.get("onload")]();
         };
-        window[url.searchParams.get("onload")]();
+        if (window.__vbtechHoldCaptchaLoad) {
+          window.__vbtechReleaseCaptchaLoad = completeLoad;
+          return;
+        }
+        completeLoad();
       })();`,
     });
   });
@@ -110,6 +139,13 @@ async function fillValidDraft(page: Page, localized: (typeof locales)[number], s
   await page.getByLabel(localized.labels.contact, { exact: true }).fill("  PERSON@Example.COM  ");
   await page.getByLabel(localized.labels.message, { exact: true }).fill(`  Project enquiry${suffix}.  `);
   await page.getByRole("checkbox", { name: localized.labels.consent }).check();
+}
+
+async function fillValidForm(form: Locator, localized: (typeof locales)[number], suffix: string) {
+  await form.getByLabel(localized.labels.name, { exact: true }).fill(`  Vlad${suffix}  `);
+  await form.getByLabel(localized.labels.contact, { exact: true }).fill("  PERSON@Example.COM  ");
+  await form.getByLabel(localized.labels.message, { exact: true }).fill(`  Project enquiry${suffix}.  `);
+  await form.getByRole("checkbox", { name: localized.labels.consent }).check();
 }
 
 function apiJson(route: Route, status: number, value: unknown) {
@@ -213,6 +249,190 @@ test("accepted submission is keyboard complete, clears all state, and keeps the 
   await expect(page.locator("[data-contact-form]")).toHaveAttribute("aria-busy", "false");
   await expect(page.locator("[data-smartcaptcha-disclosure]")).toBeVisible();
   expect(requests).toHaveLength(1);
+  await expect(page.getByRole("status")).toContainText((requests[0] as { requestId: string }).requestId);
+});
+
+test("two-form fixture owns unique deterministic IDs and scoped accessible relationships", async ({ page }) => {
+  await page.goto(`${fixtureOrigin}/en/multi/`);
+  const forms = page.locator("[data-contact-form]");
+  await expect(forms).toHaveCount(2);
+  await expect(forms.nth(0)).toHaveAttribute("data-contact-instance", "fixture-contact-a");
+  await expect(forms.nth(1)).toHaveAttribute("data-contact-instance", "fixture-contact-b");
+  await forms.nth(0).getByRole("button", { name: locales[1].labels.submit }).click();
+  await expect(forms.nth(0).getByLabel(locales[1].labels.name, { exact: true })).toBeFocused();
+  await expect(forms.nth(0).getByRole("alert")).toBeVisible();
+  await expect(forms.nth(1).getByRole("alert")).toBeHidden();
+  await expect(forms.nth(1).getByLabel(locales[1].labels.name, { exact: true })).not.toHaveAttribute("aria-invalid");
+
+  const audit = await page.evaluate(() => {
+    const ids = [...document.querySelectorAll<HTMLElement>("[id]")].map((node) => node.id);
+    const missingReferences = [...document.querySelectorAll<HTMLElement>("[data-contact-form] [aria-labelledby], [data-contact-form] [aria-describedby]")]
+      .flatMap((node) => `${node.getAttribute("aria-labelledby") ?? ""} ${node.getAttribute("aria-describedby") ?? ""}`.trim().split(/\s+/))
+      .filter(Boolean)
+      .filter((id) => document.getElementById(id) === null);
+    const badLabels = [...document.querySelectorAll<HTMLLabelElement>("[data-contact-form] label[for]")]
+      .filter((label) => {
+        const form = label.closest("[data-contact-form]");
+        return !form?.querySelector(`#${CSS.escape(label.htmlFor)}`);
+      })
+      .map((label) => label.htmlFor);
+    return {
+      duplicates: ids.filter((id, index) => ids.indexOf(id) !== index),
+      missingReferences,
+      badLabels,
+    };
+  });
+  expect(audit).toEqual({ duplicates: [], missingReferences: [], badLabels: [] });
+
+  const result = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22a", "wcag22aa"])
+    .analyze();
+  expect(result.violations).toEqual([]);
+});
+
+test("two forms dedupe the captcha loader and keep widget callbacks and disposal isolated", async ({ page }) => {
+  const localized = locales[1];
+  const captchaRequests: string[] = [];
+  const bodies: Array<{ name: string; captchaToken: string; requestId: string }> = [];
+  page.on("request", (request) => {
+    if (request.url().startsWith(captchaScript)) captchaRequests.push(request.url());
+  });
+  await mockCaptcha(page, "token", true);
+  await page.route(`${fixtureOrigin}/api/contact`, async (route) => {
+    const body = route.request().postDataJSON() as (typeof bodies)[number];
+    bodies.push(body);
+    await apiJson(route, 202, { accepted: true, requestId: body.requestId });
+  });
+  await page.goto(`${fixtureOrigin}/en/multi/`);
+  await page.evaluate(() => {
+    window.__vbtechInitializeContactForms();
+    window.__vbtechInitializeContactForms();
+  });
+  const forms = page.locator("[data-contact-form]");
+  const first = forms.nth(0);
+  const second = forms.nth(1);
+  await fillValidForm(first, localized, " Alpha");
+  await fillValidForm(second, localized, " Beta");
+
+  await first.getByRole("button", { name: localized.labels.submit }).click();
+  await second.getByRole("button", { name: localized.labels.submit }).click();
+  await expect(first).toHaveAttribute("aria-busy", "true");
+  await expect(second).toHaveAttribute("aria-busy", "true");
+  expect(captchaRequests).toHaveLength(1);
+  await page.evaluate(() => window.__vbtechReleaseCaptchaLoad?.());
+  await expect(first.getByRole("status")).toContainText(localized.labels.success);
+  await expect(second.getByRole("status")).toContainText(localized.labels.success);
+
+  expect(captchaRequests).toHaveLength(1);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0]!.requestId).not.toBe(bodies[1]!.requestId);
+  const tokenWidgets = await page.evaluate(() => window.__vbtechCaptchaTokenWidgets);
+  const firstWidget = Number(await first.locator("[data-smartcaptcha-disclosure]").getAttribute("data-smartcaptcha-widget"));
+  const secondWidget = Number(await second.locator("[data-smartcaptcha-disclosure]").getAttribute("data-smartcaptcha-widget"));
+  expect(firstWidget).not.toBe(secondWidget);
+  expect(tokenWidgets[bodies.find(({ name }) => name.includes("Alpha"))!.captchaToken]).toBe(firstWidget);
+  expect(tokenWidgets[bodies.find(({ name }) => name.includes("Beta"))!.captchaToken]).toBe(secondWidget);
+
+  await page.evaluate(() => window.__vbtechDisposeContactForm("fixture-contact-a"));
+  await expect(first.locator("[data-smartcaptcha-disclosure]")).toHaveCount(0);
+  await expect(second.locator("[data-smartcaptcha-disclosure]")).toBeVisible();
+  expect(await page.evaluate(() => window.__vbtechCaptchaDestroyedWidgets)).toEqual([firstWidget]);
+
+  await fillValidForm(second, localized, " Gamma");
+  await second.getByRole("button", { name: localized.labels.submit }).click();
+  await expect(second.getByRole("status")).toContainText(localized.labels.success);
+  expect(bodies).toHaveLength(3);
+  expect((await page.evaluate(() => window.__vbtechCaptchaTokenWidgets))[bodies[2]!.captchaToken]).toBe(secondWidget);
+  expect(captchaRequests).toHaveLength(1);
+});
+
+test("dispose, remount, and repeated initialization keep exactly one live form binding", async ({ page }) => {
+  const localized = locales[1];
+  const bodies: Array<{ requestId: string }> = [];
+  await mockCaptcha(page);
+  await page.route(`${fixtureOrigin}/api/contact`, async (route) => {
+    const body = route.request().postDataJSON() as { requestId: string };
+    bodies.push(body);
+    await apiJson(route, 202, { accepted: true, requestId: body.requestId });
+  });
+  await page.goto(`${fixtureOrigin}/en/`);
+  await page.evaluate(() => {
+    window.__vbtechDisposeContactForms();
+    window.__vbtechRemountContactForms();
+    window.__vbtechInitializeContactForms();
+    window.__vbtechInitializeContactForms();
+  });
+  await fillValidDraft(page, localized);
+
+  await page.getByRole("button", { name: localized.labels.submit }).click();
+
+  await expect(page.getByRole("status")).toContainText(localized.labels.success);
+  expect(bodies).toHaveLength(1);
+  expect(await page.evaluate(() => window.__vbtechCaptchaExecuteCount)).toBe(1);
+});
+
+test("visitor-editable controls freeze for a delayed request and restore exactly after failure", async ({ page, contactFailures }) => {
+  const localized = locales[1];
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  contactFailures.expectStatus(503);
+  await mockCaptcha(page);
+  await page.route(`${fixtureOrigin}/api/contact`, async (route) => {
+    await gate;
+    await apiJson(route, 503, { error: "temporarily_unavailable" });
+  });
+  await page.goto(`${fixtureOrigin}/en/`);
+  await fillValidDraft(page, localized);
+  const form = page.locator("[data-contact-form]");
+  const name = page.getByLabel(localized.labels.name, { exact: true });
+  const consent = page.getByRole("checkbox", { name: localized.labels.consent });
+
+  await page.getByRole("button", { name: localized.labels.submit }).click();
+  await expect(form).toHaveAttribute("aria-busy", "true");
+  await expect(name).toBeDisabled();
+  await expect(consent).toBeDisabled();
+  await expect(name).toHaveValue("Vlad");
+  release();
+
+  await expect(page.getByRole("status")).toContainText(/temporarily unavailable/i);
+  await expect(form).toHaveAttribute("aria-busy", "false");
+  await expect(name).toBeEnabled();
+  await expect(consent).toBeEnabled();
+  await expect(name).toHaveValue("Vlad");
+  await expect(consent).toBeChecked();
+});
+
+test("a hung local API route is aborted after the fixed ten-second operation timeout", async ({ page, contactFailures }) => {
+  const localized = locales[1];
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  contactFailures.expectClientAbort();
+  await page.clock.install();
+  await mockCaptcha(page);
+  await page.route(`${fixtureOrigin}/api/contact`, async (route) => {
+    await gate;
+    try {
+      await apiJson(route, 202, {
+        accepted: true,
+        requestId: (route.request().postDataJSON() as { requestId: string }).requestId,
+      });
+    } catch {
+      // The browser-owned fetch is expected to be gone after AbortController fires.
+    }
+  });
+  await page.goto(`${fixtureOrigin}/en/`);
+  await fillValidDraft(page, localized);
+  const apiRequest = page.waitForRequest(`${fixtureOrigin}/api/contact`);
+
+  await page.getByRole("button", { name: localized.labels.submit }).click();
+  await apiRequest;
+  await page.clock.fastForward(10_001);
+
+  await expect(page.getByRole("status")).toContainText(/temporarily unavailable/i);
+  await expect(page.locator("[data-contact-form]")).toHaveAttribute("aria-busy", "false");
+  await expect(page.getByLabel(localized.labels.name, { exact: true })).toBeEnabled();
+  await expect(page.getByLabel(localized.labels.message, { exact: true })).toHaveValue("Project enquiry.");
+  release();
 });
 
 test("safe retry reacquires a one-time token and reuses the UUID, then accepted and changed drafts rotate it", async ({ page, contactFailures }) => {
@@ -315,6 +535,10 @@ test("captcha provider recovery keeps the pending UUID and reacquires before the
   const firstId = "11111111-1111-4111-8111-111111111111";
   const secondId = "22222222-2222-4222-8222-222222222222";
   const bodies: Array<{ requestId: string; captchaToken: string }> = [];
+  const captchaRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().startsWith(captchaScript)) captchaRequests.push(request.url());
+  });
   await page.addInitScript(({ first, second }) => {
     const ids = [first, second] as const;
     window.__vbtechRequestIdCount = 0;
@@ -339,12 +563,17 @@ test("captcha provider recovery keeps the pending UUID and reacquires before the
 
   await submit.click();
   await expect(page.getByRole("status")).toContainText(/captcha.*unavailable/i);
+  await expect(page.locator(`script[src^="${captchaScript}"]`)).toHaveCount(0);
+  expect(await page.evaluate(() => Object.keys(window).filter((key) => key.startsWith("__vbtechSmartCaptchaOnload")))).toEqual([]);
   await page.evaluate(() => { window.__vbtechCaptchaMode = "token"; });
   await submit.click();
   await expect(page.getByRole("status")).toContainText(localized.labels.success);
 
   expect(bodies).toHaveLength(1);
   expect(bodies[0]).toMatchObject({ requestId: firstId, captchaToken: "fixture-token-1" });
+  expect(captchaRequests).toHaveLength(2);
+  await expect(page.locator(`script[src^="${captchaScript}"]`)).toHaveCount(1);
+  expect(await page.evaluate(() => Object.keys(window).filter((key) => key.startsWith("__vbtechSmartCaptchaOnload")))).toEqual([]);
   expect(await page.evaluate(() => window.__vbtechRequestIdCount)).toBe(1);
 });
 
@@ -442,7 +671,7 @@ test("enabled mobile controls expose comfortable targets and focused errors are 
   await mockCaptcha(page);
   await page.goto(`${fixtureOrigin}${localized.path}`);
   const submit = page.getByRole("button", { name: localized.labels.submit });
-  const consentLabel = page.locator("label[for='contact-consent']");
+  const consentLabel = page.getByRole("checkbox", { name: localized.labels.consent }).locator("xpath=ancestor::label");
   for (const target of [submit, consentLabel]) {
     const box = await target.boundingBox();
     expect(box).not.toBeNull();
