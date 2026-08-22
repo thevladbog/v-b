@@ -47,12 +47,16 @@ if (!title) {
   </div>
 
   <div class="hero-ticker" aria-hidden="true">
-    <div>
+    <div class="hero-ticker-track">
       {Array.from({ length: 2 }, () => (
-        <>
-          <span>product logic</span><i></i><span>interface</span><i></i>
-          <span>architecture</span><i></i><span>launch</span><i></i><span>operations</span><i></i>
-        </>
+        <div class="hero-ticker-group">
+          {Array.from({ length: 4 }, () => (
+            <>
+              <span>product logic</span><i></i><span>interface</span><i></i>
+              <span>architecture</span><i></i><span>launch</span><i></i><span>operations</span><i></i>
+            </>
+          ))}
+        </div>
       ))}
     </div>
   </div>
