@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { parse } from "parse5";
 import { describe, expect, it } from "vitest";
 import {
-  DRAFT_LEGAL_ROUTES,
+  LEGAL_ROUTES,
   PUBLIC_ROUTES,
   REACHABLE_HTML_ROUTES,
 } from "../src/lib/route-inventory.js";
@@ -66,7 +66,7 @@ const inheritedLanguageOfText = (
 
 const publicOrigin = "https://v-b.tech";
 const expectedPublicRoutes = ["/", "/en/"] as const;
-const expectedDraftLegalRoutes = [
+const expectedLegalRoutes = [
   "/legal/",
   "/privacy/",
   "/personal-data-consent/",
@@ -98,14 +98,14 @@ I design and build complex digital products from workflows and interfaces to inf
 - Idento: The event team gets one coherent operating tool instead of a collection of utilities. https://github.com/thevladbog/idento
 - QuokkaQ: The queue becomes a managed visitor experience and an operating system for the branch. https://github.com/thevladbog/quokkaq
 
-## Legal drafts
+## Legal documents
 
 - Legal register: https://v-b.tech/legal/
-- Privacy draft: https://v-b.tech/privacy/
-- Personal data consent draft: https://v-b.tech/personal-data-consent/
+- Privacy policy: https://v-b.tech/privacy/
+- Personal data consent: https://v-b.tech/personal-data-consent/
 - English legal register: https://v-b.tech/en/legal/
-- English privacy draft: https://v-b.tech/en/privacy/
-- English personal data consent draft: https://v-b.tech/en/personal-data-consent/
+- English privacy policy: https://v-b.tech/en/privacy/
+- English personal data consent: https://v-b.tech/en/personal-data-consent/
 `;
 
 describe("public route inventory", () => {
@@ -113,8 +113,8 @@ describe("public route inventory", () => {
     expect(PUBLIC_ROUTES).toEqual(expectedPublicRoutes);
   });
 
-  it("keeps reachable draft legal routes out of the indexable inventory", () => {
-    expect(DRAFT_LEGAL_ROUTES).toEqual(expectedDraftLegalRoutes);
+  it("keeps reachable legal routes in their explicit noindex inventory", () => {
+    expect(LEGAL_ROUTES).toEqual(expectedLegalRoutes);
     expect(PUBLIC_ROUTES).not.toContain("/privacy/");
     expect(PUBLIC_ROUTES).not.toContain("/en/privacy/");
   });
@@ -172,7 +172,7 @@ describe("generated discovery artifacts", () => {
         canonicalPages: [{ label: "Primary", href: "https://example.test/" }],
         services: [{ title: "Service", description: "Service description." }],
         projects: [{ name: "Project", outcome: "Project outcome.", href: "https://example.test/project" }],
-        legalDrafts: [{ label: "Legal", href: "https://example.test/legal/" }],
+        legalDocuments: [{ label: "Legal", href: "https://example.test/legal/" }],
       }),
     ).toBe(`# Example
 
@@ -190,7 +190,7 @@ Bounded description.
 
 - Project: Project outcome. https://example.test/project
 
-## Legal drafts
+## Legal documents
 
 - Legal: https://example.test/legal/
 `);
@@ -199,7 +199,7 @@ Bounded description.
   it("does not leak draft, private, or nonexistent routes into the sitemap", async () => {
     const sitemap = await readText("dist/sitemap.xml");
 
-    for (const route of expectedDraftLegalRoutes) {
+    for (const route of expectedLegalRoutes) {
       expect(sitemap).not.toContain(new URL(route, publicOrigin).toString());
     }
     expect(sitemap).not.toMatch(/\/api\/|\/admin\/|\/draft\/|\/404\/?</);

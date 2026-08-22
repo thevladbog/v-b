@@ -24,13 +24,13 @@ const POLICY_SECTION_REQUIREMENTS = {
 export const PRIVACY_CONTENT = {
   ru: {
     documentCode: "VBT-PD-01",
-    releaseIdentity: "VBT-PD-01/DRAFT",
+    releaseIdentity: "VBT-PD-01/2026.08/01",
     locale: "ru",
-    title: "Политика обработки персональных данных — проект",
+    title: "Политика обработки персональных данных",
     description:
-      "Проект политики обработки персональных данных для узкой формы обращения на сайте v-b.tech; документ не вступил в силу.",
+      "Политика обработки персональных данных для формы обращения на сайте v-b.tech, редакция VBT-PD-01/2026.08/01 от 23.08.2026.",
     summary:
-      "Проект описывает только предполагаемую обработку данных посетителя, который по своей инициативе направляет обращение через будущую форму v-b.tech.",
+      "Политика описывает обработку данных посетителя, который по своей инициативе направляет обращение через форму v-b.tech.",
     sections: [
       {
         id: "operator-and-scope",
@@ -39,11 +39,11 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "Предполагаемый оператор: Богатырев Владислав Сергеевич; почтовый адрес: 353745, Краснодарский край, Ленинградский район, ст. Ленинградская, ул. Грузская, д. 26; email: hello@v-b.tech; телефон: +7 934 355-14-90; сайт: https://v-b.tech.",
+            text: "Оператор: Богатырев Владислав Сергеевич; почтовый адрес: 353745, Краснодарский край, Ленинградский район, ст. Ленинградская, ул. Грузская, д. 26; email: hello@v-b.tech; телефон: +7 934 355-14-90; сайт: https://v-b.tech.",
           },
           {
             kind: "paragraph",
-            text: "Политика ограничена сайтом v-b.tech и будущей формой проектного обращения. Субъекты — только посетители, которые сами решат отправить такое обращение. Документ является проектом, не действует и сам по себе не разрешает прием обращений.",
+            text: "Политика ограничена сайтом v-b.tech и формой проектного обращения. Субъекты — только посетители, которые сами решают отправить такое обращение.",
           },
         ],
       },
@@ -74,7 +74,7 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "Посетитель сможет указать только имя длиной не более 100 символов, контакт в виде email или @telegram длиной не более 254 символов и сообщение длиной не более 4 000 символов. Вложения не принимаются.",
+            text: "Посетитель может указать только имя длиной не более 100 символов, контакт в виде email или @telegram длиной не более 254 символов и сообщение длиной не более 4 000 символов. Вложения не принимаются.",
           },
           {
             kind: "paragraph",
@@ -102,7 +102,7 @@ export const PRIVACY_CONTENT = {
           },
           {
             kind: "paragraph",
-            text: "UUID обращения используется только как ограниченный идентификатор корреляции. Предполагаемые телеметрия и журналы приложения должны быть ограничены видом события, UUID обращения, этапом, статусом и длительностью; они не должны включать предоставленные пользователем поля — имя, контакт и сообщение — или иное персональное содержимое обращения, captcha-токен или секреты. Скрытое обогащение не предусматривается, произвольные источники перехода и маркетинговые метки не должны сохраняться.",
+            text: "UUID обращения используется только как ограниченный идентификатор корреляции. Телеметрия и журналы приложения ограничены видом события, UUID обращения, этапом, статусом и длительностью; они не включают предоставленные пользователем поля — имя, контакт и сообщение — или иное персональное содержимое обращения, captcha-токен или секреты. Скрытое обогащение не применяется, произвольные источники перехода и маркетинговые метки не сохраняются.",
           },
         ],
       },
@@ -134,11 +134,11 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "До будущего включения формы обработка ее данных не начинается. Для добровольно отправленного обращения предполагается отдельное согласие VBT-PD-02 соответствующей действующей редакции. Проект VBT-PD-02/DRAFT не является действующей редакцией и не может быть принят посетителем.",
+            text: "Обработка данных формы начинается только после добровольной отправки обращения и подтверждения отдельного согласия VBT-PD-02/2026.08/01 посредством изначально не отмеченного обязательного флажка.",
           },
           {
             kind: "paragraph",
-            text: "После начала переписки отдельные операции могут иметь иное применимое основание, если оно действительно существует и документировано; настоящий проект заранее не утверждает наличие такого основания.",
+            text: "После начала переписки отдельные операции могут иметь иное применимое основание только если оно действительно существует и документировано.",
           },
         ],
       },
@@ -149,7 +149,7 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "В предполагаемых пределах возможны сбор, запись, систематизация, накопление, хранение, уточнение, извлечение, использование, необходимая передача привлеченным обработчикам, блокирование, удаление и уничтожение. Обработка смешанная: автоматизированная и, при работе с перепиской, без средств автоматизации.",
+            text: "В установленных пределах выполняются сбор, запись, систематизация, накопление, хранение, уточнение, извлечение, использование, необходимая передача привлеченным обработчикам, блокирование, удаление и уничтожение. Обработка смешанная: автоматизированная и, при работе с перепиской, без средств автоматизации.",
           },
         ],
       },
@@ -160,7 +160,7 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "Обращение и связанная деловая переписка предполагаются к хранению не более одного года после последнего содержательного контакта, если отсутствует иное документированное основание. Обоснованные запросы субъекта на блокирование, удаление или уничтожение рассматриваются отдельно.",
+            text: "Обращение и связанная деловая переписка хранятся не более одного года после последнего содержательного контакта, если отсутствует иное документированное основание. Обоснованные запросы субъекта на блокирование, удаление или уничтожение рассматриваются отдельно.",
           },
           {
             kind: "paragraph",
@@ -171,20 +171,20 @@ export const PRIVACY_CONTENT = {
       {
         id: "providers",
         requirements: POLICY_SECTION_REQUIREMENTS.providers,
-        heading: "9. Поставщики и их предполагаемые роли",
+        heading: "9. Поставщики и их роли",
         blocks: [
           {
             kind: "definition-list",
             items: [
               { term: "Yandex Cloud", detail: "размещение, функции, база данных и инфраструктура секретов по поручению оператора." },
               { term: "Postbox", detail: "транзакционная доставка сообщений в необходимом объеме." },
-              { term: "SmartCaptcha", detail: "защита от автоматизированных обращений только после включения онлайн-отправки." },
+              { term: "SmartCaptcha", detail: "защита формы от автоматизированных обращений." },
               { term: "Почтовый провайдер оператора", detail: "прием и хранение связанной деловой переписки." },
             ],
           },
           {
             kind: "paragraph",
-            text: "Точные договорные лица, роли, регионы обработки и действующие условия каждого поставщика подлежат повторной проверке до активации. Этот перечень не подтверждает заключение или содержание договоров.",
+            text: "Yandex Cloud, Cloud Postbox и SmartCaptcha используются в рамках условий сервисов Yandex Cloud; оператор определяет цели обработки, а поставщики обрабатывают необходимый технический объем в рамках соответствующего сервиса. Почтовый провайдер оператора принимает и хранит связанную деловую переписку.",
           },
         ],
       },
@@ -195,7 +195,7 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "Для будущей конфигурации первичный сбор, запись, систематизация, накопление, хранение, уточнение и извлечение данных граждан Российской Федерации должны выполняться с использованием баз данных на территории Российской Федерации.",
+            text: "Первичный сбор, запись, систематизация, накопление, хранение, уточнение и извлечение данных граждан Российской Федерации выполняются с использованием баз данных на территории Российской Федерации.",
           },
           {
             kind: "paragraph",
@@ -210,7 +210,7 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "Предполагаются ограничение доступа, изоляция данных, защита секретов, шифрование полезной нагрузки доставки, контроль изменений, резервирование, ограниченное журналирование и сроки хранения соразмерно характеру данных и актуальным угрозам, без публикации сведений, ослабляющих защиту.",
+            text: "Применяются ограничение доступа, изоляция данных, защита секретов, шифрование полезной нагрузки доставки, контроль изменений, резервирование, ограниченное журналирование и сроки хранения соразмерно характеру данных и актуальным угрозам, без публикации сведений, ослабляющих защиту.",
           },
           {
             kind: "paragraph",
@@ -225,7 +225,7 @@ export const PRIVACY_CONTENT = {
         blocks: [
           {
             kind: "paragraph",
-            text: "Запрос о доступе, уточнении, блокировании, удалении, уничтожении данных или отзыве согласия можно будет направить на hello@v-b.tech либо по почтовому адресу оператора. Для защиты данных оператор может запросить сведения, достаточные для подтверждения личности и поиска обращения.",
+            text: "Запрос о доступе, уточнении, блокировании, удалении, уничтожении данных или отзыве согласия можно направить на hello@v-b.tech либо по почтовому адресу оператора. Для защиты данных оператор может запросить сведения, достаточные для подтверждения личности и поиска обращения.",
           },
           {
             kind: "paragraph",
@@ -244,22 +244,22 @@ export const PRIVACY_CONTENT = {
           },
           {
             kind: "paragraph",
-            text: "SmartCaptcha и связанные с ней ресурсы могут загружаться только когда онлайн-отправка включена; для проверки она может получить проверочный токен и минимально необходимый сетевой контекст, но имя, контакт и сообщение ей не передаются. До включения отправки captcha не работает и данные ей не передаются.",
+            text: "SmartCaptcha и связанные с ней ресурсы загружаются только при работе с формой; для проверки она может получить проверочный токен и минимально необходимый сетевой контекст, но имя, контакт и сообщение ей не передаются.",
           },
         ],
       },
       {
         id: "revisions-and-language",
         requirements: POLICY_SECTION_REQUIREMENTS["revisions-and-language"],
-        heading: "14. Редакции, язык и статус проекта",
+        heading: "14. Редакции и язык",
         blocks: [
           {
             kind: "paragraph",
-            text: "Код документа: VBT-PD-01. Идентификатор кандидата: VBT-PD-01/DRAFT. Публичная редакция не присвоена, дата вступления в силу отсутствует. Документ является проектом, не вступил в силу и не подтверждает правовую проверку.",
+            text: "Код документа: VBT-PD-01. Идентификатор редакции: VBT-PD-01/2026.08/01. Дата вступления в силу: 23.08.2026.",
           },
           {
             kind: "paragraph",
-            text: "После активации приоритетным будет русский текст конкретной опубликованной редакции. Английский текст — информационный перевод соответствующего русского текста. Новая редакция публикуется как отдельный идентификатор после повторной проверки.",
+            text: "Приоритетным является русский текст этой опубликованной редакции. Английский текст — информационный перевод соответствующего русского текста. Новая редакция публикуется как отдельный идентификатор после повторной проверки.",
           },
         ],
       },
@@ -267,21 +267,21 @@ export const PRIVACY_CONTENT = {
   },
   en: {
     documentCode: "VBT-PD-01",
-    releaseIdentity: "VBT-PD-01/DRAFT",
+    releaseIdentity: "VBT-PD-01/2026.08/01",
     locale: "en",
-    title: "Personal Data Processing Policy — Draft",
+    title: "Personal Data Processing Policy",
     description:
-      "Draft personal data processing policy for the narrow v-b.tech enquiry form; the document is not in force.",
+      "Personal data processing policy for the narrow v-b.tech enquiry form, release VBT-PD-01/2026.08/01 effective 23 August 2026.",
     summary:
-      "This draft describes only the intended processing of a visitor's data when that visitor chooses to send a future v-b.tech project enquiry.",
+      "This policy describes processing of a visitor's data when that visitor chooses to send a v-b.tech project enquiry.",
     sections: [
       {
         id: "operator-and-scope",
         requirements: POLICY_SECTION_REQUIREMENTS["operator-and-scope"],
         heading: "1. Controller and scope",
         blocks: [
-          { kind: "paragraph", text: "Intended controller: Богатырев Владислав Сергеевич; postal address: 353745, Краснодарский край, Ленинградский район, ст. Ленинградская, ул. Грузская, д. 26; email: hello@v-b.tech; phone: +7 934 355-14-90; site: https://v-b.tech." },
-          { kind: "paragraph", text: "The policy is limited to v-b.tech and its future project enquiry form. Data subjects are visitors who choose to send an enquiry. This document is a draft, is not in force, and does not itself permit enquiries to be accepted." },
+          { kind: "paragraph", text: "Controller: Богатырев Владислав Сергеевич; postal address: 353745, Краснодарский край, Ленинградский район, ст. Ленинградская, ул. Грузская, д. 26; email: hello@v-b.tech; phone: +7 934 355-14-90; site: https://v-b.tech." },
+          { kind: "paragraph", text: "The policy is limited to v-b.tech and its project enquiry form. Data subjects are visitors who choose to send an enquiry." },
         ],
       },
       {
@@ -306,7 +306,7 @@ export const PRIVACY_CONTENT = {
         requirements: POLICY_SECTION_REQUIREMENTS["subjects-and-user-data"],
         heading: "3. Data subjects and visitor-provided data",
         blocks: [
-          { kind: "paragraph", text: "A visitor will be able to provide only a name of no more than 100 characters, a contact value as email or @telegram of no more than 254 characters, and a message of no more than 4,000 characters. Attachments are not accepted." },
+          { kind: "paragraph", text: "A visitor may provide only a name of no more than 100 characters, a contact value as email or @telegram of no more than 254 characters, and a message of no more than 4,000 characters. Attachments are not accepted." },
           { kind: "paragraph", text: "Visitors should not send passwords, payment details, legally protected secrets, special-category personal data, or other unnecessary confidential information." },
         ],
       },
@@ -325,7 +325,7 @@ export const PRIVACY_CONTENT = {
             ],
           },
           { kind: "paragraph", text: "The raw IP address must not be persisted in the application database. During verification SmartCaptcha may receive only the verification token and the minimum network context required; no name, contact, or message is sent to it." },
-          { kind: "paragraph", text: "The enquiry UUID is used only as a bounded correlation identifier. For the intended flow, application telemetry and logs must be limited to event kind, enquiry UUID, stage, status, and latency; they must exclude the user-provided fields — name, contact, and message — and any other personal body data, captcha token, and secrets. No hidden enrichment is intended, and arbitrary referrers and marketing parameters must not be retained." },
+          { kind: "paragraph", text: "The enquiry UUID is used only as a bounded correlation identifier. Application telemetry and logs are limited to event kind, enquiry UUID, stage, status, and latency; they exclude the user-provided fields — name, contact, and message — and any other personal body data, captcha token, and secrets. No hidden enrichment is performed, and arbitrary referrers and marketing parameters are not retained." },
         ],
       },
       {
@@ -351,8 +351,8 @@ export const PRIVACY_CONTENT = {
         requirements: POLICY_SECTION_REQUIREMENTS["grounds-and-consent"],
         heading: "6. Grounds and separate-consent boundary",
         blocks: [
-          { kind: "paragraph", text: "Processing for the form does not begin until the form is enabled in the future. A voluntarily sent enquiry is intended to rely on a separate active revision of consent VBT-PD-02. VBT-PD-02/DRAFT is not active and cannot be accepted by a visitor." },
-          { kind: "paragraph", text: "After correspondence begins, a specific operation may have another applicable ground only if it actually exists and is documented; this draft does not claim such a ground in advance." },
+          { kind: "paragraph", text: "Processing for the form begins only after a visitor voluntarily submits an enquiry and confirms separate consent VBT-PD-02/2026.08/01 using an initially unchecked required checkbox." },
+          { kind: "paragraph", text: "After correspondence begins, a specific operation may have another applicable ground only if it actually exists and is documented." },
         ],
       },
       {
@@ -360,7 +360,7 @@ export const PRIVACY_CONTENT = {
         requirements: POLICY_SECTION_REQUIREMENTS.operations,
         heading: "7. Operations and processing methods",
         blocks: [
-          { kind: "paragraph", text: "Intended operations are collection, recording, organization, accumulation, storage, correction, retrieval, use, necessary transfer to engaged processors, restriction, erasure, and destruction. Processing is mixed: automated and, for correspondence, without automated means." },
+          { kind: "paragraph", text: "Operations are collection, recording, organization, accumulation, storage, correction, retrieval, use, necessary transfer to engaged processors, restriction, erasure, and destruction. Processing is mixed: automated and, for correspondence, without automated means." },
         ],
       },
       {
@@ -368,14 +368,14 @@ export const PRIVACY_CONTENT = {
         requirements: POLICY_SECTION_REQUIREMENTS["retention-and-destruction"],
         heading: "8. Retention, restriction, erasure, and destruction",
         blocks: [
-          { kind: "paragraph", text: "The enquiry and related business correspondence are intended to be retained for no more than one year after the last substantive contact unless another documented ground applies. Substantiated subject requests for restriction, erasure, or destruction are handled separately." },
+          { kind: "paragraph", text: "The enquiry and related business correspondence are retained for no more than one year after the last substantive contact unless another documented ground applies. Substantiated subject requests for restriction, erasure, or destruction are handled separately." },
           { kind: "paragraph", text: "The encrypted delivery payload must be erased on a short schedule after a terminal outcome. Bounded technical delivery history is retained only for an operational term and does not replace separate correspondence management." },
         ],
       },
       {
         id: "providers",
         requirements: POLICY_SECTION_REQUIREMENTS.providers,
-        heading: "9. Providers and intended roles",
+        heading: "9. Providers and roles",
         blocks: [
           {
             kind: "definition-list",
@@ -386,7 +386,7 @@ export const PRIVACY_CONTENT = {
               { term: "The controller's mailbox provider", detail: "receipt and storage of directly related business correspondence." },
             ],
           },
-          { kind: "paragraph", text: "The exact contracting entities, roles, processing regions, and current terms for every provider must be reverified before activation. This list does not confirm that any particular agreement exists or what it contains." },
+          { kind: "paragraph", text: "Yandex Cloud, Cloud Postbox, and SmartCaptcha are used under the applicable Yandex Cloud service terms; the controller determines the processing purposes, and each provider processes the technical data necessary for its service. The controller's mailbox provider receives and stores directly related business correspondence." },
         ],
       },
       {
@@ -394,7 +394,7 @@ export const PRIVACY_CONTENT = {
         requirements: POLICY_SECTION_REQUIREMENTS["localization-and-transfer"],
         heading: "10. Russian localization and cross-border transfer",
         blocks: [
-          { kind: "paragraph", text: "For the future configuration, primary collection, recording, organization, accumulation, storage, correction, and retrieval of Russian citizens' data must use databases located in the Russian Federation." },
+          { kind: "paragraph", text: "Primary collection, recording, organization, accumulation, storage, correction, and retrieval of Russian citizens' data use databases located in the Russian Federation." },
           { kind: "paragraph", text: "No cross-border transfer is intended. It cannot be enabled without a separate review of recipients, grounds, procedures, and updated documents before such transfer begins." },
         ],
       },
@@ -403,7 +403,7 @@ export const PRIVACY_CONTENT = {
         requirements: POLICY_SECTION_REQUIREMENTS["security-and-incidents"],
         heading: "11. Security and incidents",
         blocks: [
-          { kind: "paragraph", text: "Intended measures include access controls, data isolation, secret protection, encryption of delivery payloads, change controls, backups, bounded logging, and retention limits proportionate to the data and current threats, without publishing details that could weaken defenses." },
+          { kind: "paragraph", text: "Measures include access controls, data isolation, secret protection, encryption of delivery payloads, change controls, backups, bounded logging, and retention limits proportionate to the data and current threats, without publishing details that could weaken defenses." },
           { kind: "paragraph", text: "For a confirmed incident, the controller must contain consequences, preserve necessary evidence, make applicable notifications, and correct the cause." },
         ],
       },
@@ -422,16 +422,16 @@ export const PRIVACY_CONTENT = {
         heading: "13. Browser storage, logs, and captcha",
         blocks: [
           { kind: "paragraph", text: "The strictly necessary vbtech-theme-v1 local record stores the theme choice. The site uses no analytics or advertising cookies. The enquiry UUID is used only as a bounded correlation identifier. Server and application telemetry and logs must be limited to event kind, enquiry UUID, stage, status, and latency and must exclude the user-provided fields — name, contact, and message — and any other personal body data, captcha token, and secrets." },
-          { kind: "paragraph", text: "SmartCaptcha and its resources may load only when online submission is enabled; during verification it may receive the verification token and the minimum network context required, but no name, contact, or message is sent to it. Before submission is enabled, captcha is inactive and receives no data." },
+          { kind: "paragraph", text: "SmartCaptcha and its resources load only when the form is used; during verification it may receive the verification token and the minimum network context required, but no name, contact, or message is sent to it." },
         ],
       },
       {
         id: "revisions-and-language",
         requirements: POLICY_SECTION_REQUIREMENTS["revisions-and-language"],
-        heading: "14. Revisions, language, and draft status",
+        heading: "14. Revisions and language",
         blocks: [
-          { kind: "paragraph", text: "Document code: VBT-PD-01. Candidate identity: VBT-PD-01/DRAFT. No public revision has been assigned and no effective date exists. This document is a draft, is not in force, and does not establish legal approval." },
-          { kind: "paragraph", text: "After activation, the Russian text of a specific published revision will be authoritative. This English text is an informational translation of the matching Russian text. A replacement revision is published as a separate identity after renewed review." },
+          { kind: "paragraph", text: "Document code: VBT-PD-01. Release identity: VBT-PD-01/2026.08/01. Effective date: 23 August 2026." },
+          { kind: "paragraph", text: "The Russian text of this published revision is authoritative. This English text is an informational translation of the matching Russian text. A replacement revision is published as a separate identity after renewed review." },
         ],
       },
     ],

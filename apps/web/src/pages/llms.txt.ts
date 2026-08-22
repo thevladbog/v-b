@@ -13,14 +13,14 @@ const body = serializeLlmsText({
   ],
   services: page.expertise.items,
   projects: page.cases,
-  legalDrafts: [
+  legalDocuments: [
     { label: "Legal register", href: "https://v-b.tech/legal/" },
-    { label: "Privacy draft", href: "https://v-b.tech/privacy/" },
-    { label: "Personal data consent draft", href: "https://v-b.tech/personal-data-consent/" },
+    { label: "Privacy policy", href: "https://v-b.tech/privacy/" },
+    { label: "Personal data consent", href: "https://v-b.tech/personal-data-consent/" },
     { label: "English legal register", href: "https://v-b.tech/en/legal/" },
-    { label: "English privacy draft", href: "https://v-b.tech/en/privacy/" },
+    { label: "English privacy policy", href: "https://v-b.tech/en/privacy/" },
     {
-      label: "English personal data consent draft",
+      label: "English personal data consent",
       href: "https://v-b.tech/en/personal-data-consent/",
     },
   ],

@@ -40,6 +40,27 @@ const syntheticActiveDocuments = () => {
   }));
 };
 
+const syntheticDraftReleases = (): LegalDocumentRelease[] =>
+  LEGAL_RELEASES.map((release) => ({
+    ...release,
+    identity: `${release.code}/DRAFT`,
+    revision: null,
+    effectiveDate: null,
+    status: "draft",
+  })) as LegalDocumentRelease[];
+
+const syntheticDraftDocuments = (): LegalDocumentSource[] => {
+  const releases = syntheticDraftReleases();
+  return LEGAL_DOCUMENTS.map((document, index) => ({
+    ...document,
+    releaseIdentity: releases[index]!.identity,
+    content: {
+      ru: { ...document.content.ru, releaseIdentity: releases[index]!.identity },
+      en: { ...document.content.en, releaseIdentity: releases[index]!.identity },
+    },
+  }));
+};
+
 type Mutable<T> = T extends readonly (infer Item)[]
   ? Mutable<Item>[]
   : T extends object
@@ -92,7 +113,7 @@ const retainedPolicyHistory = () => {
   };
 };
 
-describe("draft legal document registry", () => {
+describe("legal document registry", () => {
   const rawWindowsHome = String.raw`C:\Users\alice\source\operator.ts`;
 
   it.each([
@@ -263,39 +284,62 @@ line.ts"]}`,
     expect(containsDeveloperHomePath(ambiguousPath, "generated-artifact")).toBe(false);
   });
 
-  it("pins exactly two paired current draft candidates", () => {
+  it("publishes the owner-approved paired ACTIVE contour effective 2026-08-23", () => {
+    expect(LEGAL_RELEASES.map(({ identity }) => identity)).toEqual([
+      "VBT-PD-01/2026.08/01",
+      "VBT-PD-02/2026.08/01",
+    ]);
+    expect(LEGAL_RELEASES.every(({ status }) => status === "active")).toBe(true);
+    expect(LEGAL_RELEASES.every(({ effectiveDate }) => effectiveDate === "2026-08-23")).toBe(true);
+    expect(CURRENT_CONTACT_CONSENT_ID).toBe("VBT-PD-02/2026.08/01");
+    expect(() => assertContactConsentPublishable(CURRENT_CONTACT_CONSENT_ID, true)).not.toThrow();
+    expect(listActiveLegalDocuments("ru").map(({ code }) => code)).toEqual([
+      "VBT-PD-01",
+      "VBT-PD-02",
+    ]);
+    expect(listActiveLegalDocuments("en").map(({ code }) => code)).toEqual([
+      "VBT-PD-01",
+      "VBT-PD-02",
+    ]);
+  });
+
+  it("pins exactly two paired current ACTIVE releases", () => {
     expect(LEGAL_RELEASES).toHaveLength(2);
     expect(LEGAL_RELEASES.map(({ code }) => code)).toEqual(["VBT-PD-01", "VBT-PD-02"]);
     expect(LEGAL_RELEASES.map(({ identity }) => identity)).toEqual([
-      "VBT-PD-01/DRAFT",
-      "VBT-PD-02/DRAFT",
+      "VBT-PD-01/2026.08/01",
+      "VBT-PD-02/2026.08/01",
     ]);
-    expect(LEGAL_RELEASES.every(({ status }) => status === "draft")).toBe(true);
-    expect(LEGAL_RELEASES.every(({ revision }) => revision === null)).toBe(true);
-    expect(LEGAL_RELEASES.every(({ effectiveDate }) => effectiveDate === null)).toBe(true);
+    expect(LEGAL_RELEASES.every(({ status }) => status === "active")).toBe(true);
+    expect(LEGAL_RELEASES.every(({ revision }) => revision === "2026.08/01")).toBe(true);
+    expect(LEGAL_RELEASES.every(({ effectiveDate }) => effectiveDate === "2026-08-23")).toBe(true);
     expect(LEGAL_DOCUMENTS.every(({ content }) => content.ru && content.en)).toBe(true);
     expect(new Set(LEGAL_RELEASES.flatMap(({ routes }) => Object.values(routes))).size).toBe(4);
     expect(listCurrentLegalDocuments("ru").map(({ code }) => code)).toEqual([
       "VBT-PD-01",
       "VBT-PD-02",
     ]);
-    expect(getCurrentLegalDocument("VBT-PD-02", "en").identity).toBe("VBT-PD-02/DRAFT");
+    expect(getCurrentLegalDocument("VBT-PD-02", "en").identity).toBe("VBT-PD-02/2026.08/01");
   });
 
-  it("has no active document and fails active lookup clearly", () => {
-    expect(listActiveLegalDocuments("ru")).toEqual([]);
-    expect(listActiveLegalDocuments("en")).toEqual([]);
-    expect(() => getActiveLegalDocument("VBT-PD-02", "ru")).toThrow(
-      /no active legal document.*VBT-PD-02/i,
+  it("exposes the paired ACTIVE documents in both locales", () => {
+    expect(listActiveLegalDocuments("ru").map(({ identity }) => identity)).toEqual([
+      "VBT-PD-01/2026.08/01",
+      "VBT-PD-02/2026.08/01",
+    ]);
+    expect(listActiveLegalDocuments("en").map(({ identity }) => identity)).toEqual([
+      "VBT-PD-01/2026.08/01",
+      "VBT-PD-02/2026.08/01",
+    ]);
+    expect(getActiveLegalDocument("VBT-PD-02", "ru").identity).toBe(
+      "VBT-PD-02/2026.08/01",
     );
   });
 
-  it("keeps the draft consent identity unusable for enabled submission", () => {
-    expect(CURRENT_CONTACT_CONSENT_ID).toBe("VBT-PD-02/DRAFT");
+  it("allows the ACTIVE consent identity for enabled submission", () => {
+    expect(CURRENT_CONTACT_CONSENT_ID).toBe("VBT-PD-02/2026.08/01");
     expect(() => assertContactConsentPublishable(CURRENT_CONTACT_CONSENT_ID, false)).not.toThrow();
-    expect(() => assertContactConsentPublishable(CURRENT_CONTACT_CONSENT_ID, true)).toThrow(
-      /draft consent.*cannot.*submission/i,
-    );
+    expect(() => assertContactConsentPublishable(CURRENT_CONTACT_CONSENT_ID, true)).not.toThrow();
   });
 
   it("pins the approved operator snapshot without unsupported identity fields", () => {
@@ -345,23 +389,23 @@ line.ts"]}`,
   });
 
   describe("personal data legal contour", () => {
-    it("derives the two current DRAFT releases in code order regardless of input order", () => {
+    it("derives the two current ACTIVE releases in code order regardless of input order", () => {
       for (const releases of [LEGAL_RELEASES, [...LEGAL_RELEASES].reverse()]) {
         const contour = derivePersonalDataLegalContour(releases);
-        expect(contour.status).toBe("draft");
+        expect(contour.status).toBe("active");
         expect(contour.policy).toMatchObject({
           code: "VBT-PD-01",
-          identity: "VBT-PD-01/DRAFT",
-          revision: null,
-          effectiveDate: null,
-          status: "draft",
+          identity: "VBT-PD-01/2026.08/01",
+          revision: "2026.08/01",
+          effectiveDate: "2026-08-23",
+          status: "active",
         });
         expect(contour.consent).toMatchObject({
           code: "VBT-PD-02",
-          identity: "VBT-PD-02/DRAFT",
-          revision: null,
-          effectiveDate: null,
-          status: "draft",
+          identity: "VBT-PD-02/2026.08/01",
+          revision: "2026.08/01",
+          effectiveDate: "2026-08-23",
+          status: "active",
         });
       }
     });
@@ -388,7 +432,7 @@ line.ts"]}`,
       ["draft policy with active consent", 1],
     ] as const)("fails closed for %s", (_label, activeIndex) => {
       const active = syntheticActiveReleases();
-      const mixed = [...LEGAL_RELEASES] as LegalDocumentRelease[];
+      const mixed = syntheticDraftReleases();
       mixed[activeIndex] = active[activeIndex]!;
       expect(() => derivePersonalDataLegalContour(mixed)).toThrow(
         /incoherent personal data legal contour.*VBT-PD-01=(?:active|draft).*VBT-PD-02=(?:active|draft)/i,
@@ -417,17 +461,18 @@ line.ts"]}`,
     });
 
     it("rejects a DRAFT identity or publication metadata that contradicts its state", () => {
+      const drafts = syntheticDraftReleases();
       const invalidIdentity = [
-        { ...LEGAL_RELEASES[0]!, identity: "VBT-PD-01/2026.09/01" },
-        LEGAL_RELEASES[1]!,
+        { ...drafts[0]!, identity: "VBT-PD-01/2026.09/01" },
+        drafts[1]!,
       ] as unknown as LegalDocumentRelease[];
       expect(() => derivePersonalDataLegalContour(invalidIdentity)).toThrow(
         /draft personal data release VBT-PD-01.*identity/i,
       );
 
       const invalidMetadata = [
-        LEGAL_RELEASES[0]!,
-        { ...LEGAL_RELEASES[1]!, revision: "2026.09/02" },
+        drafts[0]!,
+        { ...drafts[1]!, revision: "2026.09/02" },
       ] as unknown as LegalDocumentRelease[];
       expect(() => derivePersonalDataLegalContour(invalidMetadata)).toThrow(
         /draft personal data release VBT-PD-02.*revision.*effective date/i,
@@ -451,7 +496,7 @@ line.ts"]}`,
     expect(reverse.map(({ identity }) => identity)).toEqual(
       forward.map(({ identity }) => identity),
     );
-    const withNextDraft = [...history.releases, LEGAL_RELEASES[0]!];
+    const withNextDraft = [...history.releases, syntheticDraftReleases()[0]!];
     expect(deriveCurrentLegalReleases(withNextDraft)[0]!.identity).toBe(history.active.identity);
   });
 
@@ -502,13 +547,14 @@ line.ts"]}`,
     const wrongCode = retainedPolicyHistory();
     wrongCode.active = {
       ...wrongCode.active,
-      supersedes: "VBT-PD-02/2026.08/01",
+      supersedes: "VBT-PD-02/2026.07/01",
     } as typeof wrongCode.active;
     wrongCode.releases[0] = wrongCode.active;
     const consentHistory = {
       ...wrongCode.superseded,
       code: "VBT-PD-02",
-      identity: "VBT-PD-02/2026.08/01",
+      identity: "VBT-PD-02/2026.07/01",
+      revision: "2026.07/01",
       routes: {
         ru: "/legal/archive/consent-2026-08/",
         en: "/en/legal/archive/consent-2026-08/",
@@ -538,7 +584,7 @@ line.ts"]}`,
 
     const draftSource = retainedPolicyHistory();
     draftSource.releases[2] = {
-      ...draftSource.consent,
+      ...syntheticDraftReleases()[1]!,
       supersedes: draftSource.superseded.identity,
     } as unknown as LegalDocumentRelease;
     expect(() => validateLegalRegistry(draftSource.releases, draftSource.documents)).toThrow(
@@ -638,20 +684,22 @@ line.ts"]}`,
       active[1]!,
     ], LEGAL_DOCUMENTS)).toThrow(/valid ISO effective date/i);
 
+    const drafts = syntheticDraftReleases();
+    const draftDocuments = syntheticDraftDocuments();
     expect(() => validateLegalRegistry([
-      { ...LEGAL_RELEASES[0]!, revision: "2026.08/01" } as unknown as LegalDocumentRelease,
-      LEGAL_RELEASES[1]!,
-    ], LEGAL_DOCUMENTS)).toThrow(/draft.*revision.*effective date/i);
+      { ...drafts[0]!, revision: "2026.08/01" } as unknown as LegalDocumentRelease,
+      drafts[1]!,
+    ], draftDocuments)).toThrow(/draft.*revision.*effective date/i);
     expect(() => validateLegalRegistry([
-      { ...LEGAL_RELEASES[0]!, effectiveDate: "2026-08-20" } as unknown as LegalDocumentRelease,
-      LEGAL_RELEASES[1]!,
-    ], LEGAL_DOCUMENTS)).toThrow(/draft.*revision.*effective date/i);
+      { ...drafts[0]!, effectiveDate: "2026-08-20" } as unknown as LegalDocumentRelease,
+      drafts[1]!,
+    ], draftDocuments)).toThrow(/draft.*revision.*effective date/i);
   });
 
   it("rejects release identity and content-source mismatches", () => {
     const mismatchedIdentity = [{
       ...LEGAL_RELEASES[0]!,
-      identity: "VBT-PD-01/2026.08/01",
+      identity: "VBT-PD-01/2026.08/02",
     } as unknown as LegalDocumentRelease, LEGAL_RELEASES[1]!];
     expect(() => validateLegalRegistry(mismatchedIdentity, LEGAL_DOCUMENTS)).toThrow(
       /identity.*metadata/i,
@@ -697,12 +745,12 @@ line.ts"]}`,
         ru: {
           ...consentContent.ru,
           documentCode: "VBT-PD-01",
-          releaseIdentity: "VBT-PD-01/DRAFT",
+          releaseIdentity: "VBT-PD-01/2026.08/01",
         },
         en: {
           ...consentContent.en,
           documentCode: "VBT-PD-01",
-          releaseIdentity: "VBT-PD-01/DRAFT",
+          releaseIdentity: "VBT-PD-01/2026.08/01",
         },
       },
     };
@@ -712,12 +760,12 @@ line.ts"]}`,
         ru: {
           ...policyContent.ru,
           documentCode: "VBT-PD-02",
-          releaseIdentity: "VBT-PD-02/DRAFT",
+          releaseIdentity: "VBT-PD-02/2026.08/01",
         },
         en: {
           ...policyContent.en,
           documentCode: "VBT-PD-02",
-          releaseIdentity: "VBT-PD-02/DRAFT",
+          releaseIdentity: "VBT-PD-02/2026.08/01",
         },
       },
     };

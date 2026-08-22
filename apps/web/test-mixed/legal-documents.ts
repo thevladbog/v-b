@@ -1,6 +1,6 @@
 import {
-  LEGAL_RELEASES as draftReleases,
-  getCurrentLegalDocument as getDraftLegalDocument,
+  LEGAL_RELEASES as activeReleases,
+  getCurrentLegalDocument as getActiveLegalDocument,
   type LegalDocumentCode,
   type LegalDocumentRelease,
   type LegalDocumentView,
@@ -17,17 +17,16 @@ if (direction !== "policy-active" && direction !== "consent-active") {
   throw new Error("The mixed legal contour requires an explicit private direction guard");
 }
 
-const activeCode: LegalDocumentCode = direction === "policy-active" ? "VBT-PD-01" : "VBT-PD-02";
-const activeRevision = activeCode === "VBT-PD-01" ? "2099.01/01" : "2099.02/02";
+const draftCode: LegalDocumentCode = direction === "policy-active" ? "VBT-PD-02" : "VBT-PD-01";
 
-const currentReleases = draftReleases.map((release): LegalDocumentRelease =>
-  release.code === activeCode
+const currentReleases = activeReleases.map((release): LegalDocumentRelease =>
+  release.code === draftCode
     ? {
         ...release,
-        identity: `${release.code}/${activeRevision}`,
-        revision: activeRevision,
-        effectiveDate: activeCode === "VBT-PD-01" ? "2099-01-01" : "2099-02-02",
-        status: "active",
+        identity: `${release.code}/DRAFT`,
+        revision: null,
+        effectiveDate: null,
+        status: "draft",
       } as LegalDocumentRelease
     : release,
 );
@@ -37,13 +36,13 @@ export const CURRENT_PERSONAL_DATA_LEGAL_CONTOUR =
 export const CURRENT_CONTACT_CONSENT_ID = CURRENT_PERSONAL_DATA_LEGAL_CONTOUR.consent.identity;
 
 const documentFor = (code: LegalDocumentCode, locale: LegalLocale): LegalDocumentView => {
-  const draft = getDraftLegalDocument(code, locale);
+  const active = getActiveLegalDocument(code, locale);
   const release = currentReleases.find((candidate) => candidate.code === code);
   if (!release) throw new Error(`Missing mixed legal fixture release for ${code}`);
   return {
     ...release,
     content: {
-      ...draft.content,
+      ...active.content,
       releaseIdentity: release.identity,
     },
   };

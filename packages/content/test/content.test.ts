@@ -29,15 +29,15 @@ describe("site content", () => {
     expect(JSON.stringify(SITE_CONTENT)).not.toMatch(/VBT-PD-\d+/);
   });
 
-  it("defines exact state-aware contact copy while preserving the DRAFT wording", () => {
+  it("defines exact state-aware contact copy against the ACTIVE legal contour", () => {
     expect(SITE_CONTENT.ru.contact).toMatchObject({
-      directContactContext: "Онлайн-форма пока недоступна. Telegram и email работают и остаются прямыми способами связи.",
-      formTitle: "Черновик обращения",
-      formNote: "Это отключённая production-оболочка: данные не передаются.",
-      formConsentInstruction: "Флажок изначально снят. Перед возможной отправкой потребуется отдельное согласие.",
-      consentLinkLabel: "проектом согласия на обработку персональных данных",
-      consentDraftContext: "Проект не вступил в силу; согласие пока нельзя принять.",
-      errors: { consent: "Для отправки потребуется явно подтвердить согласие." },
+      directContactContext: "Онлайн-форма временно недоступна. Telegram и email работают и остаются прямыми способами связи.",
+      formTitle: "Обращение",
+      formNote: "Сейчас форма не отправляет данные. Используйте прямые каналы связи.",
+      formConsentInstruction: "Флажок изначально снят. Для отправки необходимо принять действующее согласие.",
+      consentLinkLabel: "согласием на обработку персональных данных",
+      consentDraftContext: "Редакция действует с 23.08.2026.",
+      errors: { consent: "Ознакомьтесь с действующим согласием и примите его, установив флажок." },
       activeSubmission: {
         directContactContext: "Отправьте обращение через форму ниже или свяжитесь напрямую по email или в Telegram.",
         formTitle: "Отправить обращение",
@@ -50,13 +50,13 @@ describe("site content", () => {
       },
     });
     expect(SITE_CONTENT.en.contact).toMatchObject({
-      directContactContext: "Online submission is currently unavailable. Telegram and email remain active direct contact options.",
-      formTitle: "Enquiry draft",
-      formNote: "This is a disabled production shell: no data is transmitted.",
-      formConsentInstruction: "The checkbox starts unchecked. Separate consent will be required before submission can be enabled.",
-      consentLinkLabel: "draft personal data processing consent",
-      consentDraftContext: "The draft consent cannot yet be accepted because it is not in force.",
-      errors: { consent: "Submission will require explicit consent confirmation." },
+      directContactContext: "Online submission is temporarily unavailable. Telegram and email remain active direct contact options.",
+      formTitle: "Enquiry",
+      formNote: "The form is not sending data at the moment. Use the direct contact options.",
+      formConsentInstruction: "The checkbox starts unchecked. Sending requires acceptance of the current consent.",
+      consentLinkLabel: "personal data processing consent",
+      consentDraftContext: "This release is effective from 23 August 2026.",
+      errors: { consent: "Review and accept the current consent by selecting the checkbox." },
       activeSubmission: {
         directContactContext: "Send an enquiry using the form below, or contact me directly by email or Telegram.",
         formTitle: "Send an enquiry",

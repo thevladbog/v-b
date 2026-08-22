@@ -88,11 +88,11 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
     "operator-and-scope": {
       ru: {
         operator: [/Богатырев Владислав Сергеевич/, /hello@v-b\.tech/],
-        scope: [/ограничена сайтом v-b\.tech и будущей формой проектного обращения/i],
+        scope: [/ограничена сайтом v-b\.tech и формой проектного обращения/i],
       },
       en: {
         operator: [/Богатырев Владислав Сергеевич/, /hello@v-b\.tech/],
-        scope: [/limited to v-b\.tech and its future project enquiry form/i],
+        scope: [/limited to v-b\.tech and its project enquiry form/i],
       },
     },
     "definitions-and-principles": {
@@ -107,7 +107,7 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
     },
     "subjects-and-user-data": {
       ru: {
-        subjects: [/Посетитель сможет указать только/i],
+        subjects: [/Посетитель может указать только/i],
         "user-data": [/имя.*100/i, /email или @telegram.*254/i, /сообщение.*4 000/i, /Вложения не принимаются/i],
         "sensitive-data-warning": [/пароли/, /платежные реквизиты/, /специальные категории персональных данных/],
       },
@@ -126,7 +126,7 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
           /состояние доставки.*ограниченные идентификаторы сообщений поставщика/i,
           /IP-адрес.*не должен сохраняться.*базе данных приложения/i,
         ],
-        "data-minimization": [/Скрытое обогащение не предусматривается/i, /маркетинговые метки не должны сохраняться/i],
+        "data-minimization": [/Скрытое обогащение не применяется/i, /маркетинговые метки не сохраняются/i],
       },
       en: {
         "operational-data": [
@@ -136,7 +136,7 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
           /delivery state.*bounded provider message identifiers/i,
           /raw IP address.*must not be persisted.*application database/i,
         ],
-        "data-minimization": [/No hidden enrichment is intended/i, /marketing parameters must not be retained/i],
+        "data-minimization": [/No hidden enrichment is performed/i, /marketing parameters are not retained/i],
       },
     },
     "purposes-and-exclusions": {
@@ -152,11 +152,11 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
     "grounds-and-consent": {
       ru: {
         "legal-grounds": [/иное применимое основание.*существует и документировано/i],
-        "consent-boundary": [/VBT-PD-02\/DRAFT не является действующей редакцией и не может быть принят/i],
+        "consent-boundary": [/VBT-PD-02\/2026\.08\/01.*изначально не отмеченного обязательного флажка/i],
       },
       en: {
         "legal-grounds": [/another applicable ground only if it actually exists and is documented/i],
-        "consent-boundary": [/VBT-PD-02\/DRAFT is not active and cannot be accepted/i],
+        "consent-boundary": [/VBT-PD-02\/2026\.08\/01.*initially unchecked required checkbox/i],
       },
     },
     operations: {
@@ -180,11 +180,11 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
     providers: {
       ru: {
         providers: [/Yandex Cloud/, /Postbox/, /SmartCaptcha/, /Почтовый провайдер оператора/],
-        "provider-review": [/договорные лица, роли, регионы обработки и действующие условия.*повторной проверке до активации/i],
+        "provider-review": [/условий сервисов Yandex Cloud.*оператор определяет цели обработки.*поставщики обрабатывают необходимый технический объем/i],
       },
       en: {
         providers: [/Yandex Cloud/, /Postbox/, /SmartCaptcha/, /mailbox provider/],
-        "provider-review": [/contracting entities, roles, processing regions, and current terms.*reverified before activation/i],
+        "provider-review": [/Yandex Cloud service terms.*controller determines the processing purposes.*provider processes the technical data necessary/i],
       },
     },
     "localization-and-transfer": {
@@ -225,7 +225,7 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
           /видом события, UUID обращения, этапом, статусом и длительностью/i,
           /поля.*имя, контакт и сообщение.*иное персональное содержимое обращения.*captcha-токен.*секреты/i,
         ],
-        captcha: [/SmartCaptcha.*только когда онлайн-отправка включена/i, /минимально необходимый сетевой контекст.*имя, контакт и сообщение.*не передаются/i],
+        captcha: [/SmartCaptcha.*загружаются только при работе с формой/i, /минимально необходимый сетевой контекст.*имя, контакт и сообщение.*не передаются/i],
       },
       en: {
         "browser-storage": [/strictly necessary vbtech-theme-v1 local record/i, /no analytics or advertising cookies/i],
@@ -234,17 +234,17 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
           /event kind, enquiry UUID, stage, status, and latency/i,
           /user-provided fields.*name, contact, and message.*other personal body data.*captcha token.*secrets/i,
         ],
-        captcha: [/SmartCaptcha.*only when online submission is enabled/i, /minimum network context.*no name, contact, or message/i],
+        captcha: [/SmartCaptcha.*load only when the form is used/i, /minimum network context.*no name, contact, or message/i],
       },
     },
     "revisions-and-language": {
       ru: {
-        lifecycle: [/VBT-PD-01\/DRAFT/, /Публичная редакция не присвоена, дата вступления в силу отсутствует/i, /проектом, не вступил в силу/i],
-        "authoritative-language": [/приоритетным будет русский текст/i, /Английский текст.*информационный перевод/i],
+        lifecycle: [/VBT-PD-01\/2026\.08\/01/, /Дата вступления в силу: 23\.08\.2026/i],
+        "authoritative-language": [/Приоритетным является русский текст/i, /Английский текст.*информационный перевод/i],
       },
       en: {
-        lifecycle: [/VBT-PD-01\/DRAFT/, /No public revision has been assigned and no effective date exists/i, /draft, is not in force/i],
-        "authoritative-language": [/Russian text.*will be authoritative/i, /English text is an informational translation/i],
+        lifecycle: [/VBT-PD-01\/2026\.08\/01/, /Effective date: 23 August 2026/i],
+        "authoritative-language": [/Russian text.*is authoritative/i, /English text is an informational translation/i],
       },
     },
   },
@@ -252,13 +252,13 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
     "draft-boundary": {
       ru: {
         "affirmative-action": [/изначально не отмеченный обязательный флажок/i, /отдельные ссылки на политику и согласие/i],
-        "consent-boundary": [/Онлайн-отправка отключена.*согласия пока нельзя принять/i],
-        lifecycle: [/VBT-PD-02\/DRAFT/, /Публичная редакция не присвоена.*дата вступления в силу отсутствует/i],
+        "consent-boundary": [/Согласие выражается добровольным утвердительным действием/i],
+        lifecycle: [/VBT-PD-02\/2026\.08\/01/, /Дата вступления в силу: 23\.08\.2026/i],
       },
       en: {
         "affirmative-action": [/initially unchecked required checkbox/i, /separate policy and consent links/i],
-        "consent-boundary": [/Online submission is disabled.*draft consent cannot yet be accepted/i],
-        lifecycle: [/VBT-PD-02\/DRAFT/, /No public revision has been assigned and no effective date exists/i],
+        "consent-boundary": [/Consent is given by voluntary affirmative action/i],
+        lifecycle: [/VBT-PD-02\/2026\.08\/01/, /Effective date: 23 August 2026/i],
       },
     },
     operator: {
@@ -274,7 +274,7 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
           /идентификатор согласия.*временные метки отправки и доставки/i,
           /краткоживущий ключевой HMAC.*фиксированного окна ограничения частоты/i,
           /состояние доставки.*ограниченные идентификаторы сообщений поставщика/i,
-          /IP-адрес.*не должен сохраняться.*базе данных приложения/i,
+          /IP-адрес.*не сохраняется.*базе данных приложения/i,
         ],
         purposes: [/ответ и уточнение обращения/i, /деловая переписка/i, /транзакционное подтверждение.*email/i, /автоматизированных злоупотреблений/i, /защита и диагностика/i],
         exclusions: [/Не допускаются реклама, новостные рассылки, аналитика, профилирование, обогащение лидов, продажа данных, передача в CRM или несвязанное повторное использование/i],
@@ -293,7 +293,7 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
           /consent identity.*submission and delivery timestamps/i,
           /short-lived keyed HMAC.*fixed rate-limit window/i,
           /delivery state.*bounded provider message identifiers/i,
-          /raw IP address.*must not be persisted.*application database/i,
+          /raw IP address.*is not persisted.*application database/i,
         ],
         purposes: [/replying to and clarifying the enquiry/i, /business correspondence/i, /transactional receipt.*email/i, /automated abuse/i, /securing and diagnosing/i],
         exclusions: [/No advertising, newsletter, analytics, profiling, lead enrichment, data sale, CRM transfer, or unrelated reuse/i],
@@ -309,12 +309,12 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
       ru: {
         operations: [/сбор, запись, систематизация, накопление, хранение, уточнение, извлечение, использование.*передача.*блокирование, удаление и уничтожение.*автоматизированным и неавтоматизированным/i],
         providers: [/Yandex Cloud/, /Postbox/, /SmartCaptcha/, /почтовый провайдер оператора/i],
-        "provider-review": [/договорные лица, роли, регионы и условия.*проверены до активации/i],
+        "provider-review": [/Оператор определяет цели обработки.*поставщики обрабатывают необходимый технический объем/i],
       },
       en: {
         operations: [/collection, recording, organization, accumulation, storage, correction, retrieval, use.*transfer.*restriction, erasure, and destruction.*automated and non-automated/i],
         providers: [/Yandex Cloud/, /Postbox/, /SmartCaptcha/, /mailbox provider/i],
-        "provider-review": [/contracting entities, roles, regions, and terms.*reviewed before activation/i],
+        "provider-review": [/controller determines the purposes.*provider processes the technical data necessary/i],
       },
     },
     "term-and-withdrawal": {
@@ -331,12 +331,12 @@ export const LEGAL_REQUIREMENT_EVIDENCE: LegalRequirementEvidenceContracts = {
     },
     "language-and-warning": {
       ru: {
-        "authoritative-language": [/приоритетным будет русский текст/i, /Английский текст является информационным переводом/i],
-        lifecycle: [/VBT-PD-02\/DRAFT.*только проект/i, /онлайн-отправка отключена.*принять его нельзя.*публичная редакция и дата вступления в силу отсутствуют/i],
+        "authoritative-language": [/Приоритетным является русский текст/i, /Английский текст является информационным переводом/i],
+        lifecycle: [/VBT-PD-02\/2026\.08\/01.*действует с 23\.08\.2026/i],
       },
       en: {
-        "authoritative-language": [/Russian text.*will be authoritative/i, /English text is an informational translation/i],
-        lifecycle: [/VBT-PD-02\/DRAFT is only a draft/i, /online submission is disabled.*cannot be accepted.*no public revision.*no effective date/i],
+        "authoritative-language": [/Russian text.*is authoritative/i, /English text is an informational translation/i],
+        lifecycle: [/VBT-PD-02\/2026\.08\/01.*effective from 23 August 2026/i],
       },
     },
   },
