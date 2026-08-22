@@ -13,8 +13,8 @@
   text-transform: uppercase;
 }
 
-.hero { position: relative; min-height: calc(100svh - 4.5rem); border-bottom: 1px solid var(--color-border); overflow: hidden; }
-.hero-grid { min-height: 47.5rem; display: grid; grid-template-columns: 1.04fr 0.96fr; align-items: center; gap: 4.125rem; padding-block: 4.875rem 3.625rem; }
+.hero { position: relative; min-height: calc(100svh - 4.5rem); display: flex; flex-direction: column; border-bottom: 1px solid var(--color-border); overflow: hidden; }
+.hero-grid { flex: 1; min-height: 47.5rem; display: grid; grid-template-columns: 1.04fr 0.96fr; align-items: center; gap: 4.125rem; padding-block: 4.875rem 3.625rem; }
 .hero-copy { position: relative; z-index: 2; animation: rise 0.75s var(--landing-ease) both; }
 .availability { width: fit-content; min-height: 2.25rem; display: flex; align-items: center; gap: 0.625rem; margin: 0 0 2rem; padding: 0.45rem 0.8rem; border: 1px solid var(--color-border); border-radius: 99px; background: var(--landing-tint); color: var(--color-success); font: 500 0.75rem var(--font-mono); }
 .availability span { width: 0.45rem; height: 0.45rem; flex: 0 0 auto; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0.7rem var(--color-success); animation: breathe 2.8s ease-in-out infinite; }
@@ -82,7 +82,8 @@
 .signal-status { position: absolute; left: 1.875rem; right: 1.875rem; bottom: 1.75rem; display: flex; justify-content: space-between; color: var(--color-muted); font: 500 0.625rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
 .signal-status b { color: var(--color-success); font-weight: 500; }
 .hero-ticker { height: 3rem; overflow: hidden; border-top: 1px solid var(--color-border); color: var(--color-muted); font: 500 0.625rem var(--font-mono); letter-spacing: 0.18em; text-transform: uppercase; }
-.hero-ticker > div { width: max-content; height: 100%; display: flex; align-items: center; gap: 2.25rem; animation: ticker 26s linear infinite; }
+.hero-ticker > div { width: max-content; height: 100%; display: flex; animation: ticker 104s linear infinite; }
+.hero-ticker-group { height: 100%; display: flex; align-items: center; gap: 2.25rem; padding-right: 2.25rem; }
 .hero-ticker span { min-width: 8rem; text-align: center; }
 .hero-ticker i { width: 1.75rem; height: 0.3125rem; border-radius: 99px; background: var(--color-border); }
 .hero-ticker i:nth-of-type(3n) { background: var(--color-signal); }
