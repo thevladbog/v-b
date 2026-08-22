@@ -10,7 +10,7 @@ export interface DnsRecord {
   readonly ttl: number;
 }
 
-export type PostboxRecordPurpose = "domain-verification" | "dkim" | "custom-mail-from" | "spf";
+export type PostboxRecordPurpose = "dkim" | "custom-mail-from" | "spf";
 
 export interface PostboxRecord extends DnsRecord {
   readonly purpose: PostboxRecordPurpose;

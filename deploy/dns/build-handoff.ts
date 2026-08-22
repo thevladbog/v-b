@@ -50,7 +50,6 @@ function verificationCommand(record: DnsRecord): string { return `dig +noall +an
 
 function providerPurpose(record: PostboxRecord): string {
   switch (record.purpose) {
-    case "domain-verification": return "Postbox domain verification";
     case "dkim": return "Postbox DKIM";
     case "custom-mail-from": return "Postbox custom MAIL FROM";
     case "spf": return "Postbox SPF authorization";
@@ -60,18 +59,19 @@ function requiresAbsoluteTarget(value: string): boolean { return /^[A-Za-z0-9_.-
 function isMxValue(value: string): boolean { return /^\d+\s+[A-Za-z0-9_.-]+\.$/.test(value); }
 function parseSpf(value: string, failureCode = "invalid_spf_record"): { mechanisms: string[]; terminal: string } {
   const parts = value.trim().split(/\s+/);
-  const terminal = parts.at(-1)?.toLowerCase();
-  if (parts[0]?.toLowerCase() !== "v=spf1" || !terminal || !/^[+?~-]all$/.test(terminal)) fail(failureCode);
-  const mechanisms = parts.slice(1, -1);
-  if (mechanisms.some((part) => /^[+?~-]?all$/i.test(part))) fail(failureCode);
+  if (parts[0]?.toLowerCase() !== "v=spf1") fail(failureCode);
+  const terms = parts.slice(1);
+  const terminalIndexes = terms.flatMap((part, index) =>
+    /^[+?~-]?all$/i.test(part) || /^redirect=[A-Za-z0-9_.-]+$/i.test(part) ? [index] : []);
+  if (terminalIndexes.length !== 1) fail(failureCode);
+  const terminalIndex = terminalIndexes[0]!;
+  const terminal = terms[terminalIndex]!;
+  const mechanisms = terms.filter((_part, index) => index !== terminalIndex);
   return { mechanisms, terminal };
 }
 function validatePostboxRecord(record: PostboxRecord): void {
   validateRecord(record);
   switch (record.purpose) {
-    case "domain-verification":
-      if ((record.type !== "TXT" && record.type !== "CNAME") || record.type === "CNAME" && !requiresAbsoluteTarget(record.value)) fail("invalid_postbox_record");
-      return;
     case "dkim":
       if (!record.name.includes("._domainkey.") || record.type !== "CNAME" && record.type !== "TXT" || record.type === "CNAME" && !requiresAbsoluteTarget(record.value) || record.type === "TXT" && !/^v=DKIM1(?:;|\s|$)/i.test(record.value)) fail("invalid_postbox_record");
       return;
@@ -82,11 +82,13 @@ function validatePostboxRecord(record: PostboxRecord): void {
       if (record.type !== "TXT") fail("invalid_postbox_record");
       parseSpf(record.value, "invalid_postbox_record");
       return;
+    default:
+      fail("invalid_postbox_record");
   }
 }
 function validatePostbox(postbox: PostboxHandoffInput): void {
   validateEvidence(postbox.evidence.id, postbox.evidence.capturedAt);
-  if (postbox.evidence.status !== "verified") fail("unverified_provider_value");
+  if (postbox.evidence.status !== "verified" && postbox.evidence.status !== "pending" && postbox.evidence.status !== "failed") fail("unverified_provider_value");
   if ((postbox.customMailFrom !== "configured" && postbox.customMailFrom !== "not-configured") || postbox.customMailFrom !== postbox.evidence.customMailFrom) fail("invalid_custom_mail_from_state");
   const counts = new Map<string, number>();
   const evidence = new Map<string, number>();
@@ -104,8 +106,16 @@ function validatePostbox(postbox: PostboxHandoffInput): void {
     evidence.set(key, remaining - 1);
   }
   if ([...evidence.values()].some(Boolean)) fail("postbox_evidence_mismatch");
-  if (counts.get("domain-verification") !== 1 || !counts.get("dkim") || counts.get("spf") !== 1) fail("incomplete_postbox_evidence");
+  const dkimRecords = postbox.records.filter((record) => record.purpose === "dkim");
+  const easyDkimSet = dkimRecords.length === 2 && dkimRecords.every((record) => record.type === "CNAME");
+  const advancedDkimSet = dkimRecords.length === 1 && dkimRecords[0]?.type === "TXT";
+  if (!easyDkimSet && !advancedDkimSet || counts.get("spf") !== 1) fail("incomplete_postbox_evidence");
+  if (postbox.evidence.status === "failed") fail("unverified_provider_value");
   if (postbox.customMailFrom === "configured" && !counts.get("custom-mail-from") || postbox.customMailFrom === "not-configured" && counts.get("custom-mail-from")) fail("invalid_custom_mail_from_state");
+}
+
+function postboxEvidenceLabel(postbox: PostboxHandoffInput): string {
+  return `${postbox.evidence.status === "verified" ? "verified Postbox evidence" : "pending Postbox setup evidence"} ${postbox.evidence.id}`;
 }
 function validateUniqueTargetRrsets(records: readonly DnsRecord[]): void {
   const seen = new Set<string>();
@@ -195,20 +205,20 @@ export function buildDnsHandoff(input: DnsHandoffInput): DnsHandoff {
   if (input.edge.ipv6) edgeRecords.push({ name: VBTECH_DOMAIN, type: "AAAA", value: input.edge.ipv6, ttl: input.edge.evidence.migrationTtl });
   const providerRecords = input.postbox.records.filter((record) => record.purpose !== "spf");
   validateUniqueTargetRrsets([...edgeRecords, ...providerRecords]);
-  const plans = [...edgeRecords.map((record) => recordFor(record, record.type === "A" ? "v-b.tech edge IPv4" : record.type === "AAAA" ? "v-b.tech edge IPv6" : "www canonical alias", `approved edge inventory ${input.edge!.evidence.id}`, input.currentZone!, rules, input.edge!.evidence.normalTtl)), ...providerRecords.map((record) => recordFor(record, providerPurpose(record), `verified Postbox evidence ${input.postbox!.evidence.id}`, input.currentZone!, rules, record.ttl, record.purpose === "dkim" && record.type === "TXT"))];
+  const plans = [...edgeRecords.map((record) => recordFor(record, record.type === "A" ? "v-b.tech edge IPv4" : record.type === "AAAA" ? "v-b.tech edge IPv6" : "www canonical alias", `approved edge inventory ${input.edge!.evidence.id}`, input.currentZone!, rules, input.edge!.evidence.normalTtl)), ...providerRecords.map((record) => recordFor(record, providerPurpose(record), postboxEvidenceLabel(input.postbox!), input.currentZone!, rules, record.ttl, record.purpose === "dkim" && record.type === "TXT"))];
   const records = plans.map((plan) => plan.record);
   const handledCurrent = new Set(plans.flatMap((plan) => plan.replacedCurrent.map(exactRecordId)));
   const providerSpf = input.postbox.records.find((record) => record.purpose === "spf")!;
   const currentSpf = input.currentZone.filter((record) => record.name === providerSpf.name && isSpf(record));
   if (currentSpf.length > 1) fail("multiple_spf_records");
   if (!currentSpf.length) {
-    const plan = recordFor(providerSpf, providerPurpose(providerSpf), `verified Postbox evidence ${input.postbox.evidence.id}`, input.currentZone, rules, providerSpf.ttl);
+    const plan = recordFor(providerSpf, providerPurpose(providerSpf), postboxEvidenceLabel(input.postbox), input.currentZone, rules, providerSpf.ttl);
     records.push(plan.record);
     plan.replacedCurrent.forEach((record) => handledCurrent.add(exactRecordId(record)));
   } else {
     const rule = findRule(rules, providerSpf);
     if (!rule || rule.kind !== "append-spf-mechanism" || rule.currentValue !== currentSpf[0]?.value || rule.providerValue !== providerSpf.value) fail("spf_merge_rule_required");
-    records.push(row({ ...providerSpf, value: mergeSpf(rule.currentValue, rule.providerValue) }, "merged SPF authorization", currentSpf[0].value, "merge", `verified Postbox evidence ${input.postbox.evidence.id}; explicit merge rule ${rule.id}`, "restore the rollback value", rule.id, currentSpf[0].value, currentSpf[0].ttl, providerSpf.ttl, currentSpf[0].ttl, currentSpf, currentSpf));
+    records.push(row({ ...providerSpf, value: mergeSpf(rule.currentValue, rule.providerValue) }, "merged SPF authorization", currentSpf[0].value, "merge", `${postboxEvidenceLabel(input.postbox)}; explicit merge rule ${rule.id}`, "restore the rollback value", rule.id, currentSpf[0].value, currentSpf[0].ttl, providerSpf.ttl, currentSpf[0].ttl, currentSpf, currentSpf));
     handledCurrent.add(exactRecordId(currentSpf[0]));
   }
   const usedRuleIds = new Set(records.map((record) => record.mergeRule).filter((id): id is string => id !== null));

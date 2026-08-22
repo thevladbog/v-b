@@ -62,7 +62,7 @@ corepack pnpm run test:contracts
 
 Gate ID: `dns-inventory`
 
-Before any mutation, follow `docs/runbooks/external-dns.md` and export the complete current `v-b.tech` zone from the external provider. Record the original export evidence ID and capture time, every A/AAAA/CNAME/MX/TXT RRset, current TTLs, verified Postbox records, approved edge addresses, and any exact rollback RRsets. A resolver lookup is not the provider inventory.
+Before any mutation, follow `docs/runbooks/external-dns.md` and export the complete current `v-b.tech` zone from the external provider. Record the original export evidence ID and capture time, every A/AAAA/CNAME/MX/TXT RRset, current TTLs, the complete Postbox DKIM setup and status, the current official Postbox SPF instruction, approved edge addresses, and any exact rollback RRsets. A resolver lookup is not the provider inventory.
 
 The runtime and DNS inventories must both be accepted before Gate P3. A missing owner, value, TTL, Postbox verification state, or rollback value stops the release. Do not replace missing release-time evidence with examples or remembered values.
 
@@ -70,8 +70,8 @@ The runtime and DNS inventories must both be accepted before Gate P3. A missing 
 
 - Target/resource: external authoritative DNS provider console for the complete `v-b.tech` zone, existing edge inventory, and Postbox verification console
 - Classification: **READ-ONLY**
-- Required evidence: operator identity, UTC capture time, provider zone identifier, complete zone export, exact edge address evidence, and complete Postbox verification output
-- Expected output: original artifacts containing every A/AAAA/CNAME/MX/TXT owner/value/TTL, all SPF/DMARC data, verified DKIM/custom-MAIL-FROM requirements, and no proposed mutation
+- Required evidence: operator identity, UTC capture time, provider zone identifier, complete zone export, exact edge address evidence, complete Postbox address output, and the current official Postbox SPF instruction
+- Expected output: original artifacts containing every A/AAAA/CNAME/MX/TXT owner/value/TTL, all SPF/DMARC data, complete pending-or-verified DKIM requirements, explicit custom-MAIL-FROM state, and no proposed mutation
 - Bounded failure branch: stop before sheet generation, retain original partial exports, and escalate missing owners, TTLs, selectors, verification state, or provider access
 
 Follow the acquisition and sheet sequence in `external-dns.md`. Resolver output is supplemental only and cannot replace the provider export.

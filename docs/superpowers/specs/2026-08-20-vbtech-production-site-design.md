@@ -351,10 +351,9 @@ Expected website records:
 | `@` | `AAAA` | existing approved public edge IPv6 | add only if the edge is already verified for IPv6; otherwise omit |
 | `www` | `CNAME` | `v-b.tech.` | redirect to canonical apex at Caddy |
 
-Expected email-authentication records are copied exactly from the active Postbox domain-verification output:
+Expected email-authentication records combine the exact Postbox address setup output with the current official Postbox SPF instruction:
 
-- provider verification TXT record;
-- DKIM CNAME/TXT records;
+- both Easy DKIM CNAME records, or the single Advanced DKIM TXT record; those records also perform domain ownership verification;
 - SPF include merged into the single existing SPF policy rather than creating a second SPF record;
 - custom MAIL FROM records if configured;
 - `_dmarc` policy reviewed against the current mailbox/provider setup.

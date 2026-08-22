@@ -19,16 +19,16 @@ const currentZone = [
 
 const postboxRecords = [
   {
-    name: "postbox-verify.v-b.tech",
-    type: "TXT",
-    value: "verification-token-from-supplied-evidence",
+    name: "postbox-1._domainkey.v-b.tech",
+    type: "CNAME",
+    value: "dkim-1-target.from-supplied-evidence.test.",
     ttl: 300,
-    purpose: "domain-verification",
+    purpose: "dkim",
   },
   {
-    name: "postbox._domainkey.v-b.tech",
+    name: "postbox-2._domainkey.v-b.tech",
     type: "CNAME",
-    value: "dkim-target.from-supplied-evidence.test.",
+    value: "dkim-2-target.from-supplied-evidence.test.",
     ttl: 300,
     purpose: "dkim",
   },
@@ -122,12 +122,12 @@ describe("external DNS handoff builder", () => {
 
   // Catches a provider handoff that drops a verified Postbox requirement or emits it without
   // the exact evidence identity that backs its value.
-  it("includes verified Postbox domain, DKIM, MAIL FROM, and one merged SPF record", () => {
+  it("includes verified Postbox Easy DKIM, MAIL FROM, and one merged SPF record", () => {
     const handoff = buildDnsHandoff(handoffInput());
 
     expect(handoff.records).toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "postbox-verify.v-b.tech", purpose: "Postbox domain verification", action: "add" }),
-      expect.objectContaining({ name: "postbox._domainkey.v-b.tech", purpose: "Postbox DKIM", action: "add" }),
+      expect.objectContaining({ name: "postbox-1._domainkey.v-b.tech", purpose: "Postbox DKIM", action: "add" }),
+      expect.objectContaining({ name: "postbox-2._domainkey.v-b.tech", purpose: "Postbox DKIM", action: "add" }),
       expect.objectContaining({ name: "bounce.v-b.tech", type: "MX", purpose: "Postbox custom MAIL FROM", action: "add" }),
       expect.objectContaining({
         name: "v-b.tech",
@@ -253,20 +253,117 @@ describe("external DNS handoff builder", () => {
     expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_unverified_edge_ip");
   });
 
-  // Catches accepting record values that were not included in the operator-supplied provider
-  // verification output, including a provider output that is merely pending.
-  it("rejects unverified Postbox values", () => {
+  // Catches direct builder callers bypassing the JSON parser with an unknown provider status.
+  it("rejects an unknown Postbox evidence status", () => {
+    const postbox = configuredPostbox(postboxRecords, "postbox-unknown-status");
     const input = handoffInput({
-      postbox: configuredPostbox(postboxRecords, "postbox-verification-pending", "pending"),
-    });
+      postbox: { ...postbox, evidence: { ...postbox.evidence, status: "unknown" } },
+    } as unknown as Partial<DnsHandoffInput>);
 
     expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_unverified_provider_value");
+  });
+
+  // Catches requiring a successful ownership check before emitting the two Easy DKIM CNAMEs
+  // that Yandex Cloud Postbox itself requires in order to complete that check.
+  it("accepts pending Easy DKIM setup evidence without a separate verification record", () => {
+    const records = [
+      { name: "easy-1._domainkey.v-b.tech", type: "CNAME", value: "easy-1.dkim.yandexcloud.net.", ttl: 3_600, purpose: "dkim" },
+      { name: "easy-2._domainkey.v-b.tech", type: "CNAME", value: "easy-2.dkim.yandexcloud.net.", ttl: 3_600, purpose: "dkim" },
+      { name: "v-b.tech", type: "TXT", value: "v=spf1 include:spf.postbox.yandexcloud.net ~all", ttl: 3_600, purpose: "spf" },
+    ] as const;
+    const input = handoffInput({
+      currentZone: currentZone.filter((record) => !record.value.startsWith("v=spf1")),
+      postbox: {
+        customMailFrom: "not-configured",
+        records,
+        evidence: {
+          id: "postbox-easy-dkim-pending",
+          capturedAt: "2026-08-22T20:30:00.000Z",
+          status: "pending",
+          customMailFrom: "not-configured",
+          records,
+        },
+      },
+      mergeRules: [],
+    });
+
+    const handoff = buildDnsHandoff(input);
+    expect(handoff.records.filter((record) => record.purpose === "Postbox DKIM")).toHaveLength(2);
+    expect(handoff.records).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: "easy-1._domainkey.v-b.tech",
+        action: "add",
+        verification: "pending Postbox setup evidence postbox-easy-dkim-pending",
+      }),
+      expect.objectContaining({
+        name: "v-b.tech",
+        type: "TXT",
+        value: "v=spf1 include:spf.postbox.yandexcloud.net ~all",
+        action: "add",
+      }),
+    ]));
+  });
+
+  // Catches reviving a generic verification TXT that Yandex Cloud Postbox does not emit for
+  // Easy DKIM; the two DKIM CNAMEs are the ownership proof.
+  it("rejects a separate Postbox domain-verification record", () => {
+    const extraRecord = {
+      name: "postbox-verify.v-b.tech",
+      type: "TXT",
+      value: "not-emitted-by-yandex-postbox",
+      ttl: 3_600,
+      purpose: "domain-verification",
+    } as const;
+    const records = [...postboxRecords, extraRecord];
+    const input = handoffInput({
+      postbox: {
+        customMailFrom: "configured",
+        records,
+        evidence: {
+          id: "postbox-no-separate-verification",
+          capturedAt: "2026-08-22T20:31:00.000Z",
+          status: "verified",
+          customMailFrom: "configured",
+          records,
+        },
+      },
+    } as unknown as Partial<DnsHandoffInput>);
+
+    expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_invalid_postbox_record");
+  });
+
+  // Catches rejecting the valid redirect-based SPF policy already used for Yandex-hosted mail,
+  // or replacing its redirect semantics while adding the Postbox authorization include.
+  it("merges Postbox authorization into an existing redirect-based SPF policy", () => {
+    const currentValue = "v=spf1 redirect=_spf.yandex.net";
+    const providerValue = postboxRecords[3].value;
+    const input = handoffInput({
+      currentZone: currentZone.map((record) => record.value.startsWith("v=spf1") ? { ...record, value: currentValue } : record),
+      mergeRules: [{
+        id: "merge-postbox-with-yandex-spf-redirect",
+        kind: "append-spf-mechanism",
+        name: "v-b.tech",
+        type: "TXT",
+        currentValue,
+        providerValue,
+      }],
+    });
+
+    expect(buildDnsHandoff(input).records).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: "v-b.tech",
+        type: "TXT",
+        value: "v=spf1 include:postbox.from-supplied-evidence.test redirect=_spf.yandex.net",
+        action: "merge",
+        rollbackValue: currentValue,
+      }),
+    ]));
   });
 
   // Catches purpose labels that allow a provider record to be interpreted as the wrong DNS
   // mechanism, or a malformed SPF record to bypass parsing when no current SPF exists.
   it.each([
-    ["verification MX", { ...postboxRecords[0], type: "MX", value: "10 verification.example.test." }],
+    ["DKIM MX", { ...postboxRecords[0], type: "MX", value: "10 verification.example.test." }],
     ["DKIM TXT without a DKIM declaration", { ...postboxRecords[1], type: "TXT", value: "not-a-dkim-record" }],
     ["MAIL FROM TXT", { ...postboxRecords[2], type: "TXT", value: "not-an-mx-record" }],
     ["malformed provider SPF", { ...postboxRecords[3], value: "include:postbox.example.test" }],
@@ -322,7 +419,7 @@ describe("external DNS handoff builder", () => {
   // requiring an exact destructive RRset rule with values and TTLs.
   it("requires a full TXT RRset replacement rule for an occupied DKIM selector", () => {
     const dkimTxt = { ...postboxRecords[1], type: "TXT", value: "v=DKIM1; k=rsa; p=new-key" };
-    const records = [postboxRecords[0], dkimTxt, postboxRecords[2], postboxRecords[3]];
+    const records = [dkimTxt, postboxRecords[2], postboxRecords[3]];
     const currentDkim = { name: dkimTxt.name, type: "TXT", value: "v=DKIM1; k=rsa; p=old-key", ttl: 3_600 };
     const input = handoffInput({ currentZone: [...currentZone, currentDkim], postbox: configuredPostbox(records, "postbox-txt-dkim") } as unknown as DnsHandoffInput);
     expect(() => buildDnsHandoff(input)).toThrow("dns_handoff_destructive_replacement_requires_merge_rule");
