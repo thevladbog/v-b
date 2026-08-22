@@ -125,7 +125,7 @@ describe("generated theme controls", () => {
 
   it.each(themePages)(
     "places a defensive bootstrap before styles and renders localized controls for $locale",
-    async ({ file, labels }) => {
+    async ({ locale, file, labels }) => {
       const html = await readFile(new URL(`../${file}`, import.meta.url), "utf8");
       const bootstrap = firstHeadInlineScript(html);
       const bootstrapIndex = html.indexOf(bootstrap ?? "");
@@ -134,6 +134,7 @@ describe("generated theme controls", () => {
       expect(bootstrap).toContain(THEME_STORAGE_KEY);
       expect(bootstrapIndex).toBeGreaterThan(-1);
       expect(bootstrapIndex).toBeLessThan(stylesheetIndex);
+      expect(html).toContain(`<html lang="${locale}" data-theme="light">`);
       expect(html).toMatch(/<link rel="stylesheet" href="\/_astro\//);
       expect(html.match(/<meta name="theme-color"/g)).toHaveLength(1);
       expect(html).toContain(`<meta name="theme-color" content="${expectedThemeColors.light}">`);
