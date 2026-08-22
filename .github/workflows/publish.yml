@@ -7,8 +7,19 @@ on:
         description: Exact 40-character commit on main to publish
         required: true
         type: string
+      submission_state:
+        description: Contact form state embedded in the immutable web image
+        required: true
+        type: choice
+        options: [disabled, enabled]
+        default: disabled
       confirm_publish:
         description: Publish the image and signed function artifact
+        required: true
+        type: boolean
+        default: false
+      confirm_enable:
+        description: Confirm publishing a request-capable enabled web image
         required: true
         type: boolean
         default: false
@@ -38,6 +49,9 @@ jobs:
       RELEASE_SHA: ${{ github.event.inputs.release_sha }}
       PUBLISH_RUN_ID: ${{ github.run_id }}
       IMAGE_REPOSITORY: ghcr.io/thevladbog/vbtech-web
+      VBTECH_SUBMISSION_STATE: ${{ github.event.inputs.submission_state }}
+      VBTECH_CONFIRM_ENABLE: ${{ github.event.inputs.confirm_enable }}
+      PUBLIC_SMARTCAPTCHA_SITE_KEY: ${{ vars.VBTECH_SMARTCAPTCHA_SITE_KEY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -50,6 +64,11 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$RELEASE_SHA" == "$GITHUB_SHA" ]]
+          [[ "$VBTECH_SUBMISSION_STATE" == "disabled" || "$VBTECH_SUBMISSION_STATE" == "enabled" ]]
+          if [[ "$VBTECH_SUBMISSION_STATE" == "enabled" ]]; then
+            [[ "$VBTECH_CONFIRM_ENABLE" == "true" ]]
+            [[ -n "$PUBLIC_SMARTCAPTCHA_SITE_KEY" ]]
+          fi
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$RELEASE_SHA" origin/main
           [[ "$(git rev-parse HEAD)" == "$RELEASE_SHA" ]]
@@ -68,6 +87,8 @@ jobs:
           corepack pnpm run build:function-artifact
           docker build --load --file deploy/container/web.Dockerfile \
             --build-arg VBTECH_RELEASE_SHA="$RELEASE_SHA" \
+            --build-arg VBTECH_SUBMISSION_STATE="$VBTECH_SUBMISSION_STATE" \
+            --build-arg PUBLIC_SMARTCAPTCHA_SITE_KEY="$PUBLIC_SMARTCAPTCHA_SITE_KEY" \
             --tag "$IMAGE_REPOSITORY:$RELEASE_SHA" .
       - uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
@@ -98,11 +119,17 @@ jobs:
         run: |
           set -euo pipefail
           artifact_dir="$RUNNER_TEMP/vbtech-release"
+          web_dir="$RUNNER_TEMP/vbtech-published-web"
           install -d -m 700 "$artifact_dir"
+          install -d -m 700 "$web_dir"
           install -m 600 .artifacts/function/vbtech-contact-function.zip "$artifact_dir/vbtech-contact-function.zip"
+          container_id="$(docker create "$IMAGE_TAG")"
+          trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container_id:/srv/vbtech/." "$web_dir"
           node deploy/production/release-artifact.mjs create \
             "$artifact_dir/release-manifest.json" \
-            "$artifact_dir/vbtech-contact-function.zip"
+            "$artifact_dir/vbtech-contact-function.zip" \
+            "$web_dir"
           (cd "$artifact_dir" && sha256sum vbtech-contact-function.zip > checksums.sha256)
           sha256sum "$artifact_dir/vbtech-contact-function.zip"
       - name: Attest the function archive and release manifest

@@ -53,7 +53,9 @@ test("publish is a protected manual exact-SHA build that attests but never deplo
   assert.match(source, /^\s*workflow_dispatch:\s*$/m);
   assert.doesNotMatch(source, /^\s+(push|pull_request|schedule):\s*$/m);
   assert.match(source, /release_sha:[\s\S]*required:\s*true/);
+  assert.match(source, /submission_state:[\s\S]*options:\s*\[disabled, enabled\][\s\S]*default:\s*disabled/);
   assert.match(source, /confirm_publish:[\s\S]*type:\s*boolean[\s\S]*default:\s*false/);
+  assert.match(source, /confirm_enable:[\s\S]*type:\s*boolean[\s\S]*default:\s*false/);
   assert.match(source, /if:\s*github\.event\.inputs\.confirm_publish\s*==\s*'true'/);
   assert.match(source, /environment:\s*release-publish/);
   assert.match(source, /permissions:[\s\S]*contents:\s*read[\s\S]*packages:\s*write/);
@@ -67,6 +69,12 @@ test("publish is a protected manual exact-SHA build that attests but never deplo
   assert.match(source, /awk -v repository="\$IMAGE_REPOSITORY"/);
   assert.doesNotMatch(source, /index \.RepoDigests 0/);
   assert.match(source, /corepack pnpm run build:function-artifact/);
+  assert.match(source, /--build-arg VBTECH_SUBMISSION_STATE="\$VBTECH_SUBMISSION_STATE"/);
+  assert.match(source, /--build-arg PUBLIC_SMARTCAPTCHA_SITE_KEY="\$PUBLIC_SMARTCAPTCHA_SITE_KEY"/);
+  assert.match(
+    source,
+    /docker create[\s\S]*docker cp[\s\S]*release-artifact\.mjs create[\s\S]*"\$web_dir"/,
+  );
   assert.match(source, /sha256sum[\s\S]*vbtech-contact-function\.zip/);
   assert.match(source, /actions\/attest@/);
   assert.match(source, /release-manifest\.json/);
