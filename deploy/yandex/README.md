@@ -2,6 +2,14 @@
 
 This directory defines the isolated v-b.tech functions and their least-privilege runtime identity. It deliberately does not create a VM, a Managed PostgreSQL cluster, a database user, a database, or a Lockbox payload.
 
+## Runtime network evidence
+
+Cloud Functions can attach to the existing production VPC only when that network has a subnet in every supported availability zone. The PostgreSQL security group must also contain one exact ingress rule for TCP port `6432` from Yandex Cloud Functions' documented service range `198.19.0.0/16`; a broader public source does not satisfy this contract.
+
+Before any Terraform plan, capture the selected subnet and PostgreSQL security-group objects from the Yandex Cloud control plane into a local, secret-free inventory document. Run `node deploy/yandex/scripts/validate-runtime-inventory.mjs <inventory.json>`. The validator checks the exact network, selected subnet IDs and zones, security-group identity, protocol, port, and source range without performing a mutation. Terraform independently repeats the subnet and security-group checks through read-only data sources and lifecycle postconditions.
+
+The repository does not manage the shared Markiro PostgreSQL security group. Adding or removing its serverless ingress is a separately approved production-network change and must preserve the existing Markiro application rule.
+
 ## Managed PostgreSQL provisioning
 
 Yandex Managed Service for PostgreSQL does not allow connecting to the `postgres` system database or creating users, roles, and databases with SQL. The `vbtech_contact` user and database must therefore be provisioned through an explicitly approved Yandex Cloud control-plane operation before the SQL bootstrap is used.
@@ -36,6 +44,8 @@ The live `--check` requires:
 Run `node deploy/yandex/scripts/bootstrap-database.mjs --check` first. It connects only to `vbtech_contact`, verifies strict TLS, PostgreSQL version, exact database ownership, role flags, direct role memberships, and confirms that the same credential cannot connect to the protected database. It performs no mutation.
 
 Only after the check evidence and the database-bootstrap change are explicitly approved, inject `VBTECH_DATABASE_BOOTSTRAP_APPROVED=yes` and run `node deploy/yandex/scripts/bootstrap-database.mjs --apply`. Apply changes only schema ownership and application objects inside the pre-provisioned contact database. It never creates or alters a database user or database.
+
+When the operator has no private route into the VPC, bundle `private-bootstrap-handler.mjs`, the reviewed CA, and the migration into a one-time Cloud Function. Keep the function private, attach the exact reviewed runtime identity and network, run `inspect` and `check` before creating a separate explicitly approved apply version, then delete the temporary function after the post-apply checks. Never add a public invoker or reuse an apply-approved version as a standing operational endpoint.
 
 Finally run `node deploy/yandex/scripts/verify-permissions.mjs --verify`. Record only the timestamp, reviewed cluster ID and host, PostgreSQL version, object names, exact public-schema owner, and protected connection denial. Do not record credentials or connection URLs.
 

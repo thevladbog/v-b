@@ -31,6 +31,17 @@ variable "network_id" {
   }
 }
 
+variable "postgres_security_group_id" {
+  description = "Existing PostgreSQL security group whose exact serverless ingress is verified read-only."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[a-z0-9]{20}$", var.postgres_security_group_id))
+    error_message = "postgres_security_group_id must be an exact existing VPC security group identifier."
+  }
+}
+
 variable "serverless_subnet_ids" {
   description = "Read-only inventory of existing subnets in every zone required by Cloud Functions connectivity."
   type        = map(string)

@@ -57,6 +57,10 @@ resource "yandex_function" "contact_http" {
       environment_variable = secrets.value.environment_variable
     }
   }
+
+  depends_on = [
+    yandex_lockbox_secret_iam_member.contact_runtime,
+  ]
 }
 
 resource "yandex_function" "contact_worker" {
@@ -93,4 +97,9 @@ resource "yandex_function" "contact_worker" {
       environment_variable = secrets.value.environment_variable
     }
   }
+
+  depends_on = [
+    yandex_lockbox_secret_iam_member.contact_runtime,
+    yandex_resourcemanager_folder_iam_member.contact_postbox_sender,
+  ]
 }
