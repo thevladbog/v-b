@@ -10,7 +10,7 @@ Do not create `docs/reviews/YYYY-MM-DD-vbtech-dns-handoff.md` until all of the f
 
 1. A read-only export of the complete current `v-b.tech` zone.
 2. An approved edge-IP inventory that identifies the IPv4 address and, only if applicable, IPv6 address for the existing Caddy edge.
-3. The exact Postbox domain-verification output, including its status, verification record, DKIM records, custom MAIL FROM records, and SPF instruction.
+3. The exact Postbox address setup output, including its status and complete DKIM record set, plus the current official Postbox SPF instruction and any custom MAIL FROM records if that feature is explicitly configured.
 
 Never substitute an example, a remembered provider value, a lookup result, or a value copied from another domain. Exact DNS and mail-authentication values are release-time evidence and must not be committed before the approval gate.
 
@@ -20,24 +20,25 @@ Export the whole zone from the external provider without changing any records. P
 
 ### Operator card: Acquire exact DNS and mail evidence
 
-- Target/resource: authoritative external provider console for the complete `v-b.tech` zone, reviewed Caddy edge inventory, and Postbox domain-verification console
+- Target/resource: authoritative external provider console for the complete `v-b.tech` zone, reviewed Caddy edge inventory, and Postbox address console
 - Classification: **READ-ONLY**
-- Required evidence: operator identity, UTC capture time, provider zone identifier, original complete zone export, exact edge addresses/TTLs, and complete Postbox verification output
-- Expected output: unmodified bounded artifacts containing every owner/type/value/TTL, all SPF/DMARC rows, DKIM selectors, custom MAIL FROM state, verification status, and stable evidence IDs
+- Required evidence: operator identity, UTC capture time, provider zone identifier, original complete zone export, exact edge addresses/TTLs, complete Postbox address output, and the current official Postbox SPF instruction
+- Expected output: unmodified bounded artifacts containing every owner/type/value/TTL, all SPF/DMARC rows, every DKIM selector, explicit custom MAIL FROM state, Postbox status, and stable evidence IDs
 - Bounded failure branch: stop before local sheet generation, retain original partial exports and audit references, and escalate any missing owner, TTL, selector, status, or read access
 
 Use only the providers' reviewed **view/export** actions. No universal DNS/Postbox client is configured in this repository, so do not invent a provider command or treat `dig`/resolver output as the authoritative inventory.
 
 Record the approved edge inventory as `edge.evidence`; it must have a stable evidence ID, capture timestamp, exact `ipv4` (plus optional `ipv6`), and evidence-backed positive `migrationTtl` and `normalTtl` values. Copy only those same addresses into `edge.ipv4` and `edge.ipv6`; IPv6 must be absent from both places or match exactly, and an empty string is invalid. The builder rejects an address or TTL plan that is not backed by the supplied inventory evidence.
 
-Copy every Postbox value directly from the supplied verification output into both `postbox.records` and `postbox.evidence.records`, preserving owner, type, value, TTL, purpose, and multiplicity exactly. Mark the evidence `verified` only after the supplied output reports that status. Set `postbox.customMailFrom` and `postbox.evidence.customMailFrom` to the same explicit state: `configured` requires the exact custom MAIL FROM record(s); `not-configured` permits none. Associate each required record with one of these purposes:
+Copy every DKIM value directly from the supplied address output into both `postbox.records` and `postbox.evidence.records`, preserving owner, type, value, TTL, purpose, and multiplicity exactly. Easy DKIM uses two CNAME records; both have purpose `dkim` because those same records perform the ownership check. Advanced DKIM uses one provider-supplied TXT record. Copy the current official SPF recommendation into the same bounded evidence bundle with purpose `spf`; do not invent a second SPF RRset. Preserve the provider status exactly: `pending` is valid only for the complete Easy/advanced DKIM setup needed to perform the initial ownership check, `verified` records an already successful check, and `failed` stops the handoff. Set `postbox.customMailFrom` and `postbox.evidence.customMailFrom` to the same explicit state: `configured` requires exact provider records; `not-configured` permits none. Associate any supplied records with these purposes:
 
-- `domain-verification`
+Provider references: [Postbox DNS records](https://yandex.cloud/ru/docs/postbox/concepts/dns-records) and [domain ownership verification](https://yandex.cloud/ru/docs/postbox/operations/check-domain).
+
 - `dkim`
 - `custom-mail-from`
 - `spf`
 
-The builder rejects pending/failed Postbox output, a subset of verified requirements (including a missing DKIM selector), a mismatched TTL, and any record value that does not appear exactly in the supplied verified evidence.
+The builder rejects failed Postbox output, a pending legacy/separate-verification shape, an incomplete Easy/advanced DKIM set, a missing SPF plan, a mismatched TTL, and any record value that does not appear exactly in the supplied evidence bundle.
 
 ## 2. State every deliberate replacement or SPF merge
 
@@ -53,7 +54,7 @@ Do not write a merge rule to "clean up" MX, unrelated TXT, or DMARC. The handoff
 
 ## 3. Generate and review the local sheet
 
-Create a local JSON input with the `DnsHandoffInput` shape: `asOf`, complete `currentZone`, edge address plus matching `edge.evidence` (including `migrationTtl` and `normalTtl`), Postbox records plus exact `postbox.evidence` and explicit custom-MAIL-FROM state, and any explicit `mergeRules`. A replacement rule's `currentRecords` entries have `{ "type", "value", "ttl" }`. The CLI rejects malformed JSON/shape, unsafe owner/value data, absent evidence, and an existing output file. It never opens the network.
+Create a local JSON input with the `DnsHandoffInput` shape: `asOf`, complete `currentZone`, edge address plus matching `edge.evidence` (including `migrationTtl` and `normalTtl`), Postbox DKIM/SPF records plus exact `postbox.evidence`, the real Postbox status, explicit custom-MAIL-FROM state, and any explicit `mergeRules`. A replacement rule's `currentRecords` entries have `{ "type", "value", "ttl" }`. The CLI rejects malformed JSON/shape, unsafe owner/value data, absent evidence, and an existing output file. It never opens the network.
 
 Use only the repository-pinned compiler and this exact local generation sequence.
 
@@ -74,13 +75,13 @@ corepack pnpm exec esbuild deploy/dns/cli.ts --bundle --platform=node --format=c
 node /tmp/vbtech-dns-handoff.cjs "$VBTECH_DNS_INPUT_EVIDENCE" "$VBTECH_DNS_REVIEW_EVIDENCE"
 ```
 
-The output path is created with exclusive-write semantics: choose a new dated artifact rather than overwriting an existing approval sheet. The rendered table distinguishes `Current TTL`, `Target / apply TTL`, `Normal / restore TTL`, and `Rollback TTL`, alongside exact current/rollback RRsets. For edge records, target is the evidence-backed migration TTL and normal is the evidence-backed post-propagation TTL. For a Postbox record, its verified TTL is both the target and normal TTL; a different current TTL produces an `update` row rather than a false `keep`. The generated `dig` command quotes each DNS argument and never interpolates a record value into a shell command.
+The output path is created with exclusive-write semantics: choose a new dated artifact rather than overwriting an existing approval sheet. The rendered table distinguishes `Current TTL`, `Target / apply TTL`, `Normal / restore TTL`, and `Rollback TTL`, alongside exact current/rollback RRsets. For edge records, target is the evidence-backed migration TTL and normal is the evidence-backed post-propagation TTL. For a Postbox record, its supplied TTL is both the target and normal TTL; a different current TTL produces an `update` row rather than a false `keep`. The generated `dig` command quotes each DNS argument and never interpolates a record value into a shell command.
 
 Before requesting DNS approval, confirm all of these in the generated table:
 
 1. `v-b.tech` has the approved IPv4 A record; AAAA appears only when the approved inventory contains IPv6.
 2. `www.v-b.tech` is a CNAME to `v-b.tech.`.
-3. Every Postbox verification, DKIM, custom MAIL FROM, and SPF value cites the supplied evidence ID.
+3. Every Postbox DKIM, optional custom MAIL FROM, and SPF value cites the supplied evidence ID; a pending sheet contains the complete initial verification set.
 4. At the Postbox-specified SPF owner there is exactly one Postbox SPF action, either an evidence-backed add or an explicit merge; each DNS owner has at most one SPF policy. Preserved SPF rows at other owners remain visible.
 5. Existing MX and unrelated TXT rows have action `keep`.
 6. Existing DMARC has action `review` and no proposed replacement.

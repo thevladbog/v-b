@@ -9,7 +9,7 @@ import type {
 } from "./record-schema.js";
 
 const recordTypes = new Set<DnsRecordType>(["A", "AAAA", "CNAME", "MX", "TXT"]);
-const purposes = new Set<PostboxRecord["purpose"]>(["domain-verification", "dkim", "custom-mail-from", "spf"]);
+const purposes = new Set<PostboxRecord["purpose"]>(["dkim", "custom-mail-from", "spf"]);
 
 function fail(code: string): never { throw new Error(`dns_handoff_${code}`); }
 function object(value: unknown): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) fail("invalid_input"); return value as Record<string, unknown>; }
