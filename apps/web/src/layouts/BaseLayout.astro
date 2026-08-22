@@ -70,6 +70,9 @@ const themeBootstrap = `(() => {
     <meta charset="utf-8" />
     {releaseSha && <meta name="vbtech-release-sha" content={releaseSha} />}
     <meta name="theme-color" content={THEME_COLORS.light} />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <script is:inline set:html={themeBootstrap} />
     <link
       rel="preload"
