@@ -1,6 +1,10 @@
 import { fileURLToPath } from "node:url";
 
-import { CONTACT_DATABASE, CONTACT_ROLE } from "./bootstrap-database.mjs";
+import {
+  CONTACT_DATABASE,
+  CONTACT_ROLE,
+  isProtectedAccessDenied,
+} from "./bootstrap-database.mjs";
 import { openPostgresClient, validatePostgresCaFile } from "./postgres-client.mjs";
 
 const MANAGED_POSTGRES_HOST = /^[a-z0-9-]+\.mdb\.yandexcloud\.net$/;
@@ -118,12 +122,12 @@ export function createPostgresPermissionAdapter({ openClient = openPostgresClien
              active_role.rolreplication AS "roleCanReplicate",
              active_role.rolbypassrls AS "roleCanBypassRls",
              COALESCE((
-               SELECT array_agg(granted_role.rolname ORDER BY granted_role.rolname)
+               SELECT array_agg(granted_role.rolname::text ORDER BY granted_role.rolname)
                  FROM pg_auth_members membership
                  JOIN pg_roles member_role ON member_role.oid = membership.member
                  JOIN pg_roles granted_role ON granted_role.oid = membership.roleid
                 WHERE member_role.rolname = current_user
-             ), ARRAY[]::name[]) AS "roleMemberships"
+             ), ARRAY[]::text[]) AS "roleMemberships"
            FROM pg_namespace namespace
            JOIN pg_roles schema_owner ON schema_owner.oid = namespace.nspowner
            JOIN pg_roles active_role ON active_role.rolname = current_user
@@ -138,7 +142,7 @@ export function createPostgresPermissionAdapter({ openClient = openPostgresClien
       try {
         client = await openClient(protectedUrl, target.caFile);
       } catch (error) {
-        if (error?.code === "42501") {
+        if (isProtectedAccessDenied(error, target)) {
           return { connected: false, readableRelations: [], inheritedRoles: [] };
         }
         throw error;

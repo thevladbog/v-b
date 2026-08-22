@@ -114,6 +114,11 @@ test("defines isolated HTTP and worker functions from one immutable package", as
     sources["variables.tf"],
     /var\.function_package_object\s*==\s*"vbtech-contact\/\$\{var\.function_release_sha\}\/function\.zip"/,
   );
+  assert.equal(
+    (functions.match(/yandex_lockbox_secret_iam_member\.contact_runtime/g) ?? []).length,
+    2,
+  );
+  assert.match(functions, /yandex_resourcemanager_folder_iam_member\.contact_postbox_sender/);
 });
 
 test("grants only invocation, Lockbox payload, and Postbox sender capabilities", async () => {
@@ -192,6 +197,24 @@ test("requires read-only evidence that the existing serverless network spans eve
   assert.match(network, /postcondition\s*\{/);
   assert.match(network, /self\.zone\s*==\s*each\.key/);
   assert.match(network, /self\.network_id\s*==\s*var\.network_id/);
+});
+
+test("fails closed unless PostgreSQL admits the exact Yandex serverless VPC range", async () => {
+  const sources = await terraformSources();
+  const network = sources["network.tf"];
+
+  assert.match(sources["variables.tf"], /variable\s+"postgres_security_group_id"/);
+  assert.match(network, /data\s+"yandex_vpc_security_group"\s+"postgres"/);
+  assert.match(network, /security_group_id\s*=\s*var\.postgres_security_group_id/);
+  assert.match(network, /self\.network_id\s*==\s*var\.network_id/);
+  assert.match(network, /rule\.protocol\s*==\s*"TCP"/);
+  assert.match(network, /rule\.port\s*==\s*6432/);
+  assert.match(network, /rule\.from_port\s*==\s*6432/);
+  assert.match(network, /rule\.to_port\s*==\s*6432/);
+  assert.match(
+    network,
+    /toset\(rule\.v4_cidr_blocks\)\s*==\s*toset\(\["198\.19\.0\.0\/16"\]\)/,
+  );
 });
 
 test("bootstrap offline check validates the fixed database boundary without credentials", () => {
@@ -502,6 +525,7 @@ test("database adapter uses only the pre-provisioned contact database and exact 
     withClient: async (connectionUrl, caFile, operation) => {
       connections.push({ database: new URL(connectionUrl).pathname, caFile });
       return await operation({
+        connection: { stream: { encrypted: true, authorized: true } },
         query: async (sql) => {
           queries.push(sql);
           if (/server_version_num/.test(sql)) {
@@ -509,7 +533,7 @@ test("database adapter uses only the pre-provisioned contact database and exact 
               rows: [{
                 user: "vbtech_contact",
                 database: "vbtech_contact",
-                tls: true,
+                tls: false,
                 serverVersionNumber: 170_000,
                 databaseOwner: "vbtech_contact",
                 publicSchemaOwner: "vbtech_contact",
@@ -540,13 +564,14 @@ test("database adapter uses only the pre-provisioned contact database and exact 
     },
   });
 
-  await adapter.inspectTarget(target);
+  assert.equal((await adapter.inspectTarget(target)).tls, true);
   assert.deepEqual(await adapter.inspectProtected(target), { connected: false });
   await adapter.prepareDatabase({ target });
 
   const joined = queries.join("\n");
   assert.doesNotMatch(joined, /CREATE\s+(?:ROLE|DATABASE)|ALTER\s+ROLE/i);
   assert.doesNotMatch(joined, /pg_has_role/);
+  assert.match(joined, /ARRAY\[\]::text\[\]/);
   assert.match(joined, /owner\.rolname AS "publicSchemaOwner"/);
   assert.match(joined, /ALTER SCHEMA public OWNER TO "vbtech_contact"/);
   assert.deepEqual(connections.map(({ database }) => database), [
@@ -555,6 +580,27 @@ test("database adapter uses only the pre-provisioned contact database and exact 
     "/vbtech_contact",
   ]);
   assert.equal(connections.some(({ database }) => database === "/postgres"), false);
+
+  const odysseyDenial = Object.assign(
+    new Error("odyssey: c4c9ec260edb0: user blocked: markiro vbtech_contact"),
+    { code: "28000" },
+  );
+  const odysseyAdapter = createPostgresBootstrapAdapter({
+    openClient: async () => { throw odysseyDenial; },
+  });
+  assert.deepEqual(await odysseyAdapter.inspectProtected(target), { connected: false });
+
+  const unrelatedAuthFailure = Object.assign(
+    new Error("odyssey: c4c9ec260edb0: user blocked: markiro markiro"),
+    { code: "28000" },
+  );
+  const unsafeOdysseyAdapter = createPostgresBootstrapAdapter({
+    openClient: async () => { throw unrelatedAuthFailure; },
+  });
+  await assert.rejects(
+    unsafeOdysseyAdapter.inspectProtected(target),
+    (error) => error === unrelatedAuthFailure,
+  );
 });
 
 test("permission verifier has a secret-free offline contract check", () => {
@@ -705,8 +751,22 @@ test("permission adapter proves schema ownership and cannot swallow inspection e
   assert.match(applicationQueries[0], /schema_owner\.rolname AS "publicSchemaOwner"/);
   assert.match(applicationQueries[0], /rolbypassrls/);
   assert.match(applicationQueries[0], /pg_auth_members/);
+  assert.match(applicationQueries[0], /ARRAY\[\]::text\[\]/);
   assert.equal(applicationClosed, true);
   assert.deepEqual(await adapter.inspectProtected(target), {
+    connected: false,
+    readableRelations: [],
+    inheritedRoles: [],
+  });
+
+  const odysseyDenial = Object.assign(
+    new Error("odyssey: c4c9ec260edb0: user blocked: markiro vbtech_contact"),
+    { code: "28000" },
+  );
+  const odysseyAdapter = createPostgresPermissionAdapter({
+    openClient: async () => { throw odysseyDenial; },
+  });
+  assert.deepEqual(await odysseyAdapter.inspectProtected(target), {
     connected: false,
     readableRelations: [],
     inheritedRoles: [],

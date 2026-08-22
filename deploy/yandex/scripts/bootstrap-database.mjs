@@ -14,7 +14,7 @@ const MINIMUM_POSTGRES_VERSION = 150_000;
 const MANAGED_POSTGRES_HOST = /^[a-z0-9-]+\.mdb\.yandexcloud\.net$/;
 const RESOURCE_ID = /^[a-z0-9]{20}$/;
 const DATABASE_NAME = /^[a-z][a-z0-9_]{0,62}$/;
-const migrationUrl = new URL(
+const migrationUrl = () => new URL(
   "../../../apps/contact-function/migrations/0001_contact_outbox.sql",
   import.meta.url,
 );
@@ -208,12 +208,12 @@ async function inspectTargetWithClient(client) {
        active_role.rolreplication AS "roleCanReplicate",
        active_role.rolbypassrls AS "roleCanBypassRls",
        COALESCE((
-         SELECT array_agg(granted_role.rolname ORDER BY granted_role.rolname)
+         SELECT array_agg(granted_role.rolname::text ORDER BY granted_role.rolname)
            FROM pg_auth_members membership
            JOIN pg_roles member_role ON member_role.oid = membership.member
            JOIN pg_roles granted_role ON granted_role.oid = membership.roleid
           WHERE member_role.rolname = current_user
-       ), ARRAY[]::name[]) AS "roleMemberships",
+       ), ARRAY[]::text[]) AS "roleMemberships",
        schema_owner.rolname AS "publicSchemaOwner"
      FROM pg_database database
      JOIN pg_roles database_owner ON database_owner.oid = database.datdba
@@ -222,7 +222,27 @@ async function inspectTargetWithClient(client) {
      LEFT JOIN pg_roles schema_owner ON schema_owner.oid = namespace.nspowner
     WHERE database.datname = current_database()`,
   );
-  return result.rows[0];
+  return {
+    ...result.rows[0],
+    tls:
+      client.connection?.stream?.encrypted === true &&
+      client.connection?.stream?.authorized !== false,
+  };
+}
+
+function escapeRegularExpression(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function isProtectedAccessDenied(error, target) {
+  if (error?.code === "42501") return true;
+  if (error?.code !== "28000" || typeof error?.message !== "string") return false;
+
+  const database = escapeRegularExpression(target.protectedDatabase);
+  const role = escapeRegularExpression(CONTACT_ROLE);
+  return new RegExp(
+    `^odyssey: [a-z0-9]+: user blocked: ${database} ${role}$`,
+  ).test(error.message);
 }
 
 async function inspectProtected(openClient, target) {
@@ -230,7 +250,7 @@ async function inspectProtected(openClient, target) {
   try {
     client = await openClient(protectedDatabaseUrl(target), target.caFile);
   } catch (error) {
-    if (error?.code === "42501") return { connected: false };
+    if (isProtectedAccessDenied(error, target)) return { connected: false };
     throw error;
   }
   try {
@@ -285,7 +305,7 @@ export function createPostgresBootstrapAdapter({
 }
 
 async function offlineCheck() {
-  validateMigration(await readFile(migrationUrl, "utf8"));
+  validateMigration(await readFile(migrationUrl(), "utf8"));
   return {
     mode: "offline-check",
     database: CONTACT_DATABASE,
@@ -321,12 +341,12 @@ async function main() {
     mode,
     target,
     adapter: createPostgresBootstrapAdapter(),
-    migrationSql: await readFile(migrationUrl, "utf8"),
+    migrationSql: await readFile(migrationUrl(), "utf8"),
   });
   process.stdout.write(`${JSON.stringify(report)}\n`);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] && import.meta.url && fileURLToPath(import.meta.url) === process.argv[1]) {
   main().catch((error) => {
     const code = typeof error?.message === "string" && /^[a-z0-9_]+$/.test(error.message)
       ? error.message

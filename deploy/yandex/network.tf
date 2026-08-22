@@ -10,3 +10,25 @@ data "yandex_vpc_subnet" "serverless" {
     }
   }
 }
+
+data "yandex_vpc_security_group" "postgres" {
+  security_group_id = var.postgres_security_group_id
+
+  lifecycle {
+    postcondition {
+      condition = (
+        self.network_id == var.network_id &&
+        anytrue([
+          for rule in self.ingress :
+          rule.protocol == "TCP" &&
+          (
+            rule.port == 6432 ||
+            (rule.from_port == 6432 && rule.to_port == 6432)
+          ) &&
+          toset(rule.v4_cidr_blocks) == toset(["198.19.0.0/16"])
+        ])
+      )
+      error_message = "PostgreSQL must admit only TCP 6432 from the exact Yandex serverless VPC source range."
+    }
+  }
+}
