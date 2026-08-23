@@ -66,8 +66,9 @@ const hasQuery = (event: YandexHttpEvent): boolean =>
   Object.keys(event.queryStringParameters ?? {}).length > 0 ||
   Object.keys(event.multiValueQueryStringParameters ?? {}).length > 0;
 
+// Yandex strips the /<function-id> invocation prefix before constructing the event.
 const exactRoute = (event: YandexHttpEvent): boolean =>
-  event.httpMethod === "POST" && event.path === "/api/contact" && !hasQuery(event);
+  event.httpMethod === "POST" && event.path === "/" && !hasQuery(event);
 
 const header = (event: YandexHttpEvent, wanted: string): string => {
   const values: string[] = [];
