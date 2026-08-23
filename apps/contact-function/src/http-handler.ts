@@ -158,19 +158,24 @@ export const createHttpHandler = (dependencies: HttpHandlerDependencies) =>
     if (!dependencies.enabled) return neutralNotFound();
     if (!exactRoute(event)) return neutralNotFound();
 
+    let validationStage = "content_type";
     try {
       if (!validJsonContentType(header(event, "content-type"))) {
         throw publicError("invalid_request", 400);
       }
+      validationStage = "body";
       const decodedBody = decodeBody(event);
+      validationStage = "origin";
       if (header(event, "origin") !== "https://v-b.tech") {
         throw publicError("invalid_request", 400);
       }
+      validationStage = "host";
       const host = optionalHeader(event, "host");
       if (host !== undefined && host !== "v-b.tech") {
         throw publicError("invalid_request", 400);
       }
 
+      validationStage = "schema";
       const parsed = contactRequestSchema.safeParse(parseJson(decodedBody));
       if (!parsed.success) {
         const captchaOnly = parsed.error.issues.every(
@@ -178,10 +183,16 @@ export const createHttpHandler = (dependencies: HttpHandlerDependencies) =>
         );
         throw publicError(captchaOnly ? "captcha_required" : "invalid_request", 400);
       }
-      const accepted = await dependencies.submitContact(parsed.data, sourceIp(event));
+      validationStage = "source_ip";
+      const source = sourceIp(event);
+      validationStage = "submission";
+      const accepted = await dependencies.submitContact(parsed.data, source);
       return jsonResponse(202, accepted);
     } catch (error) {
       if (isPublicContactError(error)) {
+        if (error.code === "invalid_request") {
+          console.warn("VBTECH_CONTACT_INVALID_REQUEST", validationStage);
+        }
         return jsonResponse(error.status, { error: error.code });
       }
       return jsonResponse(503, { error: "temporarily_unavailable" });

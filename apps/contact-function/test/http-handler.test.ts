@@ -42,6 +42,28 @@ const enabledHandler = () => {
 };
 
 describe("Yandex HTTP contact boundary", () => {
+  it("logs only a stable validation stage when an invalid request is rejected", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { handler } = enabledHandler();
+      const response = await handler(event({
+        headers: {
+          host: "v-b.tech",
+          origin: "https://v-b.tech",
+          "content-type": "text/plain",
+        },
+      }));
+
+      expect(response.body).toBe('{"error":"invalid_request"}');
+      expect(warning).toHaveBeenCalledExactlyOnceWith(
+        "VBTECH_CONTACT_INVALID_REQUEST",
+        "content_type",
+      );
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
   it("also accepts the documented empty path when the HTTPS event includes it", async () => {
     const { handler, submit } = enabledHandler();
     const response = await handler(event({ path: "" }));
