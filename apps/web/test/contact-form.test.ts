@@ -204,13 +204,19 @@ describe("contact form binding", () => {
     expect(form.attributes.get("aria-busy")).toBe("false");
   });
 
-  it("bounds pending captcha acquisition and ignores its late resolution", async () => {
+  it("allows a human captcha challenge to finish after the request deadline", async () => {
     const form = new FakeForm();
     fillValid(form);
     const timers = new Map<number, { callback(): void; milliseconds: number }>();
     let nextTimer = 0;
     let resolveCaptcha!: (token: string) => void;
-    const fetch = vi.fn();
+    const fetch = vi.fn(async (_input, init) => {
+      const requestId = (JSON.parse(String(init?.body)) as { requestId: string }).requestId;
+      return new Response(JSON.stringify({ accepted: true, requestId }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      });
+    });
     const createRequestId = vi.fn(() => "11111111-1111-4111-8111-111111111111");
     const dependencies = enhancedDependencies({
       createRequestId,
@@ -237,12 +243,13 @@ describe("contact form binding", () => {
     expect(form.attributes.get("aria-busy")).toBe("true");
     expect(createRequestId).toHaveBeenCalledTimes(1);
 
-    [...timers.values()].find(({ milliseconds }) => milliseconds === 10_000)!.callback();
+    for (const timer of [...timers.values()]) {
+      if (timer.milliseconds <= 10_000) timer.callback();
+    }
 
-    await vi.waitFor(() => expect(form.status.textContent).toMatch(/temporarily unavailable/i));
-    expect(form.fieldset.disabled).toBe(false);
-    expect(form.submitControl.disabled).toBe(false);
-    expect(form.attributes.get("aria-busy")).toBe("false");
+    expect(form.fieldset.disabled).toBe(true);
+    expect(form.submitControl.disabled).toBe(true);
+    expect(form.attributes.get("aria-busy")).toBe("true");
     expect(form.controls.name.value).toBe("Vlad");
     expect(form.controls.contact.value).toBe("@abc_1");
     expect(form.controls.message.value).toBe("Project enquiry");
@@ -250,13 +257,10 @@ describe("contact form binding", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(createRequestId).toHaveBeenCalledTimes(1);
 
-    const statusAfterTimeout = form.status.textContent;
     resolveCaptcha("late-token");
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(form.status.textContent).toBe(statusAfterTimeout);
-    expect(form.resetCount).toBe(0);
-    expect(fetch).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(form.status.textContent).toMatch(/reference/i));
+    expect(form.resetCount).toBe(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(createRequestId).toHaveBeenCalledTimes(1);
   });
 
