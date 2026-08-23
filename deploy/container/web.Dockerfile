@@ -14,7 +14,16 @@ RUN case "$VBTECH_RELEASE_SHA" in \
     esac && test "${#VBTECH_RELEASE_SHA}" -eq 40
 ENV VBTECH_RELEASE_SHA=$VBTECH_RELEASE_SHA
 
-RUN corepack pnpm --filter @vbtech/web build
+ARG VBTECH_SUBMISSION_STATE=disabled
+ARG PUBLIC_SMARTCAPTCHA_SITE_KEY
+RUN case "$VBTECH_SUBMISSION_STATE" in \
+      disabled) PUBLIC_CONTACT_SUBMISSION_ENABLED=false corepack pnpm --filter @vbtech/web build ;; \
+      enabled) test -n "$PUBLIC_SMARTCAPTCHA_SITE_KEY" && \
+        PUBLIC_CONTACT_SUBMISSION_ENABLED=true \
+        PUBLIC_SMARTCAPTCHA_SITE_KEY="$PUBLIC_SMARTCAPTCHA_SITE_KEY" \
+        corepack pnpm --filter @vbtech/web build ;; \
+      *) exit 64 ;; \
+    esac
 
 FROM caddy:2.11.4-alpine AS runtime
 

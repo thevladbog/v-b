@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { ContactRequest } from "@vbtech/contracts";
+import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import { Pool } from "pg";
 import { decryptPayload } from "../src/crypto.js";
 import { OutboxRepository } from "../src/outbox-repository.js";
@@ -23,7 +24,7 @@ const telegramRequest: ContactRequest = {
   contact: "@thevladbog",
   message: "A concrete product problem",
   sourcePath: "/en/",
-  consentId: "VBT-PD-02/DRAFT",
+  consentId: CURRENT_CONTACT_CONSENT_ID,
   captchaToken: "opaque-token-one",
   website: "",
 };
@@ -197,7 +198,7 @@ describe("transactional contact acceptance", () => {
       contact: "@thevladbog",
       message: "A concrete product problem",
       sourcePath: "/en/",
-      consentId: "VBT-PD-02/DRAFT",
+      consentId: CURRENT_CONTACT_CONSENT_ID,
     });
   });
 
@@ -348,7 +349,7 @@ describe("transactional contact acceptance", () => {
         contact: "hello@example.com",
         message: "A concrete product problem",
         sourcePath: "/en/",
-        consentId: "VBT-PD-02/DRAFT",
+        consentId: CURRENT_CONTACT_CONSENT_ID,
       });
     }
 

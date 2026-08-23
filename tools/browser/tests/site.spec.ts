@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { expect, test } from "./fixtures.js";
 import {
   DISCOVERY_ARTIFACT_ROUTES,
-  DRAFT_LEGAL_ROUTES,
+  LEGAL_ROUTES,
   PUBLIC_ROUTES,
   REACHABLE_HTML_ROUTES,
 } from "../../../apps/web/src/lib/route-inventory.js";
@@ -143,7 +143,7 @@ for (const { path, locale, alternate } of landingPairs) {
       "href",
       locale === "ru" ? "/privacy/" : "/en/privacy/",
     );
-    await expect(form.getByRole("link", { name: locale === "ru" ? "проектом согласия на обработку персональных данных" : "draft personal data processing consent" })).toHaveAttribute(
+    await expect(form.getByRole("link", { name: locale === "ru" ? "согласием на обработку персональных данных" : "personal data processing consent" })).toHaveAttribute(
       "href",
       locale === "ru" ? "/personal-data-consent/" : "/en/personal-data-consent/",
     );
@@ -159,7 +159,7 @@ for (const { path, locale, alternate } of landingPairs) {
     const form = page.locator("[data-contact-form]");
     const actions = [
       form.getByRole("link", { name: locale === "ru" ? "политикой обработки персональных данных" : "personal data processing policy" }),
-      form.getByRole("link", { name: locale === "ru" ? "проектом согласия на обработку персональных данных" : "draft personal data processing consent" }),
+      form.getByRole("link", { name: locale === "ru" ? "согласием на обработку персональных данных" : "personal data processing consent" }),
     ];
 
     for (const action of actions) {
@@ -253,7 +253,7 @@ for (const path of REACHABLE_HTML_ROUTES) {
 
 test("central route inventory and discovery artifacts are reachable", async ({ request }) => {
   expect(PUBLIC_ROUTES).toEqual(["/", "/en/"]);
-  expect(DRAFT_LEGAL_ROUTES).toEqual([
+  expect(LEGAL_ROUTES).toEqual([
     "/legal/",
     "/privacy/",
     "/personal-data-consent/",
@@ -273,12 +273,12 @@ test("central route inventory and discovery artifacts are reachable", async ({ r
   expect((await request.get("/llms.txt")).headers()["content-type"]).toContain("text/plain");
 });
 
-test("landing, legal drafts, and 404 expose their intended index policy", async ({ page }, testInfo) => {
+test("landing, legal pages, and 404 expose their intended index policy", async ({ page }, testInfo) => {
   for (const path of PUBLIC_ROUTES) {
     await page.goto(path);
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
   }
-  for (const path of DRAFT_LEGAL_ROUTES) {
+  for (const path of LEGAL_ROUTES) {
     await page.goto(path);
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex,nofollow");
   }
@@ -375,7 +375,7 @@ for (const localized of [
 }
 
 for (const route of [
-  ...DRAFT_LEGAL_ROUTES.map((path) => ({
+  ...LEGAL_ROUTES.map((path) => ({
     path,
     locale: path.startsWith("/en/") ? "en" : "ru",
   })),

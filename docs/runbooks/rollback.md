@@ -6,13 +6,13 @@ Rollback is ordered to stop new personal-data intake while preserving required i
 
 Do not invent live resource IDs. Use named release-time evidence placeholders for the incident approval, active and disabled release manifests, exact image/function digests, runtime targets, prior versions, and provider audit records. Missing recovery evidence fails closed. Never capture credentials, secret values, visitor content, mailbox content, or provider response bodies.
 
-The repository currently has no remote web/runtime executor. An operator may use only a separately reviewed executor named in the incident or activation approval. A GitHub deployment handoff with `remoteMutation: false` is evidence input, not proof that rollback occurred.
+Use only the protected Markiro `Deploy v-b.tech web` workflow for the web rollback and `deploy/production/activate.mjs` for the exact reviewed function targets. A GitHub deployment handoff with `remoteMutation: false` is evidence input, not proof that rollback occurred.
 
 ## Trigger and incident envelope
 
-Open an incident record before mutation unless immediate containment policy already authorizes action 1. Record UTC start, trigger, operator/approver, maximum scope, active release SHA/digests, disabled recovery release SHA/digests, runtime and DNS inventory evidence IDs, accepted-job handling decision, and the rollback window. Evidence contains bounded states and IDs only.
+Open an incident record before mutation unless immediate containment policy already authorizes action 1. Record UTC start, trigger, operator/approver, maximum scope, active `<release-sha>-enabled` tag/digest, disabled `<release-sha>-disabled` recovery tag/digest, runtime and DNS inventory evidence IDs, accepted-job handling decision, and the rollback window. Evidence contains bounded states and IDs only.
 
-The disabled recovery artifact must already be immutable and verified. Its manifest must say `submissionState: disabled` and `VBT-PD-02/DRAFT`; its web artifact must contain nine HTML files and zero JS/MJS request runtime. It must preserve RU/EN legal pages, email, and Telegram direct contacts.
+The disabled recovery artifact must already be immutable and verified. Its manifest must say `submissionState: disabled` and `VBT-PD-02/2026.08/01`; its web artifact must contain nine HTML files and zero JS/MJS request runtime. It must preserve RU/EN legal pages, email, and Telegram direct contacts.
 
 ### Command: Validate the pre-approved disabled recovery handoff
 
@@ -51,14 +51,14 @@ set -euo pipefail
 : "${VBTECH_DISABLED_RELEASE_SHA_EVIDENCE:?set from the incident recovery record}"
 [[ "$VBTECH_DISABLED_RELEASE_SHA_EVIDENCE" =~ ^[0-9a-f]{40}$ ]]
 export VBTECH_DISABLED_RELEASE_SHA_EVIDENCE
-node --input-type=module -e 'import { runSmoke } from "./deploy/production/smoke.mjs"; const result = await runSmoke({ baseUrl: "https://v-b.tech", mode: "public", expected: { releaseSha: process.env.VBTECH_DISABLED_RELEASE_SHA_EVIDENCE, submissionState: "disabled", consentId: "VBT-PD-02/DRAFT" } }); process.stdout.write(`${JSON.stringify(result)}\n`);'
+node --input-type=module -e 'import { runSmoke } from "./deploy/production/smoke.mjs"; const result = await runSmoke({ baseUrl: "https://v-b.tech", mode: "public", expected: { releaseSha: process.env.VBTECH_DISABLED_RELEASE_SHA_EVIDENCE, submissionState: "disabled", consentId: "VBT-PD-02/2026.08/01" } }); process.stdout.write(`${JSON.stringify(result)}\n`);'
 ```
 
 ### Command: Verify preserved legal releases and direct contacts
 
 - Target/resource: six exact canonical HTTPS routes after containment: RU/EN landings, policy pages, and consent pages on `https://v-b.tech`
 - Classification: **READ-ONLY**
-- Expected output: bounded local parsing validates four exact DRAFT legal identities and both direct contact links, then emits one JSON object whose only key is an ordered six-entry `responses` array of file names and SHA-256 hashes
+- Expected output: bounded local parsing validates four exact ACTIVE legal identities and both direct contact links, then emits one JSON object whose only key is an ordered six-entry `responses` array of file names and SHA-256 hashes
 - Bounded failure branch: stop further rollback changes, remove temporary HTML, retain only failed route/marker metadata, and restore the prior disabled web image if available
 
 ```bash
@@ -71,7 +71,7 @@ curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/privacy/" --output "$evidence_dir/en-policy.html"
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/personal-data-consent/" --output "$evidence_dir/ru-consent.html"
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/personal-data-consent/" --output "$evidence_dir/en-consent.html"
-node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFile } from "node:fs/promises"; import { join } from "node:path"; const dir = process.argv[1]; const checks = [["ru-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["en-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["ru-policy.html", ["VBT-PD-01/DRAFT"]], ["en-policy.html", ["VBT-PD-01/DRAFT"]], ["ru-consent.html", ["VBT-PD-02/DRAFT"]], ["en-consent.html", ["VBT-PD-02/DRAFT"]]]; const hashes = []; for (const [file, markers] of checks) { const body = await readFile(join(dir, file)); const html = body.toString("utf8"); for (const marker of markers) if (!html.includes(marker)) throw new Error(`evidence_mismatch:${file}:${marker}`); hashes.push({ file, sha256: createHash("sha256").update(body).digest("hex") }); } process.stdout.write(`${JSON.stringify({ responses: hashes })}\n`);' "$evidence_dir"
+node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFile } from "node:fs/promises"; import { join } from "node:path"; const dir = process.argv[1]; const checks = [["ru-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["en-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["ru-policy.html", ["VBT-PD-01/2026.08/01"]], ["en-policy.html", ["VBT-PD-01/2026.08/01"]], ["ru-consent.html", ["VBT-PD-02/2026.08/01"]], ["en-consent.html", ["VBT-PD-02/2026.08/01"]]]; const hashes = []; for (const [file, markers] of checks) { const body = await readFile(join(dir, file)); const html = body.toString("utf8"); for (const marker of markers) if (!html.includes(marker)) throw new Error(`evidence_mismatch:${file}:${marker}`); hashes.push({ file, sha256: createHash("sha256").update(body).digest("hex") }); } process.stdout.write(`${JSON.stringify({ responses: hashes })}\n`);' "$evidence_dir"
 ```
 
 Record only the command's ordered six-entry `responses` array, exact marker names, release SHA, operator, and UTC time. Each response entry contains only its local file name and SHA-256 hash. A 200 status or generic route-smoke pass without this marker evidence does not prove preservation.
@@ -102,12 +102,12 @@ Keep the timer worker running to drain jobs accepted before containment unless d
 
 Starting state: public form enabled, backend enabled, legal pages available, direct contacts available, and immutable disabled recovery evidence present. Walk the following state transitions without touching a live system:
 
-| Order | Action ID | Public form | Legal pages | Direct contacts |
-| ---: | --- | --- | --- | --- |
-| 1 | `disable-public-form` | disabled | kept | kept |
-| 2 | `disable-backend-acceptance` | disabled | kept | kept |
-| 3 | `restore-independent-artifacts` | disabled | kept | kept |
-| 4 | `optional-approved-dns-restore` | disabled | kept | kept |
+| Order | Action ID                       | Public form | Legal pages | Direct contacts |
+| ----: | ------------------------------- | ----------- | ----------- | --------------- |
+|     1 | `disable-public-form`           | disabled    | kept        | kept            |
+|     2 | `disable-backend-acceptance`    | disabled    | kept        | kept            |
+|     3 | `restore-independent-artifacts` | disabled    | kept        | kept            |
+|     4 | `optional-approved-dns-restore` | disabled    | kept        | kept            |
 
 The exercise passes only if action 1 contains public intake before any backend/artifact/DNS recovery, every later state keeps legal pages and direct contacts, web and function recovery can be chosen independently, DNS remains optional and separately approved, and accepted work has an explicit processing/retention decision. The tabletop record must state that the legal/contact evidence command passed after action 1 and cite its six response hashes; table cells alone are not proof.
 

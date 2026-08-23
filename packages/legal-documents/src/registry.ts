@@ -54,27 +54,27 @@ export const LEGAL_ACTIVATION_CHECKLIST = [
 export const LEGAL_RELEASES = [
   {
     code: "VBT-PD-01",
-    identity: "VBT-PD-01/DRAFT",
-    revision: null,
-    effectiveDate: null,
-    status: "draft",
+    identity: "VBT-PD-01/2026.08/01",
+    revision: "2026.08/01",
+    effectiveDate: "2026-08-23",
+    status: "active",
     operatorProfileId: "operator-vbtech-2026-08-20",
     routes: { ru: "/privacy/", en: "/en/privacy/" },
   },
   {
     code: "VBT-PD-02",
-    identity: "VBT-PD-02/DRAFT",
-    revision: null,
-    effectiveDate: null,
-    status: "draft",
+    identity: "VBT-PD-02/2026.08/01",
+    revision: "2026.08/01",
+    effectiveDate: "2026-08-23",
+    status: "active",
     operatorProfileId: "operator-vbtech-2026-08-20",
     routes: { ru: "/personal-data-consent/", en: "/en/personal-data-consent/" },
   },
 ] as const satisfies readonly LegalDocumentRelease[];
 
 export const LEGAL_DOCUMENTS = [
-  { releaseIdentity: "VBT-PD-01/DRAFT", content: PRIVACY_CONTENT },
-  { releaseIdentity: "VBT-PD-02/DRAFT", content: CONSENT_CONTENT },
+  { releaseIdentity: "VBT-PD-01/2026.08/01", content: PRIVACY_CONTENT },
+  { releaseIdentity: "VBT-PD-02/2026.08/01", content: CONSENT_CONTENT },
 ] as const satisfies readonly LegalDocumentSource[];
 
 const CODES = ["VBT-PD-01", "VBT-PD-02"] as const;

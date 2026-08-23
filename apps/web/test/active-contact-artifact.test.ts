@@ -204,7 +204,7 @@ describe("private production-shaped ACTIVE contact artifact", () => {
     });
   });
 
-  it("keeps the public flag alone fail-closed on the actual DRAFT registry", async () => {
+  it("builds the actual ACTIVE registry when the public flag and site key are supplied", async () => {
     await expect(execFileAsync("node_modules/.bin/astro", ["build"], {
       cwd: webRoot,
       env: {
@@ -212,8 +212,10 @@ describe("private production-shaped ACTIVE contact artifact", () => {
         PUBLIC_CONTACT_SUBMISSION_ENABLED: "true",
         PUBLIC_SMARTCAPTCHA_SITE_KEY: publicSiteKey,
       },
-    })).rejects.toMatchObject({
-      stderr: expect.stringContaining("Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled"),
-    });
+    })).resolves.toBeDefined();
+    const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+    expect(html).toContain('data-submission-enabled="true"');
+    expect(html).toContain('data-consent-id="VBT-PD-02/2026.08/01"');
+    expect(html).toContain(`data-captcha-site-key="${publicSiteKey}"`);
   });
 });

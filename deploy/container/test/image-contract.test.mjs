@@ -14,6 +14,10 @@ test("the image builds the pinned workspace and copies only static output into C
   assert.match(dockerfile, /^FROM node:24\.18\.0-alpine AS web-build$/m);
   assert.match(dockerfile, /corepack pnpm install --frozen-lockfile/);
   assert.match(dockerfile, /ARG VBTECH_RELEASE_SHA/);
+  assert.match(dockerfile, /ARG VBTECH_SUBMISSION_STATE/);
+  assert.match(dockerfile, /ARG PUBLIC_SMARTCAPTCHA_SITE_KEY/);
+  assert.match(dockerfile, /PUBLIC_CONTACT_SUBMISSION_ENABLED=true/);
+  assert.match(dockerfile, /PUBLIC_SMARTCAPTCHA_SITE_KEY="\$PUBLIC_SMARTCAPTCHA_SITE_KEY"/);
   assert.match(dockerfile, /corepack pnpm --filter @vbtech\/web build/);
   assert.match(dockerfile, /^FROM caddy:2\.11\.4-alpine AS runtime$/m);
   assert.match(dockerfile, /COPY --from=web-build .*\/dist \/srv\/vbtech\//);

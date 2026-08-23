@@ -44,7 +44,8 @@ describe("root acceptance gate contract", () => {
     expect(source).toContain('const explicitThemes = ["light", "dark"] as const');
     expect(source).toContain("for (const path of allHtmlRoutes)");
     expect(source).toContain("for (const theme of explicitThemes)");
-    expect(source).toContain('"wcag22a", "wcag22aa"');
+    expect(source).toContain('"wcag22a"');
+    expect(source).toContain('"wcag22aa"');
     expect(source).toContain("assertSharedChromeStyles");
     expect(source).toContain("assertLocalRequests");
   });

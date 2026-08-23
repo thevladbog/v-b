@@ -92,16 +92,17 @@ describe("contact form state", () => {
     ).toEqual({ valid: false, fields: ["name", "contact", "message"] });
   });
 
-  it("keeps the disabled shell bounded to the current consent draft", () => {
+  it("keeps the disabled shell bounded to the current ACTIVE consent", () => {
     expect(resolveContactSubmissionReadiness(false)).toEqual({
       submissionEnabled: false,
-      consentIdentity: "VBT-PD-02/DRAFT",
+      consentIdentity: "VBT-PD-02/2026.08/01",
     });
   });
 
-  it("fails closed when submission is enabled with the draft consent", () => {
-    expect(() => resolveContactSubmissionReadiness(true)).toThrow(
-      "Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled",
-    );
+  it("allows submission with the current ACTIVE consent", () => {
+    expect(resolveContactSubmissionReadiness(true)).toEqual({
+      submissionEnabled: true,
+      consentIdentity: "VBT-PD-02/2026.08/01",
+    });
   });
 });

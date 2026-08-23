@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
+import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import { encryptPayload, type DeliveryKind } from "../src/crypto.js";
 import type {
   BeginDeliveryAttemptResult,
@@ -27,7 +28,7 @@ const durableTelegram = {
   contact: "@thevladbog",
   message: "A concrete product problem",
   sourcePath: "/en/" as const,
-  consentId: "VBT-PD-02/DRAFT",
+  consentId: CURRENT_CONTACT_CONSENT_ID,
 };
 
 const job = (
@@ -385,7 +386,7 @@ describe("durable outbox worker", () => {
     const item = job(
       "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       "notification",
-      { ...durableTelegram, consentId: "VBT-PD-02/older-approved-revision" },
+      { ...durableTelegram, consentId: "VBT-PD-02/2026.07/01" },
     );
     const repository = new InMemoryDeliveryRepository([item]);
     const sender = new CapturingSender();

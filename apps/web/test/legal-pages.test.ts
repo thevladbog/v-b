@@ -23,9 +23,9 @@ const pages = [
     file: "dist/legal/index.html",
     pair: "/en/legal/",
     pairFile: "dist/en/legal/index.html",
-    title: "Правовые документы v-b.tech — проекты",
-    description: "Реестр проектов документов v-b.tech: политика обработки персональных данных и согласие для будущей формы обращения.",
-    identity: "VBT-PD-01/DRAFT",
+    title: "Правовые документы v-b.tech",
+    description: "Реестр действующих документов v-b.tech для формы обращения.",
+    identity: "VBT-PD-01/2026.08/01",
     back: null,
   },
   {
@@ -34,9 +34,9 @@ const pages = [
     file: "dist/privacy/index.html",
     pair: "/en/privacy/",
     pairFile: "dist/en/privacy/index.html",
-    title: "Политика обработки персональных данных — проект | v-b.tech",
-    description: "Проект политики обработки персональных данных для узкой формы обращения на сайте v-b.tech; документ не вступил в силу.",
-    identity: "VBT-PD-01/DRAFT",
+    title: "Политика обработки персональных данных | v-b.tech",
+    description: "Политика обработки персональных данных для формы обращения на сайте v-b.tech, редакция VBT-PD-01/2026.08/01 от 23.08.2026.",
+    identity: "VBT-PD-01/2026.08/01",
     back: "/legal/",
   },
   {
@@ -45,9 +45,9 @@ const pages = [
     file: "dist/personal-data-consent/index.html",
     pair: "/en/personal-data-consent/",
     pairFile: "dist/en/personal-data-consent/index.html",
-    title: "Согласие на обработку персональных данных — проект | v-b.tech",
-    description: "Проект согласия для будущей формы обращения v-b.tech; принять его нельзя, онлайн-отправка отключена.",
-    identity: "VBT-PD-02/DRAFT",
+    title: "Согласие на обработку персональных данных | v-b.tech",
+    description: "Согласие на обработку персональных данных для формы обращения v-b.tech, редакция VBT-PD-02/2026.08/01 от 23.08.2026.",
+    identity: "VBT-PD-02/2026.08/01",
     back: "/legal/",
   },
   {
@@ -56,9 +56,9 @@ const pages = [
     file: "dist/en/legal/index.html",
     pair: "/legal/",
     pairFile: "dist/legal/index.html",
-    title: "v-b.tech legal documents — drafts",
-    description: "Register of v-b.tech draft documents: the personal data processing policy and consent for the future enquiry form.",
-    identity: "VBT-PD-01/DRAFT",
+    title: "v-b.tech legal documents",
+    description: "Register of current v-b.tech documents for the enquiry form.",
+    identity: "VBT-PD-01/2026.08/01",
     back: null,
   },
   {
@@ -67,9 +67,9 @@ const pages = [
     file: "dist/en/privacy/index.html",
     pair: "/privacy/",
     pairFile: "dist/privacy/index.html",
-    title: "Personal Data Processing Policy — Draft | v-b.tech",
-    description: "Draft personal data processing policy for the narrow v-b.tech enquiry form; the document is not in force.",
-    identity: "VBT-PD-01/DRAFT",
+    title: "Personal Data Processing Policy | v-b.tech",
+    description: "Personal data processing policy for the narrow v-b.tech enquiry form, release VBT-PD-01/2026.08/01 effective 23 August 2026.",
+    identity: "VBT-PD-01/2026.08/01",
     back: "/en/legal/",
   },
   {
@@ -78,9 +78,9 @@ const pages = [
     file: "dist/en/personal-data-consent/index.html",
     pair: "/personal-data-consent/",
     pairFile: "dist/personal-data-consent/index.html",
-    title: "Consent to Personal Data Processing — Draft | v-b.tech",
-    description: "Draft consent for the future v-b.tech enquiry form; it cannot be accepted while online submission is disabled.",
-    identity: "VBT-PD-02/DRAFT",
+    title: "Consent to Personal Data Processing | v-b.tech",
+    description: "Consent to personal data processing for the v-b.tech enquiry form, release VBT-PD-02/2026.08/01 effective 23 August 2026.",
+    identity: "VBT-PD-02/2026.08/01",
     back: "/en/legal/",
   },
 ] as const;
@@ -158,7 +158,7 @@ const validLegalFixture = `<!doctype html>
   </body>
 </html>`;
 
-describe("draft legal pages", () => {
+describe("legal pages", () => {
   it("builds exactly the six canonical legal route files", async () => {
     const generatedRoutes = await listGeneratedLegalRoutes(new URL("../dist/", import.meta.url));
     expect(generatedRoutes).toEqual(pages.map(({ route }) => route).sort());
@@ -177,7 +177,7 @@ describe("draft legal pages", () => {
     }
   });
 
-  it.each(pages)("renders metadata and draft boundary for $route", async (page) => {
+  it.each(pages)("renders metadata and ACTIVE boundary for $route", async (page) => {
     const html = await readBuilt(page.file);
     const document = parse(html) as unknown as HtmlNode;
     expect(validateLegalPageContract(html, {
@@ -188,14 +188,14 @@ describe("draft legal pages", () => {
       description: page.description,
       draftBanner:
         page.locale === "ru"
-          ? "Проект. Документ не вступил в силу. Дата вступления в силу отсутствует. Отправка формы отключена."
-          : "Draft. This document is not in force. No effective date. Submission is disabled.",
+          ? "Действующий документ. Редакция и дата вступления в силу указаны ниже."
+          : "Current document. The revision and effective date are shown below.",
     })).toEqual([]);
     expect(text(document)).toContain(page.identity);
     expect(text(document)).toMatch(
       page.locale === "ru"
-        ? /Проект.*не вступил в силу.*Дата вступления в силу отсутствует.*Отправка формы отключена/i
-        : /Draft.*not in force.*No effective date.*Submission is disabled/i,
+        ? /Действующий документ.*Редакция и дата вступления в силу указаны ниже/i
+        : /Current document.*revision and effective date are shown below/i,
     );
     expect(html).toMatch(new RegExp(`<a[^>]+href="${page.pair.replaceAll("/", "\\/")}"[^>]*>\\s*(?:RU|EN)\\s*<\\/a>`));
     expect(await readBuilt(page.pairFile)).toBeTruthy();
@@ -241,13 +241,13 @@ describe("draft legal pages", () => {
   );
 
   it.each(pages.filter(({ back }) => back === null))(
-    "lists both current draft candidates in $route",
+    "lists both current ACTIVE documents in $route",
     async ({ file, locale }) => {
       const html = await readBuilt(file);
       const document = parse(html) as unknown as HtmlNode;
-      expect(text(document)).toContain("VBT-PD-01/DRAFT");
-      expect(text(document)).toContain("VBT-PD-02/DRAFT");
-      expect(text(document)).toMatch(locale === "ru" ? /Статус:\s*проект/i : /Status:\s*draft/i);
+      expect(text(document)).toContain("VBT-PD-01/2026.08/01");
+      expect(text(document)).toContain("VBT-PD-02/2026.08/01");
+      expect(text(document)).toMatch(locale === "ru" ? /Статус:\s*действует/i : /Status:\s*active/i);
       const hrefs = elements(document, "a").map((node) => attr(node, "href"));
       expect(hrefs).toContain(locale === "ru" ? "/privacy/" : "/en/privacy/");
       expect(hrefs).toContain(locale === "ru" ? "/personal-data-consent/" : "/en/personal-data-consent/");

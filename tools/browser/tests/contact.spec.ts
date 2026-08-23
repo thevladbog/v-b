@@ -35,7 +35,7 @@ const locales = [
       success: /обращение получено/i,
       invalid: /Проверьте отмеченные поля/i,
       policy: "политикой обработки персональных данных",
-      consentDocument: "проектом согласия на обработку персональных данных",
+      consentDocument: "согласием на обработку персональных данных",
     },
   },
   {
@@ -50,7 +50,7 @@ const locales = [
       success: /enquiry was received/i,
       invalid: /Review the marked fields/i,
       policy: "personal data processing policy",
-      consentDocument: "draft personal data processing consent",
+      consentDocument: "personal data processing consent",
     },
   },
 ] as const;
@@ -166,7 +166,10 @@ for (const localized of locales) {
 
     const form = page.locator("[data-contact-form]");
     await expect(form).toHaveAttribute("data-internal-test-fixture", "true");
-    await expect(page.getByText(/DRAFT.*not active|DRAFT.*не действует/i)).toBeVisible();
+    await expect(form).toHaveAttribute(
+      "data-consent-id",
+      "VBT-PD-02/2026.08/01",
+    );
     await page.getByRole("button", { name: localized.labels.submit }).click();
 
     await expect(page.getByRole("alert")).toContainText(localized.labels.invalid);

@@ -18,8 +18,26 @@ const textFor = (content: LegalDocumentLocaleContent) =>
   ]).join(" ");
 
 describe("legal document content contracts", () => {
+  it("publishes matched ACTIVE text without draft-only activation disclaimers", () => {
+    expect(LEGAL_DOCUMENTS.map(({ releaseIdentity }) => releaseIdentity)).toEqual([
+      "VBT-PD-01/2026.08/01",
+      "VBT-PD-02/2026.08/01",
+    ]);
+
+    const serialized = JSON.stringify(LEGAL_DOCUMENTS);
+    expect(serialized).not.toMatch(
+      /VBT-PD-0[12]\/DRAFT|submission is disabled|отправка.{0,30}отключена|no public revision|публичн.{0,30}редакц.{0,30}(?:не|отсутств)|no effective date|дат.{0,30}вступлен.{0,30}отсутств|must be reviewed before activation|подлежат повторной проверке до активации/i,
+    );
+
+    for (const document of LEGAL_DOCUMENTS) {
+      for (const locale of ["ru", "en"] as const) {
+        expect(document.content[locale].releaseIdentity).toBe(document.releaseIdentity);
+      }
+    }
+  });
+
   it("covers the complete policy structure in matched RU and EN sections", () => {
-    const policy = LEGAL_DOCUMENTS.find(({ releaseIdentity }) => releaseIdentity === "VBT-PD-01/DRAFT");
+    const policy = LEGAL_DOCUMENTS.find(({ releaseIdentity }) => releaseIdentity === "VBT-PD-01/2026.08/01");
     expect(policy).toBeDefined();
     const expectedSections = [
       "operator-and-scope",
@@ -52,12 +70,13 @@ describe("legal document content contracts", () => {
       expect(text).toMatch(/one year|одного года/i);
       expect(text).toMatch(/cross-border|трансгранич/i);
       expect(text).toMatch(/no analytics|аналитик/i);
-      expect(text).toMatch(/draft|проект/i);
+      expect(text).toMatch(/VBT-PD-01\/2026\.08\/01/);
+      expect(text).toMatch(/23 August 2026|23\.08\.2026/);
     }
   });
 
-  it("covers the draft consent boundary in both languages", () => {
-    const consent = LEGAL_DOCUMENTS.find(({ releaseIdentity }) => releaseIdentity === "VBT-PD-02/DRAFT");
+  it("covers the ACTIVE consent boundary in both languages", () => {
+    const consent = LEGAL_DOCUMENTS.find(({ releaseIdentity }) => releaseIdentity === "VBT-PD-02/2026.08/01");
     expect(consent).toBeDefined();
     expect(consent!.content.ru.sections.map(({ id }) => id)).toEqual(
       consent!.content.en.sections.map(({ id }) => id),
@@ -65,11 +84,9 @@ describe("legal document content contracts", () => {
 
     for (const locale of ["ru", "en"] as const) {
       const text = textFor(consent!.content[locale]);
-      expect(text).toContain("VBT-PD-02/DRAFT");
+      expect(text).toContain("VBT-PD-02/2026.08/01");
       expect(text).toMatch(/unchecked|required|не отмеченн|обязательн/i);
-      expect(text).toMatch(/submission is disabled|отправка.*отключена/i);
-      expect(text).toMatch(/no public revision|публичн.*редакц/i);
-      expect(text).toMatch(/no effective date|дат.*вступлен.*отсутств/i);
+      expect(text).toMatch(/effective from 23 August 2026|действует с 23\.08\.2026/i);
       expect(text).toMatch(/one year|одного года/i);
       expect(text).toMatch(/withdraw|отозвать|отзыв/i);
     }
@@ -82,7 +99,7 @@ describe("legal document content contracts", () => {
 
   it("pins complete per-section requirement markers for both locales", () => {
     const expectedByIdentity = {
-      "VBT-PD-01/DRAFT": [
+      "VBT-PD-01/2026.08/01": [
         "operator", "scope", "definitions", "principles", "subject-rights", "subjects",
         "user-data", "sensitive-data-warning", "operational-data", "data-minimization",
         "purposes", "exclusions", "legal-grounds", "consent-boundary", "operations",
@@ -90,7 +107,7 @@ describe("legal document content contracts", () => {
         "cross-border", "security", "incidents", "withdrawal", "browser-storage", "logs",
         "captcha", "lifecycle", "authoritative-language",
       ],
-      "VBT-PD-02/DRAFT": [
+      "VBT-PD-02/2026.08/01": [
         "affirmative-action", "consent-boundary", "lifecycle", "operator", "user-data",
         "sensitive-data-warning", "operational-data", "purposes", "exclusions", "operations",
         "providers", "provider-review", "retention", "delivery-lifecycle", "withdrawal",
@@ -140,7 +157,7 @@ describe("legal document content contracts", () => {
     }
   });
 
-  it("states operational controls as binding future requirements, not implementation claims", () => {
+  it("states operational controls as binding requirements or current controls", () => {
     for (const document of LEGAL_DOCUMENTS) {
       for (const locale of ["ru", "en"] as const) {
         const operationalSections = document.content[locale].sections.filter(({ requirements }) =>
@@ -153,13 +170,13 @@ describe("legal document content contracts", () => {
         });
         expect(operationalText).toMatch(
           locale === "ru"
-            ? /IP-адрес.{0,50}не должен сохраняться.{0,50}баз.{0,30}прилож/i
-            : /raw IP address.{0,50}must not be persisted.{0,50}application database/i,
+            ? /IP-адрес.{0,50}(?:не должен сохраняться|не сохраняется).{0,50}баз.{0,30}прилож/i
+            : /raw IP address.{0,50}(?:must not be|is not) persisted.{0,50}application database/i,
         );
         expect(operationalText).toMatch(
           locale === "ru"
-            ? /телеметри.{0,30}журнал.{0,50}должны быть ограничены/i
-            : /telemetry and logs.{0,50}must be limited/i,
+            ? /телеметри.{0,30}журнал.{0,50}(?:должны быть )?ограничены/i
+            : /telemetry and logs.{0,50}(?:must be|are) limited/i,
         );
       }
     }
@@ -187,7 +204,7 @@ describe("legal document content contracts", () => {
         expect(text).toMatch(
           locale === "ru"
             ? /не (?:должны )?включа.{0,80}(?:поля|данные).{0,30}им.{0,30}контакт.{0,30}сообщен.{0,80}(?:ин.{0,20})?персональн.{0,30}содержим.{0,80}captcha-токен.{0,50}секрет/i
-            : /must exclude.{0,80}user-provided fields.{0,30}name.{0,30}contact.{0,30}message.{0,80}other personal body data.{0,80}captcha token.{0,50}secrets/i,
+            : /(?:must )?exclude.{0,80}user-provided fields.{0,30}name.{0,30}contact.{0,30}message.{0,80}other personal body data.{0,80}captcha token.{0,50}secrets/i,
         );
       }
     }

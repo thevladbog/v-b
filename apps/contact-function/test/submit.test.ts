@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ContactRequest } from "@vbtech/contracts";
+import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import { PublicContactError } from "../src/errors.js";
 import { createSubmitContact } from "../src/submit.js";
 
@@ -10,7 +11,7 @@ const validRequest: ContactRequest = {
   contact: "hello@example.com",
   message: "A concrete product problem",
   sourcePath: "/en/",
-  consentId: "VBT-PD-02/DRAFT",
+  consentId: CURRENT_CONTACT_CONSENT_ID,
   captchaToken: "one-time-token",
   website: "",
 };

@@ -20,7 +20,7 @@ export interface LlmsTextInput {
   readonly canonicalPages: readonly Link[];
   readonly services: readonly Service[];
   readonly projects: readonly Project[];
-  readonly legalDrafts: readonly Link[];
+  readonly legalDocuments: readonly Link[];
 }
 
 const linesForLinks = (links: readonly Link[]) =>
@@ -50,8 +50,8 @@ ${serviceLines}
 
 ${projectLines}
 
-## Legal drafts
+## Legal documents
 
-${linesForLinks(input.legalDrafts)}
+${linesForLinks(input.legalDocuments)}
 `;
 }
