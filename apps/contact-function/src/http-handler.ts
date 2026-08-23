@@ -66,9 +66,9 @@ const hasQuery = (event: YandexHttpEvent): boolean =>
   Object.keys(event.queryStringParameters ?? {}).length > 0 ||
   Object.keys(event.multiValueQueryStringParameters ?? {}).length > 0;
 
-// Yandex strips the /<function-id> invocation prefix before constructing the event.
+// Direct HTTPS invocation strips the /<function-id> prefix and emits an empty path.
 const exactRoute = (event: YandexHttpEvent): boolean =>
-  event.httpMethod === "POST" && event.path === "/" && !hasQuery(event);
+  event.httpMethod === "POST" && event.path === "" && !hasQuery(event);
 
 const header = (event: YandexHttpEvent, wanted: string): string => {
   const values: string[] = [];
