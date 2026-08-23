@@ -6,7 +6,7 @@ This runbook begins only after `publication.md` records a passing public disable
 
 Do not invent live resource IDs. Use named release-time evidence placeholders from the approved release record, validate them, and fail closed on missing or mismatched evidence. Do not expose credentials, secret-store values, visitor fields, or provider response content in commands or evidence.
 
-The current repository can prove an isolated ACTIVE layout and can model enabled preflight/smoke behavior, but `publish.yml` only emits a disabled DRAFT manifest and `deploy.yml` has no remote executor. Therefore a live activation is blocked until a separately reviewed immutable ACTIVE publication path and runtime executor exist. The ordered gates remain the acceptance contract for that future capability.
+The repository publishes a state-bound immutable ACTIVE image/function bundle, verifies it through `deploy.yml`, and provides the bounded `deploy/production/activate.mjs` runtime executor. Live activation still requires the exact owner approval, current inventory, attested artifacts, backend-before-web ordering, and controlled delivery evidence below.
 
 ## Gate A1 — Legal approval
 
@@ -38,7 +38,7 @@ Gate ID: `active-artifact-proof`
 
 Build and inspect the repository's guarded private ACTIVE contour first. It is restricted to loopback, uses a test-only legal alias, and is proof of layout/client behavior only. It must never be copied to the public output or treated as the production legal release.
 
-The actual activation artifact must then be produced by a reviewed immutable publication mechanism that binds the exact ACTIVE legal IDs, public SmartCaptcha site key, release commit, web image digest, function digest, and nine HTML files. It must contain exactly one shared request-capable JS/MJS chunk and no fixture marker, secret name/value, or developer path. Because that immutable ACTIVE publisher does not yet exist, this gate currently stops after private proof.
+The actual activation artifact is produced by the reviewed immutable publication mechanism binding the exact ACTIVE legal IDs, public SmartCaptcha site key, release commit, web image digest, function digest, and nine HTML files. It must contain exactly one shared request-capable JS/MJS chunk and no fixture marker, secret name/value, or developer path. The attested manifest and extracted image identity are the release evidence; the private fixture remains layout-only proof.
 
 ### Command: Build and browser-test the guarded private ACTIVE contour
 
@@ -67,7 +67,7 @@ Gate ID: `backend-enable`
 
 Using only the reviewed runtime executor named by the activation approval, first enable public invocation/approved abuse controls and set the exact `vbtech-contact-http` function revision's `CONTACT_SUBMISSION_ENABLED` to true. Keep the web artifact disabled while verifying that exact route, alternate routes/methods, database reachability, worker/timer health, and Postbox sender identity match the approval.
 
-Capture target resource IDs, prior and new revision IDs, release SHA, boolean gates, operator, provider audit ID, and timestamps. Do not capture environment values. If the executor is absent, the plan contains any unrelated resource, the revision/digest differs, or the handler cannot be verified privately, abort and restore the prior disabled backend revision. The current repository has no reviewed remote activation executor, so this gate is presently blocked.
+Capture target resource IDs, prior and new revision IDs, release SHA, boolean gates, operator, provider audit ID, and timestamps. Do not capture environment values. Use `deploy/production/activate.mjs` with the downloaded attested manifest/archive and the exact approval token; it re-reads live inventory before applying. If the executor is absent, the plan contains any unrelated resource, the revision/digest differs, or the handler cannot be verified privately, abort and restore the prior disabled backend revision.
 
 ## Gate A5 — Enabled web deployment
 
@@ -75,13 +75,13 @@ Gate ID: `web-enable`
 
 Only after the backend enable evidence passes, deploy the approved immutable ACTIVE web image to the existing v-b.tech edge. Do not rebuild at the server and do not change DNS. Verify that the edge serves the exact digest/release header, ACTIVE legal IDs, public site key, same-origin `/api/contact`, and the approved CSP while legal pages and direct contacts remain available.
 
-If the image digest, release header, legal IDs, form state, route, or CSP differs, immediately execute rollback action 1 from `rollback.md`: redeploy the pre-approved disabled web artifact while keeping legal pages and direct contacts. The current publication workflow cannot produce an immutable ACTIVE release, so this gate is presently blocked.
+If the image digest, release header, legal IDs, form state, route, or CSP differs, immediately execute rollback action 1 from `rollback.md`: redeploy the pre-approved `<release-sha>-disabled` web artifact while keeping legal pages and direct contacts.
 
 ## Gate A6 — Enabled ACTIVE legal and contact evidence
 
 Gate ID: `active-legal-contact-evidence`
 
-The enabled web deployment replaces the disabled/DRAFT public bytes. The generic route smoke does not inspect the policy page identity, consent page identity, or direct-contact links, so it cannot prove that the approved ACTIVE legal contour survived that replacement. Run this independent READ-ONLY evidence gate immediately after Gate A5 and before the generic enabled smoke.
+The enabled web deployment replaces the disabled ACTIVE rollback bytes. The generic route smoke does not inspect the policy page identity, consent page identity, or direct-contact links, so it cannot prove that the approved ACTIVE legal contour survived that replacement. Run this independent READ-ONLY evidence gate immediately after Gate A5 and before the generic enabled smoke.
 
 ### Command: Verify enabled ACTIVE legal releases and direct contacts
 

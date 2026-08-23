@@ -26,7 +26,7 @@ describe("contact notification rendering", () => {
     expect(rendered.subject).toBe("New v-b.tech enquiry");
     expect(rendered.html).toContain("&lt;Vlad &amp; &quot;team&quot;&gt;");
     expect(rendered.html).toContain("Build the product safely.");
-    expect(rendered.html).toContain("VBT-PD-02/DRAFT");
+    expect(rendered.html).toContain(CURRENT_CONTACT_CONSENT_ID);
     expect(rendered.html).not.toMatch(/<script|https?:\/\/.*\.(png|gif|woff)/i);
     expect(rendered.text).toContain("11111111-1111-4111-8111-111111111111");
     expect(rendered.text).toContain("2026-08-20T12:00:00.000Z");

@@ -2,7 +2,7 @@
 
 ## Scope and evidence rules
 
-This runbook orders the production publication gates. It does not grant permission to change GitHub Packages, the runtime, external DNS, or the public form. `publish.yml` publishes immutable artifacts; `deploy.yml` verifies them and produces a disabled handoff with `remoteMutation: false` and `executor: "not-configured"`. A handoff is not a deployment.
+This runbook orders the production publication gates. It does not grant permission to change GitHub Packages, the runtime, external DNS, or the public form. `publish.yml` publishes immutable artifacts; `deploy.yml` verifies the selected state and produces a handoff with `remoteMutation: false` and the reviewed activation executor path. A handoff is not a deployment.
 
 Do not invent live resource IDs. All identifiers below are **named release-time evidence placeholders** ending in `_EVIDENCE`; populate them only from the cited release record, validate them before use, and store evidence IDs rather than secret values. Missing, stale, ambiguous, or mismatched evidence fails closed. Never record credentials, secret-store values, visitor content, or provider response bodies.
 
@@ -103,7 +103,7 @@ Obtain a release-publication approval that names the exact commit, successful CI
 
 Gate ID: `immutable-publication`
 
-Dispatch the protected manual workflow only after Gate P3. The workflow refuses an existing commit tag, verifies CI on `main`, publishes the image as `ghcr.io/thevladbog/vbtech-web:<40-character-sha>`, creates the deterministic function archive and manifest, and attests them. Never use `latest` or replace an existing tag.
+Dispatch the protected manual workflow only after Gate P3. The workflow refuses an existing state-bound commit tag, verifies CI on `main`, publishes the image as `ghcr.io/thevladbog/vbtech-web:<40-character-sha>-<disabled|enabled>`, creates the deterministic function archive and manifest, and attests them. Publish and verify both states for the same source release before activation so the disabled image is already available as an immutable rollback target. Never use `latest` or replace an existing tag.
 
 ### Command: Dispatch immutable publication for the approved commit
 
@@ -121,7 +121,7 @@ gh workflow run publish.yml --ref main --field release_sha="$VBTECH_RELEASE_SHA_
 
 ### Command: Verify and download the exact immutable publication evidence
 
-- Target/resource: one GitHub `publish.yml` run and its `vbtech-release-<release-sha>` handoff artifact
+- Target/resource: one GitHub `publish.yml` run and its `vbtech-release-<release-sha>-<submission-state>` handoff artifact
 - Classification: **READ-ONLY**
 - Expected output: the run is successful on main at the exact commit and the manifest, checksum, archive, image digest, and attestations validate
 - Bounded failure branch: stop before deployment, retain the run URL and validation error, and do not substitute another run or artifact
@@ -136,7 +136,7 @@ test ! -e "$VBTECH_RELEASE_DIR_EVIDENCE"
 run_json="$(gh run view "$VBTECH_PUBLISH_RUN_ID_EVIDENCE" --json databaseId,workflowName,event,headBranch,headSha,status,conclusion,url)"
 jq -e --arg sha "$VBTECH_RELEASE_SHA_EVIDENCE" '.workflowName == "Publish immutable release" and .event == "workflow_dispatch" and .headBranch == "main" and .headSha == $sha and .status == "completed" and .conclusion == "success"' <<<"$run_json" >/dev/null
 install -d -m 700 "$VBTECH_RELEASE_DIR_EVIDENCE"
-gh run download "$VBTECH_PUBLISH_RUN_ID_EVIDENCE" --name "vbtech-release-$VBTECH_RELEASE_SHA_EVIDENCE" --dir "$VBTECH_RELEASE_DIR_EVIDENCE"
+gh run download "$VBTECH_PUBLISH_RUN_ID_EVIDENCE" --name "vbtech-release-$VBTECH_RELEASE_SHA_EVIDENCE-$VBTECH_SUBMISSION_STATE_EVIDENCE" --dir "$VBTECH_RELEASE_DIR_EVIDENCE"
 node deploy/production/release-artifact.mjs validate "$VBTECH_RELEASE_DIR_EVIDENCE/release-manifest.json" "$VBTECH_RELEASE_SHA_EVIDENCE" "$VBTECH_PUBLISH_RUN_ID_EVIDENCE" "$VBTECH_RELEASE_DIR_EVIDENCE/vbtech-contact-function.zip" >/dev/null
 (cd "$VBTECH_RELEASE_DIR_EVIDENCE" && sha256sum --check checksums.sha256)
 attestation_policy=(--repo thevladbog/v-b --signer-workflow thevladbog/v-b/.github/workflows/publish.yml --source-digest "$VBTECH_RELEASE_SHA_EVIDENCE" --source-ref refs/heads/main)
@@ -226,7 +226,7 @@ node deploy/yandex/scripts/verify-permissions.mjs --verify
 
 Gate ID: `disabled-function-deploy`
 
-First create the repository's exact disabled handoff, then use only the remote deployment executor named by Gate P5. The handoff itself records `remoteMutation: false` and is not deployment evidence. The remote deployment executor is not configured in this repository; if it is absent or unreviewed, fail closed here and do not continue to private smoke or DNS.
+First create the repository's exact disabled handoff, then use only `deploy/production/activate.mjs` for the reviewed v-b.tech function targets and the protected Markiro `Deploy v-b.tech web` workflow for the existing edge VM. The handoff itself records `remoteMutation: false` and is not deployment evidence. If either executor contract or exact current inventory fails validation, stop before private smoke or DNS.
 
 ### Command: Dispatch the exact disabled deployment handoff
 
@@ -262,7 +262,7 @@ Gate ID: `disabled-web-deploy`
 - Expected output: private edge evidence shows the exact release header/image digest, nine HTML files, zero JS/MJS contact runtime, unchanged Markiro authorities, and no public DNS change
 - Bounded failure branch: stop before smoke and DNS, restore the prior container/image only, retain bounded runtime metadata, and escalate an absent executor or authority collision
 
-The remote web deployment executor is not configured in this repository. Do not invent SSH, Docker, cloud, or server commands; without a reviewed executor and actual Gate P10/P11 evidence, the sequence fails closed.
+The web executor is owned by the protected Markiro `Deploy v-b.tech web` workflow. Do not invent SSH, Docker, cloud, or server commands; without its successful bounded evidence and actual Gate P10/P11 records, the sequence fails closed.
 
 ## Gate P12 — Private disabled route smoke
 
@@ -283,7 +283,7 @@ set -euo pipefail
 : "${VBTECH_RELEASE_SHA_EVIDENCE:?set from the immutable release manifest}"
 [[ "$VBTECH_PRIVATE_ORIGIN_EVIDENCE" =~ ^http://127\.0\.0\.1:[1-9][0-9]{0,4}/?$ ]]
 export VBTECH_PRIVATE_ORIGIN_EVIDENCE VBTECH_RELEASE_SHA_EVIDENCE
-node --input-type=module -e 'import { runSmoke } from "./deploy/production/smoke.mjs"; const result = await runSmoke({ baseUrl: process.env.VBTECH_PRIVATE_ORIGIN_EVIDENCE, mode: "private", expected: { releaseSha: process.env.VBTECH_RELEASE_SHA_EVIDENCE, submissionState: "disabled", consentId: "VBT-PD-02/DRAFT" } }); process.stdout.write(`${JSON.stringify(result)}\n`);'
+node --input-type=module -e 'import { runSmoke } from "./deploy/production/smoke.mjs"; const result = await runSmoke({ baseUrl: process.env.VBTECH_PRIVATE_ORIGIN_EVIDENCE, mode: "private", expected: { releaseSha: process.env.VBTECH_RELEASE_SHA_EVIDENCE, submissionState: "disabled", consentId: "VBT-PD-02/2026.08/01" } }); process.stdout.write(`${JSON.stringify(result)}\n`);'
 ```
 
 ## Gate P13 — Private legal and contact evidence
@@ -294,7 +294,7 @@ Gate ID: `private-legal-contact-evidence`
 
 - Target/resource: six exact private HTML routes on the Gate P11 loopback edge: RU/EN landings, policy pages, and consent pages
 - Classification: **READ-ONLY**
-- Expected output: bounded local parsing validates four exact DRAFT legal identities and both direct contact links, then emits one JSON object whose only key is an ordered six-entry `responses` array of file names and SHA-256 hashes
+- Expected output: bounded local parsing validates four exact ACTIVE legal identities and both direct contact links, then emits one JSON object whose only key is an ordered six-entry `responses` array of file names and SHA-256 hashes
 - Bounded failure branch: stop before DNS, remove temporary HTML, retain only the failed route/marker name, and restore the prior disabled web image if needed
 
 ```bash
@@ -310,7 +310,7 @@ curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "$origin/p
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "$origin/en/privacy/" --output "$evidence_dir/en-policy.html"
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "$origin/personal-data-consent/" --output "$evidence_dir/ru-consent.html"
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "$origin/en/personal-data-consent/" --output "$evidence_dir/en-consent.html"
-node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFile } from "node:fs/promises"; import { join } from "node:path"; const dir = process.argv[1]; const checks = [["ru-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["en-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["ru-policy.html", ["VBT-PD-01/DRAFT"]], ["en-policy.html", ["VBT-PD-01/DRAFT"]], ["ru-consent.html", ["VBT-PD-02/DRAFT"]], ["en-consent.html", ["VBT-PD-02/DRAFT"]]]; const hashes = []; for (const [file, markers] of checks) { const body = await readFile(join(dir, file)); const html = body.toString("utf8"); for (const marker of markers) if (!html.includes(marker)) throw new Error(`evidence_mismatch:${file}:${marker}`); hashes.push({ file, sha256: createHash("sha256").update(body).digest("hex") }); } process.stdout.write(`${JSON.stringify({ responses: hashes })}\n`);' "$evidence_dir"
+node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFile } from "node:fs/promises"; import { join } from "node:path"; const dir = process.argv[1]; const checks = [["ru-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["en-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["ru-policy.html", ["VBT-PD-01/2026.08/01"]], ["en-policy.html", ["VBT-PD-01/2026.08/01"]], ["ru-consent.html", ["VBT-PD-02/2026.08/01"]], ["en-consent.html", ["VBT-PD-02/2026.08/01"]]]; const hashes = []; for (const [file, markers] of checks) { const body = await readFile(join(dir, file)); const html = body.toString("utf8"); for (const marker of markers) if (!html.includes(marker)) throw new Error(`evidence_mismatch:${file}:${marker}`); hashes.push({ file, sha256: createHash("sha256").update(body).digest("hex") }); } process.stdout.write(`${JSON.stringify({ responses: hashes })}\n`);' "$evidence_dir"
 ```
 
 Record the command's ordered six-entry `responses` array, exact markers, origin, release SHA, operator, and UTC time. Each response entry contains only its local file name and SHA-256 hash; do not store the HTML bodies in the evidence packet.
@@ -353,7 +353,7 @@ set -euo pipefail
 : "${VBTECH_RELEASE_SHA_EVIDENCE:?set from the immutable release manifest}"
 [[ "$VBTECH_RELEASE_SHA_EVIDENCE" =~ ^[0-9a-f]{40}$ ]]
 export VBTECH_RELEASE_SHA_EVIDENCE
-node --input-type=module -e 'import { runSmoke } from "./deploy/production/smoke.mjs"; const result = await runSmoke({ baseUrl: "https://v-b.tech", mode: "public", expected: { releaseSha: process.env.VBTECH_RELEASE_SHA_EVIDENCE, submissionState: "disabled", consentId: "VBT-PD-02/DRAFT" } }); process.stdout.write(`${JSON.stringify(result)}\n`);'
+node --input-type=module -e 'import { runSmoke } from "./deploy/production/smoke.mjs"; const result = await runSmoke({ baseUrl: "https://v-b.tech", mode: "public", expected: { releaseSha: process.env.VBTECH_RELEASE_SHA_EVIDENCE, submissionState: "disabled", consentId: "VBT-PD-02/2026.08/01" } }); process.stdout.write(`${JSON.stringify(result)}\n`);'
 ```
 
 ## Gate P17 — Public legal and contact evidence
@@ -364,7 +364,7 @@ Gate ID: `public-legal-contact-evidence`
 
 - Target/resource: six exact canonical HTTPS routes on `https://v-b.tech`: RU/EN landings, policy pages, and consent pages
 - Classification: **READ-ONLY**
-- Expected output: bounded local parsing validates four exact DRAFT legal identities and both direct contact links, then emits one JSON object whose only key is an ordered six-entry `responses` array of file names and SHA-256 hashes
+- Expected output: bounded local parsing validates four exact ACTIVE legal identities and both direct contact links, then emits one JSON object whose only key is an ordered six-entry `responses` array of file names and SHA-256 hashes
 - Bounded failure branch: stop form activation, remove temporary HTML, retain only failed route/marker metadata, and execute runtime recovery before separately approved DNS rollback
 
 ```bash
@@ -377,7 +377,7 @@ curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/privacy/" --output "$evidence_dir/en-policy.html"
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/personal-data-consent/" --output "$evidence_dir/ru-consent.html"
 curl --fail --silent --show-error --max-time 10 --max-filesize 262144 "https://v-b.tech/en/personal-data-consent/" --output "$evidence_dir/en-consent.html"
-node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFile } from "node:fs/promises"; import { join } from "node:path"; const dir = process.argv[1]; const checks = [["ru-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["en-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["ru-policy.html", ["VBT-PD-01/DRAFT"]], ["en-policy.html", ["VBT-PD-01/DRAFT"]], ["ru-consent.html", ["VBT-PD-02/DRAFT"]], ["en-consent.html", ["VBT-PD-02/DRAFT"]]]; const hashes = []; for (const [file, markers] of checks) { const body = await readFile(join(dir, file)); const html = body.toString("utf8"); for (const marker of markers) if (!html.includes(marker)) throw new Error(`evidence_mismatch:${file}:${marker}`); hashes.push({ file, sha256: createHash("sha256").update(body).digest("hex") }); } process.stdout.write(`${JSON.stringify({ responses: hashes })}\n`);' "$evidence_dir"
+node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFile } from "node:fs/promises"; import { join } from "node:path"; const dir = process.argv[1]; const checks = [["ru-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["en-home.html", ["mailto:hello@v-b.tech", "https://t.me/thevladbog"]], ["ru-policy.html", ["VBT-PD-01/2026.08/01"]], ["en-policy.html", ["VBT-PD-01/2026.08/01"]], ["ru-consent.html", ["VBT-PD-02/2026.08/01"]], ["en-consent.html", ["VBT-PD-02/2026.08/01"]]]; const hashes = []; for (const [file, markers] of checks) { const body = await readFile(join(dir, file)); const html = body.toString("utf8"); for (const marker of markers) if (!html.includes(marker)) throw new Error(`evidence_mismatch:${file}:${marker}`); hashes.push({ file, sha256: createHash("sha256").update(body).digest("hex") }); } process.stdout.write(`${JSON.stringify({ responses: hashes })}\n`);' "$evidence_dir"
 ```
 
 Record HTTPS/TLS evidence, route smoke, the command's ordered six-entry `responses` array, exact release/legal/contact markers, disabled form state, and rejected API routes. Each response entry contains only its local file name and SHA-256 hash. Only then hand off to `form-activation.md`. DNS approval does not authorize form activation.

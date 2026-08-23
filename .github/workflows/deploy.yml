@@ -15,8 +15,13 @@ on:
         description: Contact form state for this handoff
         required: true
         type: choice
-        options: [disabled]
+        options: [disabled, enabled]
         default: disabled
+      confirm_enable:
+        description: Confirm preparation of an enabled activation handoff
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -30,14 +35,15 @@ concurrency:
 
 jobs:
   handoff:
-    name: Verify release and create deployment handoff (no remote mutation)
+    name: Verify release and create activation handoff (no remote mutation)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production-deploy
     env:
       PUBLISH_RUN_ID: ${{ github.event.inputs.publish_run_id }}
       RELEASE_SHA: ${{ github.event.inputs.release_sha }}
-      VBTECH_SUBMISSION_STATE: disabled
+      VBTECH_SUBMISSION_STATE: ${{ github.event.inputs.submission_state }}
+      VBTECH_CONFIRM_ENABLE: ${{ github.event.inputs.confirm_enable }}
       IMAGE_REPOSITORY: ghcr.io/thevladbog/vbtech-web
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -50,6 +56,11 @@ jobs:
           set -euo pipefail
           [[ "$PUBLISH_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
           [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$VBTECH_SUBMISSION_STATE" =~ ^(disabled|enabled)$ ]]
+          if [[ "$VBTECH_SUBMISSION_STATE" == "enabled" ]]
+          then
+            [[ "$VBTECH_CONFIRM_ENABLE" == "true" ]]
+          fi
           run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PUBLISH_RUN_ID")"
           [[ "$(jq -r '.path' <<<"$run")" == ".github/workflows/publish.yml" ]]
           [[ "$(jq -r '.event' <<<"$run")" == "workflow_dispatch" ]]
@@ -60,7 +71,7 @@ jobs:
       - name: Download the exact published handoff
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: vbtech-release-${{ github.event.inputs.release_sha }}
+          name: vbtech-release-${{ github.event.inputs.release_sha }}-${{ github.event.inputs.submission_state }}
           path: ${{ runner.temp }}/vbtech-release
           github-token: ${{ github.token }}
           run-id: ${{ github.event.inputs.publish_run_id }}
@@ -79,6 +90,13 @@ jobs:
           node "$GITHUB_WORKSPACE/deploy/production/release-artifact.mjs" validate \
             release-manifest.json "$RELEASE_SHA" "$PUBLISH_RUN_ID" \
             vbtech-contact-function.zip >/dev/null
+          jq -e --arg state "$VBTECH_SUBMISSION_STATE" \
+            '.contact.submissionState == $state' release-manifest.json >/dev/null
+          if [[ "$VBTECH_SUBMISSION_STATE" == "enabled" ]]
+          then
+            jq -e '.contact.consentRelease == "VBT-PD-02/2026.08/01"' \
+              release-manifest.json >/dev/null
+          fi
           sha256sum --check checksums.sha256
           attestation_policy=(
             --repo "$GITHUB_REPOSITORY"
@@ -91,29 +109,28 @@ jobs:
           IMAGE_DIGEST="$(jq -er '.image.digest' release-manifest.json)"
           docker manifest inspect "$IMAGE_REPOSITORY@$IMAGE_DIGEST" >/dev/null
           gh attestation verify "oci://$IMAGE_REPOSITORY@$IMAGE_DIGEST" "${attestation_policy[@]}"
-      - name: Create disabled deployment handoff
+      - name: Create reviewed activation handoff
         working-directory: ${{ runner.temp }}/vbtech-release
         run: |
           set -euo pipefail
-          [[ "$VBTECH_SUBMISSION_STATE" == "disabled" ]]
           jq -n \
             --arg releaseSha "$RELEASE_SHA" \
             --arg publishRunId "$PUBLISH_RUN_ID" \
             --arg submissionState "$VBTECH_SUBMISSION_STATE" \
             --slurpfile release release-manifest.json \
-            '{schemaVersion: 1, releaseSha: $releaseSha, publishRunId: $publishRunId, submissionState: $submissionState, remoteMutation: false, executor: "not-configured", release: $release[0]}' \
+            '{schemaVersion: 1, releaseSha: $releaseSha, publishRunId: $publishRunId, submissionState: $submissionState, remoteMutation: false, executor: "deploy/production/activate.mjs", release: $release[0]}' \
             > deployment-handoff.json
           printf '%s\n' \
             "### Deployment handoff verified" \
             "" \
             "Release: \`$RELEASE_SHA\`" \
-            "Submission: disabled" \
-            "Remote deployment executor is not configured; no server, cloud, DNS, database, or form state was changed." \
+            "Submission: $VBTECH_SUBMISSION_STATE" \
+            "The bounded activation executor is available; this verification job made no cloud, server, DNS, database, or form-state mutation." \
             >> "$GITHUB_STEP_SUMMARY"
       - name: Upload verified deployment handoff
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: vbtech-deployment-handoff-${{ github.event.inputs.release_sha }}
+          name: vbtech-deployment-handoff-${{ github.event.inputs.release_sha }}-${{ github.event.inputs.submission_state }}
           path: ${{ runner.temp }}/vbtech-release/deployment-handoff.json
           if-no-files-found: error
           retention-days: 7

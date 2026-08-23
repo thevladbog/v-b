@@ -105,14 +105,14 @@ describe.skipIf(!E2E_ENABLED)("local PostgreSQL 17 and Mailpit contact pipeline"
     await pool?.end();
   });
 
-  it("keeps the production public handler neutral while consent is DRAFT", async () => {
-    // Break caught: enabling only the environment flag exposes the exact public route under a draft consent.
+  it("fails closed when ACTIVE production routing has no runtime secrets", async () => {
+    // Break caught: ACTIVE routing accepts a request before its protected runtime config is available.
     const previous = process.env.CONTACT_SUBMISSION_ENABLED;
     process.env.CONTACT_SUBMISSION_ENABLED = "true";
     try {
       await expect(httpHandler(exactHttpEvent())).resolves.toMatchObject({
-        statusCode: 404,
-        body: "Not Found",
+        statusCode: 503,
+        body: '{"error":"temporarily_unavailable"}',
       });
     } finally {
       if (previous === undefined) delete process.env.CONTACT_SUBMISSION_ENABLED;

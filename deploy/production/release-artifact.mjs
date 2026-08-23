@@ -18,7 +18,8 @@ function exactKeys(value, keys) {
     value !== null &&
     typeof value === "object" &&
     !Array.isArray(value) &&
-    JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort())
+    JSON.stringify(Object.keys(value).sort()) ===
+      JSON.stringify([...keys].sort())
   );
 }
 
@@ -27,42 +28,60 @@ function invalid() {
 }
 
 async function fileSha256(path) {
-  return createHash("sha256").update(await readFile(path)).digest("hex");
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex");
 }
 
 export function validatePublishedReleaseManifest(manifest, expected = {}) {
-  if (!exactKeys(manifest, ["schemaVersion", "releaseSha", "publishRunId", "image", "function", "contact"])) invalid();
+  if (
+    !exactKeys(manifest, [
+      "schemaVersion",
+      "releaseSha",
+      "publishRunId",
+      "image",
+      "function",
+      "contact",
+    ])
+  )
+    invalid();
   if (
     manifest.schemaVersion !== 1 ||
     typeof manifest.releaseSha !== "string" ||
     !RELEASE_SHA.test(manifest.releaseSha) ||
     typeof manifest.publishRunId !== "string" ||
     !RUN_ID.test(manifest.publishRunId)
-  ) invalid();
-
-  if (!exactKeys(manifest.image, ["repository", "tag", "digest"])) invalid();
-  if (
-    manifest.image.repository !== IMAGE_REPOSITORY ||
-    manifest.image.tag !== `${IMAGE_REPOSITORY}:${manifest.releaseSha}` ||
-    typeof manifest.image.digest !== "string" ||
-    !OCI_DIGEST.test(manifest.image.digest)
-  ) invalid();
+  )
+    invalid();
 
   if (!exactKeys(manifest.function, ["name", "sha256"])) invalid();
   if (
     manifest.function.name !== FUNCTION_NAME ||
     typeof manifest.function.sha256 !== "string" ||
     !FILE_DIGEST.test(manifest.function.sha256)
-  ) invalid();
+  )
+    invalid();
 
-  if (!exactKeys(manifest.contact, ["submissionState", "consentRelease"])) invalid();
+  if (!exactKeys(manifest.contact, ["submissionState", "consentRelease"]))
+    invalid();
   if (
     !["disabled", "enabled"].includes(manifest.contact.submissionState) ||
     typeof manifest.contact.consentRelease !== "string" ||
     !CONSENT_RELEASE.test(manifest.contact.consentRelease) ||
     (manifest.contact.submissionState === "enabled" &&
       !ACTIVE_CONSENT_RELEASE.test(manifest.contact.consentRelease))
-  ) invalid();
+  )
+    invalid();
+
+  if (!exactKeys(manifest.image, ["repository", "tag", "digest"])) invalid();
+  if (
+    manifest.image.repository !== IMAGE_REPOSITORY ||
+    manifest.image.tag !==
+      `${IMAGE_REPOSITORY}:${manifest.releaseSha}-${manifest.contact.submissionState}` ||
+    typeof manifest.image.digest !== "string" ||
+    !OCI_DIGEST.test(manifest.image.digest)
+  )
+    invalid();
 
   if (
     (expected.expectedReleaseSha !== undefined &&
@@ -89,10 +108,12 @@ export async function createPublishedReleaseManifest({
 }) {
   if (basename(functionPath) !== FUNCTION_NAME) invalid();
   const functionSha256 = await fileSha256(functionPath);
-  const artifact = extractArtifactIdentity(await Promise.all([
-    readFile(join(webDirectory, "index.html"), "utf8"),
-    readFile(join(webDirectory, "en", "index.html"), "utf8"),
-  ]));
+  const artifact = extractArtifactIdentity(
+    await Promise.all([
+      readFile(join(webDirectory, "index.html"), "utf8"),
+      readFile(join(webDirectory, "en", "index.html"), "utf8"),
+    ]),
+  );
   if (artifact.releaseSha !== releaseSha) invalid();
   return validatePublishedReleaseManifest({
     schemaVersion: 1,
@@ -137,11 +158,18 @@ async function main() {
       functionPath,
       webDirectory,
     });
-    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, {
+      mode: 0o600,
+    });
     return;
   }
   if (command === "validate" && args.length === 4) {
-    const [manifestPath, expectedReleaseSha, expectedPublishRunId, functionPath] = args;
+    const [
+      manifestPath,
+      expectedReleaseSha,
+      expectedPublishRunId,
+      functionPath,
+    ] = args;
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     validatePublishedReleaseManifest(manifest, {
       expectedReleaseSha,

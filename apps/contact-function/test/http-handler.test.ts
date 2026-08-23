@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import { PublicContactError } from "../src/errors.js";
 import {
   createHttpHandler,
@@ -14,7 +15,7 @@ const request = {
   contact: "hello@example.com",
   message: "A concrete product problem",
   sourcePath: "/en/",
-  consentId: "VBT-PD-02/DRAFT",
+  consentId: CURRENT_CONTACT_CONSENT_ID,
   captchaToken: "one-time-token",
   website: "",
 };
@@ -61,7 +62,7 @@ describe("Yandex HTTP contact boundary", () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it("keeps the exported production handler disabled under the current draft consent without secrets", async () => {
+  it("keeps the exported production handler disabled when the enable flag is absent", async () => {
     const previous = process.env.CONTACT_SUBMISSION_ENABLED;
     delete process.env.CONTACT_SUBMISSION_ENABLED;
     try {
@@ -72,7 +73,7 @@ describe("Yandex HTTP contact boundary", () => {
     }
   });
 
-  it("keeps every production route neutral when the flag is true but consent remains draft", async () => {
+  it("opens only the exact production route when the flag is true and fails closed without runtime secrets", async () => {
     const previous = process.env.CONTACT_SUBMISSION_ENABLED;
     process.env.CONTACT_SUBMISSION_ENABLED = "true";
     try {
@@ -84,12 +85,12 @@ describe("Yandex HTTP contact boundary", () => {
 
       expect(responses).toEqual([
         {
-          statusCode: 404,
+          statusCode: 503,
           headers: {
             "cache-control": "no-store",
-            "content-type": "text/plain; charset=utf-8",
+            "content-type": "application/json; charset=utf-8",
           },
-          body: "Not Found",
+          body: '{"error":"temporarily_unavailable"}',
           isBase64Encoded: false,
         },
         {

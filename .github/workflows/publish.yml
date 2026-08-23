@@ -89,7 +89,7 @@ jobs:
             --build-arg VBTECH_RELEASE_SHA="$RELEASE_SHA" \
             --build-arg VBTECH_SUBMISSION_STATE="$VBTECH_SUBMISSION_STATE" \
             --build-arg PUBLIC_SMARTCAPTCHA_SITE_KEY="$PUBLIC_SMARTCAPTCHA_SITE_KEY" \
-            --tag "$IMAGE_REPOSITORY:$RELEASE_SHA" .
+            --tag "$IMAGE_REPOSITORY:$RELEASE_SHA-$VBTECH_SUBMISSION_STATE" .
       - uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
           registry: ghcr.io
@@ -99,7 +99,7 @@ jobs:
         id: image
         run: |
           set -euo pipefail
-          IMAGE_TAG="$IMAGE_REPOSITORY:$RELEASE_SHA"
+          IMAGE_TAG="$IMAGE_REPOSITORY:$RELEASE_SHA-$VBTECH_SUBMISSION_STATE"
           if docker manifest inspect "$IMAGE_TAG" >/dev/null 2>&1; then
             echo "Refusing to replace an existing immutable release tag" >&2
             exit 1
@@ -114,7 +114,7 @@ jobs:
           printf '%s\n' "digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
       - name: Create strict release manifest and checksums
         env:
-          IMAGE_TAG: ghcr.io/thevladbog/vbtech-web:${{ github.event.inputs.release_sha }}
+          IMAGE_TAG: ghcr.io/thevladbog/vbtech-web:${{ github.event.inputs.release_sha }}-${{ github.event.inputs.submission_state }}
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
         run: |
           set -euo pipefail
@@ -147,7 +147,7 @@ jobs:
       - name: Upload immutable release handoff
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: vbtech-release-${{ github.event.inputs.release_sha }}
+          name: vbtech-release-${{ github.event.inputs.release_sha }}-${{ github.event.inputs.submission_state }}
           path: ${{ runner.temp }}/vbtech-release
           if-no-files-found: error
           retention-days: 30

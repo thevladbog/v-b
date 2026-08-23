@@ -117,7 +117,8 @@ test("publication separates artifact approval from ordered cloud and disabled-ru
   assert.match(source, /cloud\/database\/private runtime mutation approval ID/i);
   assert.match(source, /publication approval[^\n]*does not authorize[^\n]*(?:cloud|database|runtime)/i);
   assert.match(source, /Task 8[^\n]*Step 1/i);
-  assert.match(source, /remote deployment executor[^\n]*not configured/i);
+  assert.match(source, /deploy\/production\/activate\.mjs/i);
+  assert.match(source, /Deploy v-b\.tech web/i);
   assert.match(source, /DNS approval ID/i);
   assert.match(source, /form activation requires a separate approval/i);
   const operators = operatorCards(source, "publication");
@@ -141,10 +142,10 @@ test("route smoke is supplemented by bounded legal-release and direct-contact ev
   const fixtures = new Map([
     ["ru-home.html", "RU mailto:hello@v-b.tech https://t.me/thevladbog body-canary-ru-home"],
     ["en-home.html", "EN mailto:hello@v-b.tech https://t.me/thevladbog body-canary-en-home"],
-    ["ru-policy.html", "RU VBT-PD-01/DRAFT body-canary-ru-policy"],
-    ["en-policy.html", "EN VBT-PD-01/DRAFT body-canary-en-policy"],
-    ["ru-consent.html", "RU VBT-PD-02/DRAFT body-canary-ru-consent"],
-    ["en-consent.html", "EN VBT-PD-02/DRAFT body-canary-en-consent"],
+    ["ru-policy.html", "RU VBT-PD-01/2026.08/01 body-canary-ru-policy"],
+    ["en-policy.html", "EN VBT-PD-01/2026.08/01 body-canary-en-policy"],
+    ["ru-consent.html", "RU VBT-PD-02/2026.08/01 body-canary-ru-consent"],
+    ["en-consent.html", "EN VBT-PD-02/2026.08/01 body-canary-en-consent"],
   ]);
   const expectedResponses = [...fixtures].map(([file, body]) => ({
     file,
@@ -157,8 +158,8 @@ test("route smoke is supplemented by bounded legal-release and direct-contact ev
   assert.match(rollback, /### Command: Verify preserved legal releases and direct contacts/);
   for (const document of [publication, rollback]) {
     assert.match(document, /curl[^\n]*--max-filesize/);
-    assert.match(document, /VBT-PD-01\/DRAFT/);
-    assert.match(document, /VBT-PD-02\/DRAFT/);
+    assert.match(document, /VBT-PD-01\/2026\.08\/01/);
+    assert.match(document, /VBT-PD-02\/2026\.08\/01/);
     assert.match(document, /mailto:hello@v-b\.tech/);
     assert.match(document, /https:\/\/t\.me\/thevladbog/);
   }

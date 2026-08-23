@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.js";
 import {
-  DRAFT_LEGAL_ROUTES,
+  LEGAL_ROUTES,
   PUBLIC_ROUTES,
   REACHABLE_HTML_ROUTES,
 } from "../../../apps/web/src/lib/route-inventory.js";
@@ -11,7 +11,7 @@ const previewOrigin = "http://127.0.0.1:43218";
 const allHtmlRoutes = [...REACHABLE_HTML_ROUTES, "/404.html"] as const;
 const explicitThemes = ["light", "dark"] as const;
 const publicRoutes = new Set<string>(PUBLIC_ROUTES);
-const draftLegalRoutes = new Set<string>(DRAFT_LEGAL_ROUTES);
+const legalRoutes = new Set<string>(LEGAL_ROUTES);
 
 const themeLabels = {
   ru: {
@@ -211,7 +211,7 @@ for (const path of allHtmlRoutes) {
         await assertVisibleTargets(page);
       }
       await assertFooterActionsRemainInline(page);
-      if (draftLegalRoutes.has(path)) await assertSharedChromeStyles(page);
+      if (legalRoutes.has(path)) await assertSharedChromeStyles(page);
 
       if (publicRoutes.has(path)) {
         await expect(page.locator('meta[name="robots"]')).toHaveCount(0);

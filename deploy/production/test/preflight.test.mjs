@@ -25,7 +25,7 @@ function artifact(options = {}) {
 
 function environment(overrides = {}) {
   return {
-    VBTECH_IMAGE_TAG: `ghcr.io/thevladbog/vbtech-web:${SHA}`,
+    VBTECH_IMAGE_TAG: `ghcr.io/thevladbog/vbtech-web:${SHA}-disabled`,
     VBTECH_DOMAIN: "v-b.tech",
     VBTECH_WWW_DOMAIN: "www.v-b.tech",
     VBTECH_FUNCTION_ORIGIN: "https://functions.yandexcloud.net/d4example",
@@ -53,7 +53,10 @@ test("extracts one coherent release identity from paired locale artifacts", () =
     /artifact_identity_mismatch/,
   );
 
-  const missingConsent = artifactHtml().replace(/\sdata-consent-id="[^"]+"/, "");
+  const missingConsent = artifactHtml().replace(
+    /\sdata-consent-id="[^"]+"/,
+    "",
+  );
   const duplicatedConsent = artifactHtml().replace(
     "</body>",
     '<form data-consent-id="VBT-PD-02/DRAFT"></form></body>',
@@ -68,25 +71,48 @@ test("accepts the exact disabled production inputs", () => {
   const parsed = parseDeploymentConfig(environment(), artifact());
 
   assert.equal(parsed.image.releaseSha, SHA);
-  assert.deepEqual(parsed.domains, { canonical: "v-b.tech", www: "www.v-b.tech" });
+  assert.deepEqual(parsed.domains, {
+    canonical: "v-b.tech",
+    www: "www.v-b.tech",
+  });
   assert.equal(parsed.contact.submissionState, "disabled");
 });
 
 test("rejects missing, mutable, or artifact-mismatched image tags", () => {
-  assert.throws(() => parseDeploymentConfig(environment({ VBTECH_IMAGE_TAG: "" }), artifact()), /invalid_vbtech_image_tag/);
   assert.throws(
-    () => parseDeploymentConfig(environment({ VBTECH_IMAGE_TAG: "ghcr.io/thevladbog/vbtech-web:latest" }), artifact()),
+    () =>
+      parseDeploymentConfig(environment({ VBTECH_IMAGE_TAG: "" }), artifact()),
     /invalid_vbtech_image_tag/,
   );
   assert.throws(
-    () => parseDeploymentConfig(environment({ VBTECH_IMAGE_TAG: `ghcr.io/thevladbog/vbtech-web:${"1".repeat(40)}` }), artifact()),
+    () =>
+      parseDeploymentConfig(
+        environment({
+          VBTECH_IMAGE_TAG: "ghcr.io/thevladbog/vbtech-web:latest",
+        }),
+        artifact(),
+      ),
+    /invalid_vbtech_image_tag/,
+  );
+  assert.throws(
+    () =>
+      parseDeploymentConfig(
+        environment({
+          VBTECH_IMAGE_TAG: `ghcr.io/thevladbog/vbtech-web:${"1".repeat(40)}-disabled`,
+        }),
+        artifact(),
+      ),
     /image_artifact_release_mismatch/,
   );
 });
 
 test("rejects malformed domains and collisions with existing edge authorities", () => {
   assert.throws(
-    () => parseDeploymentConfig(environment({ VBTECH_DOMAIN: "V-B.tech" }), artifact()),
+    () =>
+      parseDeploymentConfig(
+        environment({ VBTECH_DOMAIN: "V-B.tech" }),
+        artifact(),
+      ),
     /invalid_vbtech_domain/,
   );
   assert.throws(
@@ -101,31 +127,47 @@ test("rejects malformed domains and collisions with existing edge authorities", 
 
 test("rejects an insecure function origin and an unknown submission state", () => {
   assert.throws(
-    () => parseDeploymentConfig(environment({ VBTECH_FUNCTION_ORIGIN: "http://function.internal" }), artifact()),
+    () =>
+      parseDeploymentConfig(
+        environment({ VBTECH_FUNCTION_ORIGIN: "http://function.internal" }),
+        artifact(),
+      ),
     /invalid_vbtech_function_origin/,
   );
   assert.throws(
-    () => parseDeploymentConfig(environment({ VBTECH_SUBMISSION_STATE: "preview" }), artifact()),
+    () =>
+      parseDeploymentConfig(
+        environment({ VBTECH_SUBMISSION_STATE: "preview" }),
+        artifact(),
+      ),
     /invalid_vbtech_submission_state/,
   );
 });
 
 test("enables submission only for the exact active consent embedded in the artifact", () => {
   const activeConsent = "VBT-PD-02/2026.08/01";
-  const activeArtifact = artifact({ submissionEnabled: true, consentId: activeConsent });
+  const activeArtifact = artifact({
+    submissionEnabled: true,
+    consentId: activeConsent,
+  });
   const activeEnvironment = environment({
+    VBTECH_IMAGE_TAG: `ghcr.io/thevladbog/vbtech-web:${SHA}-enabled`,
     VBTECH_SUBMISSION_STATE: "enabled",
     VBTECH_CONSENT_RELEASE: activeConsent,
   });
 
   assert.equal(
-    parseDeploymentConfig(activeEnvironment, activeArtifact).contact.consentRelease,
+    parseDeploymentConfig(activeEnvironment, activeArtifact).contact
+      .consentRelease,
     activeConsent,
   );
   assert.throws(
     () =>
       parseDeploymentConfig(
-        environment({ VBTECH_SUBMISSION_STATE: "enabled" }),
+        environment({
+          VBTECH_IMAGE_TAG: `ghcr.io/thevladbog/vbtech-web:${SHA}-enabled`,
+          VBTECH_SUBMISSION_STATE: "enabled",
+        }),
         artifact({ submissionEnabled: true }),
       ),
     /active_consent_required/,
@@ -137,7 +179,21 @@ test("enables submission only for the exact active consent embedded in the artif
   assert.throws(
     () =>
       parseDeploymentConfig(
-        { ...activeEnvironment, VBTECH_CONSENT_RELEASE: "VBT-PD-02/2026.08/02" },
+        {
+          ...activeEnvironment,
+          VBTECH_IMAGE_TAG: `ghcr.io/thevladbog/vbtech-web:${SHA}-disabled`,
+        },
+        activeArtifact,
+      ),
+    /image_submission_state_mismatch/,
+  );
+  assert.throws(
+    () =>
+      parseDeploymentConfig(
+        {
+          ...activeEnvironment,
+          VBTECH_CONSENT_RELEASE: "VBT-PD-02/2026.08/02",
+        },
         activeArtifact,
       ),
     /consent_artifact_release_mismatch/,

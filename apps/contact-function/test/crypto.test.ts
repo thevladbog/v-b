@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
+import { CURRENT_CONTACT_CONSENT_ID } from "@vbtech/legal-documents";
 import { decryptPayload, encryptPayload } from "../src/crypto.js";
 
 const key = Buffer.from(
@@ -20,7 +21,7 @@ const payload = {
   contact: "hello@example.com",
   message: "A concrete product problem",
   sourcePath: "/en/",
-  consentId: "VBT-PD-02/DRAFT",
+  consentId: CURRENT_CONTACT_CONSENT_ID,
 } as const;
 
 describe("AES-256-GCM payload envelope", () => {
@@ -34,7 +35,7 @@ describe("AES-256-GCM payload envelope", () => {
       contact: "hello@example.com",
       message: "A concrete product problem",
       sourcePath: "/en/",
-      consentId: "VBT-PD-02/DRAFT",
+      consentId: CURRENT_CONTACT_CONSENT_ID,
     });
     expect(encrypted.iv).toHaveLength(12);
     expect(encrypted.authTag).toHaveLength(16);

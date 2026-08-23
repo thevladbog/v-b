@@ -1,12 +1,19 @@
 const IMAGE_REPOSITORY = "ghcr.io/thevladbog/vbtech-web";
-const IMAGE_PATTERN = /^ghcr\.io\/thevladbog\/vbtech-web:([0-9a-f]{40})$/;
+const IMAGE_PATTERN =
+  /^ghcr\.io\/thevladbog\/vbtech-web:([0-9a-f]{40})-(disabled|enabled)$/;
 const ACTIVE_CONSENT_PATTERN = /^VBT-PD-02\/\d{4}\.\d{2}\/\d{2}$/;
 const CONSENT_PATTERN = /^VBT-PD-02\/(?:DRAFT|\d{4}\.\d{2}\/\d{2})$/;
-const AUTHORITY_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+const AUTHORITY_PATTERN =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 function required(environment, name, maximum = 2_048) {
   const value = environment[name];
-  if (typeof value !== "string" || value.length === 0 || value.length > maximum || /[\u0000-\u001f\u007f]/.test(value)) {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > maximum ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  ) {
     throw new Error(`invalid_${name.toLowerCase()}`);
   }
   return value;
@@ -44,7 +51,10 @@ function functionOrigin(environment) {
 function reservedAuthorities(environment) {
   const raw = required(environment, "MARKIRO_EDGE_AUTHORITIES");
   const values = raw.split(",").map((value) => value.trim());
-  if (values.length === 0 || values.some((value) => !AUTHORITY_PATTERN.test(value))) {
+  if (
+    values.length === 0 ||
+    values.some((value) => !AUTHORITY_PATTERN.test(value))
+  ) {
     throw new Error("invalid_markiro_edge_authorities");
   }
   return new Set(values);
@@ -62,7 +72,8 @@ export function parseDeploymentConfig(environment, artifact) {
   const canonical = exactDomain(environment, "VBTECH_DOMAIN", "v-b.tech");
   const www = exactDomain(environment, "VBTECH_WWW_DOMAIN", "www.v-b.tech");
   const reserved = reservedAuthorities(environment);
-  if (reserved.has(canonical) || reserved.has(www)) throw new Error("authority_collision");
+  if (reserved.has(canonical) || reserved.has(www))
+    throw new Error("authority_collision");
 
   const submissionState = required(environment, "VBTECH_SUBMISSION_STATE", 16);
   if (submissionState !== "disabled" && submissionState !== "enabled") {
@@ -71,13 +82,20 @@ export function parseDeploymentConfig(environment, artifact) {
   if ((submissionState === "enabled") !== artifact.submissionEnabled) {
     throw new Error("submission_artifact_state_mismatch");
   }
+  if (imageMatch[2] !== submissionState) {
+    throw new Error("image_submission_state_mismatch");
+  }
 
   const consentRelease = required(environment, "VBTECH_CONSENT_RELEASE", 64);
-  if (!CONSENT_PATTERN.test(consentRelease)) throw new Error("invalid_vbtech_consent_release");
+  if (!CONSENT_PATTERN.test(consentRelease))
+    throw new Error("invalid_vbtech_consent_release");
   if (consentRelease !== artifact.consentId) {
     throw new Error("consent_artifact_release_mismatch");
   }
-  if (submissionState === "enabled" && !ACTIVE_CONSENT_PATTERN.test(consentRelease)) {
+  if (
+    submissionState === "enabled" &&
+    !ACTIVE_CONSENT_PATTERN.test(consentRelease)
+  ) {
     throw new Error("active_consent_required");
   }
 
@@ -87,7 +105,11 @@ export function parseDeploymentConfig(environment, artifact) {
   }
 
   return Object.freeze({
-    image: Object.freeze({ repository: IMAGE_REPOSITORY, tag: imageTag, releaseSha }),
+    image: Object.freeze({
+      repository: IMAGE_REPOSITORY,
+      tag: imageTag,
+      releaseSha,
+    }),
     domains: Object.freeze({ canonical, www }),
     contact: Object.freeze({
       functionOrigin: functionOrigin(environment),

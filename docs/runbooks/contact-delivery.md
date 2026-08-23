@@ -2,7 +2,7 @@
 
 ## Purpose and safety boundary
 
-This runbook verifies the v-b.tech contact outbox locally and describes the production operating sequence. The repository's current consent identity is `VBT-PD-02/DRAFT`; the public form and production handler must remain disabled and route-neutral until the legal wording receives explicit approval and a non-draft revision is published.
+This runbook verifies the v-b.tech contact outbox locally and describes the production operating sequence. The repository's current ACTIVE consent identity is `VBT-PD-02/2026.08/01`. The public form and production handler remain disabled and route-neutral until the exact enabled artifacts pass the protected activation flow; legal approval alone does not enable submission.
 
 The local contour uses only synthetic data, PostgreSQL 17, and Mailpit. It does not call SmartCaptcha, Postbox, Yandex Cloud, Timeweb, DNS, or a public endpoint.
 
@@ -48,7 +48,7 @@ Without `VBTECH_E2E=1`, the three real-service tests are reported as skipped. Wh
 
 The configured run proves:
 
-- the production public handler stays a neutral 404 while consent is DRAFT;
+- the production public handler stays a neutral 404 while its submission gate is disabled;
 - a RU email request creates an operator notification and visitor confirmation;
 - an EN Telegram request creates only the operator notification;
 - repeated acceptance of the same canonical UUID does not create or send another job;
@@ -93,21 +93,21 @@ For every message, inspect HTML and plain text at both sizes and modes. Dark cap
 - no horizontal clipping or unreadable contrast;
 - the RU and EN copy, subject, and footer are appropriate;
 - the request UUID is visible in HTML and text;
-- operator notifications show `VBT-PD-02/DRAFT` as the test consent identity;
+- operator notifications show `VBT-PD-02/2026.08/01` as the accepted consent identity;
 - confirmation links are exactly `mailto:hello@v-b.tech` and `https://t.me/thevladbog`;
 - the browser Network panel shows no remote image, font, stylesheet, tracking, or other request from the message body.
 
 Do not use real personal data in Mailpit evidence. Screenshots and exported message bodies are local evidence artifacts and are not committed.
 
-## Prove the public build remains fail-closed
+## Prove the enabled build remains fail-closed without its reviewed public key
 
-This command must fail while the legal identity is DRAFT:
+This command must fail because an enabled artifact requires the reviewed public SmartCaptcha site key:
 
 ```bash
 PUBLIC_CONTACT_SUBMISSION_ENABLED=true CI=1 corepack pnpm --dir apps/web build
 ```
 
-Expected error: `Draft consent VBT-PD-02/DRAFT cannot be used when submission is enabled`.
+Expected error: `A reviewed public SmartCaptcha site key is required for active contact submission`.
 
 Run a normal build afterward so `apps/web/dist` is restored to the disabled, client-free artifact.
 
@@ -134,7 +134,7 @@ The private ACTIVE contour is a release gate, not a deployable artifact. It is r
 8. Deploy the handler/backend with submission disabled. Verify `/api/contact` remains a neutral 404, alternate paths/methods stay 404, the worker can reach the dedicated database and Postbox, and bounded synthetic notification/confirmation delivery succeeds.
 9. After the shared personal-data legal contour reports ACTIVE for both current releases, build the real `https://v-b.tech` artifact with `PUBLIC_CONTACT_SUBMISSION_ENABLED=true` and the reviewed `PUBLIC_SMARTCAPTCHA_SITE_KEY`. Require nine HTML files and exactly one shared request-capable JS/MJS chunk containing the active consent identity, public site key, SmartCaptcha URL, and `/api/contact`, with no fixture marker, secret name/value, or developer path.
 10. Enable the backend handler, then deploy the reviewed active web artifact as separate approved changes. Verify SmartCaptcha domain restrictions, exact route behavior, same-origin TLS/DNS/Caddy routing, Postbox sender identity, mailbox receipt, timer delivery, and the public form with controlled non-sensitive data.
-11. Keep the default/DRAFT regression mandatory throughout: a normal build produces nine HTML files and zero JS/MJS; the recursive deny-list contains no `/api/contact`, SmartCaptcha endpoint/API/client, public site key, enabled marker, fixture marker, request-capable fetch/XHR/beacon, secret, or developer path. A public-flag build against DRAFT must fail with the exact documented error.
+11. Keep the state-bound disabled regression mandatory throughout: the immutable `<release-sha>-disabled` build produces nine HTML files and zero JS/MJS; the recursive deny-list contains no `/api/contact`, SmartCaptcha endpoint/API/client, public site key, enabled marker, fixture marker, request-capable fetch/XHR/beacon, secret, or developer path. An enabled build without the reviewed public site key must fail with the exact documented error.
 
 ### Queue diagnosis
 
