@@ -72,7 +72,7 @@ const exactRoute = (event: YandexHttpEvent): boolean =>
   (event.path === undefined || event.path === "") &&
   !hasQuery(event);
 
-const header = (event: YandexHttpEvent, wanted: string): string => {
+const optionalHeader = (event: YandexHttpEvent, wanted: string): string | undefined => {
   const singleValues: string[] = [];
   const multiValues: string[] = [];
   for (const [name, value] of Object.entries(event.headers ?? {})) {
@@ -93,12 +93,18 @@ const header = (event: YandexHttpEvent, wanted: string): string => {
   const singleValue = singleValues[0];
   const multiValue = multiValues[0];
   if (singleValue === undefined && multiValue === undefined) {
-    throw publicError("invalid_request", 400);
+    return undefined;
   }
   if (singleValue !== undefined && multiValue !== undefined && singleValue !== multiValue) {
     throw publicError("invalid_request", 400);
   }
   return singleValue ?? multiValue!;
+};
+
+const header = (event: YandexHttpEvent, wanted: string): string => {
+  const value = optionalHeader(event, wanted);
+  if (value === undefined) throw publicError("invalid_request", 400);
+  return value;
 };
 
 const validJsonContentType = (value: string): boolean =>
@@ -160,7 +166,10 @@ export const createHttpHandler = (dependencies: HttpHandlerDependencies) =>
       if (header(event, "origin") !== "https://v-b.tech") {
         throw publicError("invalid_request", 400);
       }
-      if (header(event, "host") !== "v-b.tech") throw publicError("invalid_request", 400);
+      const host = optionalHeader(event, "host");
+      if (host !== undefined && host !== "v-b.tech") {
+        throw publicError("invalid_request", 400);
+      }
 
       const parsed = contactRequestSchema.safeParse(parseJson(decodedBody));
       if (!parsed.success) {

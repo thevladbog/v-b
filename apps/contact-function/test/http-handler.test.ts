@@ -64,6 +64,23 @@ describe("Yandex HTTP contact boundary", () => {
     expect(submit).toHaveBeenCalledWith(request, "192.0.2.1");
   });
 
+  it("accepts Yandex HTTPS events that omit the routing Host header", async () => {
+    const { handler, submit } = enabledHandler();
+    const response = await handler(event({
+      headers: {
+        origin: "https://v-b.tech",
+        "content-type": "application/json; charset=utf-8",
+      },
+      multiValueHeaders: {
+        Origin: ["https://v-b.tech"],
+        "Content-Type": ["application/json; charset=utf-8"],
+      },
+    }));
+
+    expect(response.statusCode).toBe(202);
+    expect(submit).toHaveBeenCalledWith(request, "192.0.2.1");
+  });
+
   it.each([
     ["wrong method", { httpMethod: "GET" }],
     ["null path", { path: null as unknown as string }],
