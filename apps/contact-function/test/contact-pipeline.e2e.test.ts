@@ -43,7 +43,6 @@ const request = (
 
 const exactHttpEvent = () => ({
   httpMethod: "POST",
-  path: "",
   headers: {
     "content-type": "application/json",
     origin: "https://v-b.tech",

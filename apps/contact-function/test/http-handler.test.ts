@@ -22,7 +22,6 @@ const request = {
 
 const event = (overrides: Partial<YandexHttpEvent> = {}): YandexHttpEvent => ({
   httpMethod: "POST",
-  path: "",
   headers: {
     host: "v-b.tech",
     origin: "https://v-b.tech",
@@ -43,8 +42,17 @@ const enabledHandler = () => {
 };
 
 describe("Yandex HTTP contact boundary", () => {
+  it("also accepts the documented empty path when the HTTPS event includes it", async () => {
+    const { handler, submit } = enabledHandler();
+    const response = await handler(event({ path: "" }));
+
+    expect(response.statusCode).toBe(202);
+    expect(submit).toHaveBeenCalledWith(request, "192.0.2.1");
+  });
+
   it.each([
     ["wrong method", { httpMethod: "GET" }],
+    ["null path", { path: null as unknown as string }],
     ["slash path", { path: "/" }],
     ["unstripped public path", { path: "/api/contact" }],
     ["trailing slash", { path: "/api/contact/" }],

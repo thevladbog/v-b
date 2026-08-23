@@ -15,7 +15,7 @@ import type { SubmitContact } from "./submit.js";
 
 export interface YandexHttpEvent {
   httpMethod: string;
-  path: string;
+  path?: string;
   headers: Record<string, string> | null;
   multiValueHeaders: Record<string, string[]> | null;
   queryStringParameters: Record<string, string> | null;
@@ -66,9 +66,11 @@ const hasQuery = (event: YandexHttpEvent): boolean =>
   Object.keys(event.queryStringParameters ?? {}).length > 0 ||
   Object.keys(event.multiValueQueryStringParameters ?? {}).length > 0;
 
-// Direct HTTPS invocation strips the /<function-id> prefix and emits an empty path.
+// The current direct HTTPS schema omits path; older debug payloads emit an empty path.
 const exactRoute = (event: YandexHttpEvent): boolean =>
-  event.httpMethod === "POST" && event.path === "" && !hasQuery(event);
+  event.httpMethod === "POST" &&
+  (event.path === undefined || event.path === "") &&
+  !hasQuery(event);
 
 const header = (event: YandexHttpEvent, wanted: string): string => {
   const values: string[] = [];
