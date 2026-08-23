@@ -55,7 +55,7 @@ const locales = [
   },
 ] as const;
 
-type CaptchaMode = "token" | "empty" | "javascript-error" | "load-error" | "timeout";
+type CaptchaMode = "token" | "delayed-token" | "empty" | "javascript-error" | "load-error" | "timeout";
 
 async function mockCaptcha(page: Page, mode: CaptchaMode = "token", holdLoad = false) {
   await page.addInitScript(({ initialMode, hold }) => {
@@ -104,7 +104,7 @@ async function mockCaptcha(page: Page, mode: CaptchaMode = "token", holdLoad = f
             if (!options) throw new Error("unexpected widget");
             window.__vbtechCaptchaExecuteCount += 1;
             const executeCount = window.__vbtechCaptchaExecuteCount;
-            queueMicrotask(() => {
+            const completeChallenge = () => {
               if (window.__vbtechCaptchaMode === "javascript-error") {
                 options["error-callback"]();
                 return;
@@ -114,7 +114,12 @@ async function mockCaptcha(page: Page, mode: CaptchaMode = "token", holdLoad = f
                 : "fixture-token-" + executeCount;
               window.__vbtechCaptchaTokenWidgets[token] = widgetId;
               options.callback(token);
-            });
+            };
+            if (window.__vbtechCaptchaMode === "delayed-token") {
+              setTimeout(completeChallenge, 15_000);
+            } else {
+              queueMicrotask(completeChallenge);
+            }
           },
           destroy(widgetId) {
             if (!optionsByWidget.has(widgetId)) throw new Error("unexpected widget");
@@ -439,7 +444,42 @@ test("a hung local API route is aborted after the fixed ten-second operation tim
   release();
 });
 
-test("a held captcha loader is bounded by the form operation deadline and ignores late onload", async ({ page }) => {
+test("a visible human challenge may complete after fifteen seconds before the request starts", async ({ page }) => {
+  const localized = locales[1];
+  const requestId = "11111111-1111-4111-8111-111111111111";
+  const bodies: Array<{ requestId: string; captchaToken: string }> = [];
+  await page.clock.install();
+  await page.addInitScript((fixedId) => {
+    Object.defineProperty(window.crypto, "randomUUID", {
+      configurable: true,
+      value: () => fixedId,
+    });
+  }, requestId);
+  await mockCaptcha(page, "delayed-token");
+  await page.route(`${fixtureOrigin}/api/contact`, async (route) => {
+    const body = route.request().postDataJSON() as (typeof bodies)[number];
+    bodies.push(body);
+    await apiJson(route, 202, { accepted: true, requestId: body.requestId });
+  });
+  await page.goto(`${fixtureOrigin}/en/`);
+  await fillValidDraft(page, localized);
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+
+  await page.getByRole("button", { name: localized.labels.submit }).click();
+  await expect(page.locator("[data-contact-form]")).toHaveAttribute("aria-busy", "true");
+  expect(bodies).toEqual([]);
+
+  await page.clock.fastForward(15_001);
+
+  await expect(page.getByRole("status")).toContainText(localized.labels.success);
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]).toMatchObject({
+    requestId,
+    captchaToken: "fixture-token-1",
+  });
+});
+
+test("a held captcha loader is bounded by its load deadline and ignores late onload", async ({ page }) => {
   const localized = locales[1];
   const requestId = "11111111-1111-4111-8111-111111111111";
   const apiRequests: string[] = [];
@@ -471,7 +511,7 @@ test("a held captcha loader is bounded by the form operation deadline and ignore
   await expect(consent).toBeDisabled();
   await expect(page.locator(`script[src^="${captchaScript}"]`)).toHaveCount(1);
 
-  await page.clock.fastForward(10_001);
+  await page.clock.fastForward(15_001);
 
   await expect(page.getByRole("status")).toContainText(/temporarily unavailable/i);
   await expect(form).toHaveAttribute("aria-busy", "false");
@@ -492,7 +532,7 @@ test("a held captcha loader is bounded by the form operation deadline and ignore
   expect(await page.evaluate(() => window.__vbtechRequestIdCount)).toBe(1);
 });
 
-test("one timed-out form releases only its shared-loader subscription while a later form succeeds", async ({ page }) => {
+test("a shared loader keeps both human attempts alive past ten seconds and then completes both", async ({ page }) => {
   const localized = locales[1];
   const firstId = "11111111-1111-4111-8111-111111111111";
   const secondId = "22222222-2222-4222-8222-222222222222";
@@ -537,9 +577,8 @@ test("one timed-out form releases only its shared-loader subscription while a la
 
   await page.clock.fastForward(5_001);
 
-  await expect(first.getByRole("status")).toContainText(/temporarily unavailable/i, { timeout: 1_000 });
-  await expect(first).toHaveAttribute("aria-busy", "false", { timeout: 1_000 });
-  await expect(first.getByLabel(localized.labels.name, { exact: true })).toBeEnabled();
+  await expect(first).toHaveAttribute("aria-busy", "true");
+  await expect(first.getByLabel(localized.labels.name, { exact: true })).toBeDisabled();
   await expect(first.getByLabel(localized.labels.name, { exact: true })).toHaveValue("Vlad Alpha");
   await expect(second).toHaveAttribute("aria-busy", "true");
   await expect(second.getByLabel(localized.labels.name, { exact: true })).toBeDisabled();
@@ -548,17 +587,35 @@ test("one timed-out form releases only its shared-loader subscription while a la
 
   await page.evaluate(() => window.__vbtechReleaseCaptchaLoad?.());
 
+  await expect(first.getByRole("status")).toContainText(localized.labels.success);
   await expect(second.getByRole("status")).toContainText(localized.labels.success);
-  await expect(first.getByRole("status")).toContainText(/temporarily unavailable/i);
-  await expect(first.locator("[data-smartcaptcha-disclosure]")).toHaveCount(0);
+  await expect(first.locator("[data-smartcaptcha-disclosure]")).toBeVisible();
   await expect(second.locator("[data-smartcaptcha-disclosure]")).toBeVisible();
   expect(captchaRequests).toHaveLength(1);
-  expect(bodies).toHaveLength(1);
-  expect(bodies[0]).toMatchObject({
-    name: "Vlad Beta",
-    requestId: secondId,
-    captchaToken: "fixture-token-1",
-  });
+  expect(bodies).toEqual([
+    {
+      name: "Vlad Alpha",
+      contact: "person@example.com",
+      message: "Project enquiry Alpha.",
+      locale: "en",
+      consentId: "VBT-PD-02/2026.08/01",
+      sourcePath: "/en/",
+      website: "",
+      requestId: firstId,
+      captchaToken: "fixture-token-1",
+    },
+    {
+      name: "Vlad Beta",
+      contact: "person@example.com",
+      message: "Project enquiry Beta.",
+      locale: "en",
+      consentId: "VBT-PD-02/2026.08/01",
+      sourcePath: "/en/",
+      website: "",
+      requestId: secondId,
+      captchaToken: "fixture-token-2",
+    },
+  ]);
   expect(await page.evaluate(() => window.__vbtechRequestIdCount)).toBe(2);
 });
 

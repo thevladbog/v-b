@@ -14,7 +14,8 @@ import {
 
 const FIELD_ORDER: readonly ContactField[] = ["name", "contact", "message", "consent"];
 const SMARTCAPTCHA_CLIENT = "https://smartcaptcha.cloud.yandex.ru/captcha.js";
-const CONTACT_OPERATION_TIMEOUT_MS = 10_000;
+const CONTACT_REQUEST_TIMEOUT_MS = 10_000;
+const CAPTCHA_CHALLENGE_TIMEOUT_MS = 120_000;
 let captchaCallbackSequence = 0;
 
 interface SmartCaptchaOptions {
@@ -269,7 +270,7 @@ export function bindContactForm(
   let consentRefreshRequired = false;
   let activeAttempt: {
     controller: AbortController;
-    timer: unknown;
+    timer?: unknown;
     restore(): void;
   } | undefined;
 
@@ -302,11 +303,7 @@ export function bindContactForm(
     busy = true;
     const restore = freezeVisitorControls(form, controls);
     const controller = new AbortController();
-    const timer = clock.setTimeout(() => {
-      controller.abort();
-      resetCaptcha();
-    }, CONTACT_OPERATION_TIMEOUT_MS);
-    activeAttempt = { controller, timer, restore };
+    activeAttempt = { controller, restore };
     setStatus(form, CONTACT_SUBMISSION_COPY[locale].busy);
 
     void (async () => {
@@ -331,6 +328,10 @@ export function bindContactForm(
           setStatus(form, CONTACT_SUBMISSION_COPY[locale].errors.temporarily_unavailable);
           return;
         }
+        activeAttempt!.timer = clock.setTimeout(() => {
+          controller.abort();
+          resetCaptcha();
+        }, CONTACT_REQUEST_TIMEOUT_MS);
         const result = await submitContactDraft(normalized, {
           requestId: pending!.requestId,
           createRequestId: dependencies.createRequestId,
@@ -361,7 +362,7 @@ export function bindContactForm(
         setStatus(form, CONTACT_SUBMISSION_COPY[locale].errors[result.code]);
       } finally {
         if (activeAttempt?.controller === controller) {
-          clock.clearTimeout(activeAttempt.timer);
+          if (activeAttempt.timer !== undefined) clock.clearTimeout(activeAttempt.timer);
           activeAttempt = undefined;
         }
         if (!disposed) {
@@ -377,7 +378,7 @@ export function bindContactForm(
     disposed = true;
     busy = false;
     if (activeAttempt) {
-      clock.clearTimeout(activeAttempt.timer);
+      if (activeAttempt.timer !== undefined) clock.clearTimeout(activeAttempt.timer);
       activeAttempt.controller.abort();
       activeAttempt.restore();
       activeAttempt = undefined;
@@ -547,7 +548,10 @@ const createCaptchaTokenProvider = (
         active = {
           resolve,
           reject,
-          timer: windowTarget.setTimeout(() => rejectActive("smartcaptcha_execute_timeout"), timeoutMs),
+          timer: windowTarget.setTimeout(
+            () => rejectActive("smartcaptcha_execute_timeout"),
+            CAPTCHA_CHALLENGE_TIMEOUT_MS,
+          ),
         };
       });
       ready.reset(widgetId);
