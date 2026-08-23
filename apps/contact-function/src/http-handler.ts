@@ -73,21 +73,32 @@ const exactRoute = (event: YandexHttpEvent): boolean =>
   !hasQuery(event);
 
 const header = (event: YandexHttpEvent, wanted: string): string => {
-  const values: string[] = [];
+  const singleValues: string[] = [];
+  const multiValues: string[] = [];
   for (const [name, value] of Object.entries(event.headers ?? {})) {
     if (name.toLowerCase() !== wanted) continue;
     if (typeof value !== "string") throw publicError("invalid_request", 400);
-    values.push(value);
+    singleValues.push(value);
   }
   for (const [name, entries] of Object.entries(event.multiValueHeaders ?? {})) {
     if (name.toLowerCase() !== wanted) continue;
     if (!Array.isArray(entries) || entries.some((value) => typeof value !== "string")) {
       throw publicError("invalid_request", 400);
     }
-    values.push(...entries);
+    multiValues.push(...entries);
   }
-  if (values.length !== 1) throw publicError("invalid_request", 400);
-  return values[0]!;
+  if (singleValues.length > 1 || multiValues.length > 1) {
+    throw publicError("invalid_request", 400);
+  }
+  const singleValue = singleValues[0];
+  const multiValue = multiValues[0];
+  if (singleValue === undefined && multiValue === undefined) {
+    throw publicError("invalid_request", 400);
+  }
+  if (singleValue !== undefined && multiValue !== undefined && singleValue !== multiValue) {
+    throw publicError("invalid_request", 400);
+  }
+  return singleValue ?? multiValue!;
 };
 
 const validJsonContentType = (value: string): boolean =>

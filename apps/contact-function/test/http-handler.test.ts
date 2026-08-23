@@ -50,6 +50,20 @@ describe("Yandex HTTP contact boundary", () => {
     expect(submit).toHaveBeenCalledWith(request, "192.0.2.1");
   });
 
+  it("accepts Yandex HTTPS events that mirror each single header in multiValueHeaders", async () => {
+    const { handler, submit } = enabledHandler();
+    const response = await handler(event({
+      multiValueHeaders: {
+        Host: ["v-b.tech"],
+        Origin: ["https://v-b.tech"],
+        "Content-Type": ["application/json; charset=utf-8"],
+      },
+    }));
+
+    expect(response.statusCode).toBe(202);
+    expect(submit).toHaveBeenCalledWith(request, "192.0.2.1");
+  });
+
   it.each([
     ["wrong method", { httpMethod: "GET" }],
     ["null path", { path: null as unknown as string }],
@@ -174,7 +188,8 @@ describe("Yandex HTTP contact boundary", () => {
     ["wrong origin", { headers: { host: "v-b.tech", origin: "https://evil.invalid", "content-type": "application/json" } }],
     ["wrong content type", { headers: { host: "v-b.tech", origin: "https://v-b.tech", "content-type": "text/plain" } }],
     ["extra content-type parameter", { headers: { host: "v-b.tech", origin: "https://v-b.tech", "content-type": "application/json; charset=utf-8; profile=x" } }],
-    ["duplicate host", { multiValueHeaders: { Host: ["v-b.tech"] } }],
+    ["conflicting mirrored host", { multiValueHeaders: { Host: ["evil.invalid"] } }],
+    ["repeated host", { multiValueHeaders: { Host: ["v-b.tech", "v-b.tech"] } }],
     ["spoofed source only", { requestContext: { identity: { sourceIp: "invalid" } }, headers: { host: "v-b.tech", origin: "https://v-b.tech", "content-type": "application/json", "x-forwarded-for": "192.0.2.1" } }],
   ])("rejects %s before submitting", async (_label, override) => {
     const { handler, submit } = enabledHandler();
