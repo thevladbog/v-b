@@ -22,7 +22,7 @@ const request = {
 
 const event = (overrides: Partial<YandexHttpEvent> = {}): YandexHttpEvent => ({
   httpMethod: "POST",
-  path: "/",
+  path: "",
   headers: {
     host: "v-b.tech",
     origin: "https://v-b.tech",
@@ -45,6 +45,7 @@ const enabledHandler = () => {
 describe("Yandex HTTP contact boundary", () => {
   it.each([
     ["wrong method", { httpMethod: "GET" }],
+    ["slash path", { path: "/" }],
     ["unstripped public path", { path: "/api/contact" }],
     ["trailing slash", { path: "/api/contact/" }],
     ["deeper path", { path: "/api/contact/extra" }],
