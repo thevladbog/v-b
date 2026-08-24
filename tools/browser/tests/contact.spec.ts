@@ -10,6 +10,7 @@ declare global {
     __vbtechCaptchaDestroyedWidgets: number[];
     __vbtechCaptchaTokenWidgets: Record<string, number>;
     __vbtechHoldCaptchaLoad: boolean;
+    __vbtechCompleteCaptchaChallenge?: () => void;
     __vbtechReleaseCaptchaLoad?: () => void;
     __vbtechRequestIdCount?: number;
     __vbtechInitializeContactForms(): () => void;
@@ -66,6 +67,7 @@ async function mockCaptcha(page: Page, mode: CaptchaMode = "token", holdLoad = f
       __vbtechCaptchaDestroyedWidgets: [],
       __vbtechCaptchaTokenWidgets: {},
       __vbtechHoldCaptchaLoad: hold,
+      __vbtechCompleteCaptchaChallenge: undefined,
     });
   }, { initialMode: mode, hold: holdLoad });
   await page.route(`${captchaScript}**`, async (route) => {
@@ -116,7 +118,10 @@ async function mockCaptcha(page: Page, mode: CaptchaMode = "token", holdLoad = f
               options.callback(token);
             };
             if (window.__vbtechCaptchaMode === "delayed-token") {
-              setTimeout(completeChallenge, 15_000);
+              window.__vbtechCompleteCaptchaChallenge = () => {
+                delete window.__vbtechCompleteCaptchaChallenge;
+                completeChallenge();
+              };
             } else {
               queueMicrotask(completeChallenge);
             }
@@ -470,6 +475,10 @@ test("a visible human challenge may complete after fifteen seconds before the re
   expect(bodies).toEqual([]);
 
   await page.clock.fastForward(15_001);
+
+  await expect(page.locator("[data-contact-form]")).toHaveAttribute("aria-busy", "true");
+  expect(bodies).toEqual([]);
+  await page.evaluate(() => window.__vbtechCompleteCaptchaChallenge?.());
 
   await expect(page.getByRole("status")).toContainText(localized.labels.success);
   expect(bodies).toHaveLength(1);
