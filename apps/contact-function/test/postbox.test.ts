@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildRawMime,
   PostboxDeliveryError,
   YandexPostbox,
   type PostboxSendInput,
@@ -24,6 +25,15 @@ const sendInput = (overrides: Partial<PostboxSendInput> = {}): PostboxSendInput 
 describe("Yandex Postbox adapter", () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  // Catches the dynamic contact suffix making a schema-valid maximum email address undeliverable at the MIME boundary.
+  it("accepts the complete notification subject for a maximum-length contact", () => {
+    const contact = `${"a".repeat(242)}@example.com`;
+    const subject = `New v-b.tech enquiry — ${contact}`;
+
+    expect(Buffer.byteLength(subject, "utf8")).toBeGreaterThan(256);
+    expect(() => buildRawMime(sendInput({ email: { ...renderedEmail, subject } }))).not.toThrow();
   });
 
   // Catches a provider-boundary break that sends Simple content, omits Reply-To, or loses the stable outbox Message-ID.

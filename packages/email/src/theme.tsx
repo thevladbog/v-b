@@ -5,7 +5,7 @@ const graphite = "#1b1e20";
 const ink = "#22262a";
 const light = "#f6f3ed";
 const line = "#d8d1c5";
-const amber = "#d88900";
+const WORDMARK_URL = "https://v-b.tech/assets/vb-wordmark-email.png";
 
 const bodyStyle: CSSProperties = {
   backgroundColor: graphite,
@@ -25,22 +25,16 @@ const containerStyle: CSSProperties = {
 };
 
 const headerStyle: CSSProperties = {
-  backgroundColor: graphite,
-  color: "#ffffff",
+  backgroundColor: light,
+  borderBottom: `1px solid ${line}`,
   padding: "24px 28px 20px",
 };
 
-const brandStyle: CSSProperties = {
-  color: "#ffffff",
-  fontFamily: "Arial, sans-serif",
-  fontSize: "22px",
-  fontWeight: "700",
-  letterSpacing: "-0.5px",
-  lineHeight: "28px",
-  margin: "0",
+const wordmarkStyle: CSSProperties = {
+  display: "block",
+  height: "24px",
+  width: "121px",
 };
-
-const dashStyle: CSSProperties = { color: amber };
 
 const contentStyle: CSSProperties = { padding: "8px 28px 20px" };
 
@@ -114,9 +108,13 @@ export function EmailTheme({
                   <tbody>
                     <tr>
                       <td style={headerStyle}>
-                        <p style={brandStyle}>
-                          v<span style={dashStyle}>-</span>b.tech
-                        </p>
+                        <img
+                          alt="v-b.tech"
+                          height="24"
+                          src={WORDMARK_URL}
+                          style={wordmarkStyle}
+                          width="121"
+                        />
                       </td>
                     </tr>
                     <tr>

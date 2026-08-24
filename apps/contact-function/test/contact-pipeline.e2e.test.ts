@@ -189,18 +189,20 @@ describe.skipIf(!E2E_ENABLED)("local PostgreSQL 17 and Mailpit contact pipeline"
     expect(ruMessages).toHaveLength(2);
     expect(ruMessages.map(({ Subject }) => Subject).sort()).toEqual([
       "Ваше обращение с v-b.tech получено",
-      "Новое обращение с v-b.tech",
+      `Новое обращение с v-b.tech — ${ru.contact}`,
     ]);
     expect(ruMessages.map(({ To }) => To.map(({ Address }) => Address))).toEqual(
       expect.arrayContaining([["hello@v-b.tech"], [ru.contact]]),
     );
-    const ruNotification = ruMessages.find(({ Subject }) => Subject === "Новое обращение с v-b.tech");
+    const ruNotification = ruMessages.find(
+      ({ Subject }) => Subject === `Новое обращение с v-b.tech — ${ru.contact}`,
+    );
     expect(ruNotification?.HTML).toContain(CURRENT_CONTACT_CONSENT_ID);
     expect(ruNotification?.Text).toContain(CURRENT_CONTACT_CONSENT_ID);
 
     const enMessages = findByRequestId(messages, en.requestId);
     expect(enMessages).toHaveLength(1);
-    expect(enMessages[0]).toMatchObject({ Subject: "New v-b.tech enquiry" });
+    expect(enMessages[0]).toMatchObject({ Subject: `New v-b.tech enquiry — ${en.contact}` });
     expect(enMessages[0]?.To.map(({ Address }) => Address)).toEqual(["hello@v-b.tech"]);
     expect(enMessages[0]?.HTML).toContain(CURRENT_CONTACT_CONSENT_ID);
     expect(enMessages[0]?.Text).toContain(CURRENT_CONTACT_CONSENT_ID);
@@ -234,7 +236,7 @@ describe.skipIf(!E2E_ENABLED)("local PostgreSQL 17 and Mailpit contact pipeline"
     const ruConfirmationRow = terminalByRequestAndKind.get(`${ru.requestId}:confirmation`)!;
     const enNotificationRow = terminalByRequestAndKind.get(`${en.requestId}:notification`)!;
     const messageBySubject = new Map(messages.map((message) => [message.Subject, message]));
-    expect(messageBySubject.get("Новое обращение с v-b.tech")).toMatchObject({
+    expect(messageBySubject.get(`Новое обращение с v-b.tech — ${ru.contact}`)).toMatchObject({
       From: { Address: "hello@v-b.tech", Name: "v-b.tech" },
       ReplyTo: [{ Address: ru.contact, Name: "" }],
       MessageID: `outbox-${ruNotificationRow.id}@v-b.tech`,
@@ -244,7 +246,7 @@ describe.skipIf(!E2E_ENABLED)("local PostgreSQL 17 and Mailpit contact pipeline"
       ReplyTo: [{ Address: "hello@v-b.tech", Name: "" }],
       MessageID: `outbox-${ruConfirmationRow.id}@v-b.tech`,
     });
-    expect(messageBySubject.get("New v-b.tech enquiry")).toMatchObject({
+    expect(messageBySubject.get(`New v-b.tech enquiry — ${en.contact}`)).toMatchObject({
       From: { Address: "hello@v-b.tech", Name: "v-b.tech" },
       ReplyTo: [{ Address: "hello@v-b.tech", Name: "" }],
       MessageID: `outbox-${enNotificationRow.id}@v-b.tech`,

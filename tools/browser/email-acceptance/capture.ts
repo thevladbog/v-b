@@ -10,6 +10,7 @@ const MAILPIT_ORIGIN = "http://127.0.0.1:58025";
 const MAILPIT_LABEL = "vbtech-task7-dedicated";
 const MAILPIT_TAG = "vbtech-task7";
 const DARK_STRATEGY = "controlled-local-email-client-emulation-v1";
+const WORDMARK_URL = "https://v-b.tech/assets/vb-wordmark-email.png";
 export const MAX_MAILPIT_JSON_RESPONSE_BYTES = 1_048_576;
 export const MAX_EMAIL_HTML_CHARACTERS = 32_768;
 export const MAX_EMAIL_HTML_UTF8_BYTES = 65_536;
@@ -44,14 +45,19 @@ const evidenceDirectory = path.join(
 );
 export const EMAIL_EVIDENCE_DIRECTORY = evidenceDirectory;
 
-const kindsBySubject = {
-  "New v-b.tech enquiry": "en-notification",
+const exactKindsBySubject = {
   "We received your v-b.tech enquiry": "en-confirmation",
-  "Новое обращение с v-b.tech": "ru-notification",
   "Ваше обращение с v-b.tech получено": "ru-confirmation",
 } as const;
 
-type MessageKind = (typeof kindsBySubject)[keyof typeof kindsBySubject];
+const notificationKindsByPrefix = {
+  "New v-b.tech enquiry": "en-notification",
+  "Новое обращение с v-b.tech": "ru-notification",
+} as const;
+
+type MessageKind =
+  | (typeof exactKindsBySubject)[keyof typeof exactKindsBySubject]
+  | (typeof notificationKindsByPrefix)[keyof typeof notificationKindsByPrefix];
 type MessagePart = "html" | "text";
 type PreviewMode = "light" | "dark";
 type PreviewSize = "desktop" | "mobile";
@@ -66,6 +72,21 @@ interface MailpitMessage extends MailpitSummary {
   HTML: string;
   Text: string;
 }
+
+export const classifyContactEmailSubject = (subject: string): MessageKind => {
+  const exact = exactKindsBySubject[subject as keyof typeof exactKindsBySubject];
+  if (exact) return exact;
+
+  for (const [prefix, kind] of Object.entries(notificationKindsByPrefix)) {
+    if (subject === prefix) return kind;
+    const separator = `${prefix} — `;
+    if (subject.startsWith(separator)) {
+      const contact = subject.slice(separator.length);
+      if (contact.length >= 1 && contact.length <= 254 && !/\p{Cc}/u.test(contact)) return kind;
+    }
+  }
+  throw new Error("email_subject_invalid");
+};
 
 export interface EmailAcceptanceCapture {
   kind: MessageKind;
@@ -247,8 +268,13 @@ const loadMessages = async (baseUrl: URL): Promise<Map<MessageKind, MailpitMessa
   const messages = new Map<MessageKind, MailpitMessage>();
   for (const summary of summaries) {
     if (!summary.Tags?.includes(MAILPIT_TAG)) throw new Error("mailpit_task7_tag_missing");
-    const kind = kindsBySubject[summary.Subject as keyof typeof kindsBySubject];
-    if (!kind || messages.has(kind)) throw new Error(`mailpit_task7_subject_matrix_invalid:${summary.Subject}`);
+    let kind: MessageKind;
+    try {
+      kind = classifyContactEmailSubject(summary.Subject);
+    } catch {
+      throw new Error(`mailpit_task7_subject_matrix_invalid:${summary.Subject}`);
+    }
+    if (messages.has(kind)) throw new Error(`mailpit_task7_subject_matrix_invalid:${summary.Subject}`);
     const detail = await fetchJson<MailpitMessage>(baseUrl, `/api/v1/message/${summary.ID}`);
     if (typeof detail.HTML !== "string" || typeof detail.Text !== "string") {
       throw new Error("mailpit_message_body_invalid");
@@ -302,6 +328,10 @@ const prepareHtmlPreview = async (page: Page, html: string, mode: PreviewMode): 
     rows.item(0)!.dataset.vbtechEmailHeader = "";
     rows.item(1)!.dataset.vbtechEmailMain = "";
     rows.item(2)!.dataset.vbtechEmailFooter = "";
+    const wordmark = rows.item(0)!.querySelector('img[alt="v-b.tech"]');
+    if (!(wordmark instanceof HTMLImageElement) || !wordmark.complete || wordmark.naturalWidth < 1) {
+      throw new Error("email_wordmark_not_loaded");
+    }
   }, mode);
   const colours = mode === "dark"
     ? {
@@ -327,7 +357,7 @@ const prepareHtmlPreview = async (page: Page, html: string, mode: PreviewMode): 
     [data-vbtech-email-main] p { color: ${colours.text} !important; }
     [data-vbtech-email-main] a { color: ${colours.link} !important; }
     [data-vbtech-email-footer] p { color: ${colours.footer} !important; }
-    [data-vbtech-email-header] p { color: #ffffff !important; }
+    [data-vbtech-email-header] td { background: #f6f3ed !important; border-color: #d8d1c5 !important; }
   ` });
 };
 
@@ -360,7 +390,6 @@ const measurePreview = async (
       [colour("[data-vbtech-email-main] h1"), background("[data-vbtech-email-card]")],
       [colour("[data-vbtech-email-main] p"), background("[data-vbtech-email-card]")],
       [colour("[data-vbtech-email-footer] p"), background("[data-vbtech-email-card]")],
-      [colour("[data-vbtech-email-header] p"), background("[data-vbtech-email-header] td")],
     ];
     const link = document.querySelector("[data-vbtech-email-main] a");
     if (link) pairs.push([getComputedStyle(link).color, background("[data-vbtech-email-card]")]);
@@ -540,6 +569,11 @@ export const captureContactEmailAcceptance = async (
   return await withCleanEvidenceDirectory(async () => {
     const mailpitVersion = await verifyDedicatedMailpit(baseUrl);
     const messages = await loadMessages(baseUrl);
+    const wordmark = await readFile(path.join(
+      repositoryRoot,
+      "apps/web/public/assets/vb-wordmark-email.png",
+    ));
+    inspectEvidencePng(wordmark, "capture");
     const viewports = {
       desktop: { width: 1280, height: 900 },
       mobile: { width: 390, height: 844 },
@@ -565,8 +599,14 @@ export const captureContactEmailAcceptance = async (
           for (const mode of ["light", "dark"] as const) {
             const page = await browser.newPage({ viewport });
             const requests: string[] = [];
-            page.on("request", (request) => requests.push(request.url()));
-            await page.route("**/*", (route) => route.abort());
+            await page.route("**/*", async (route) => {
+              if (route.request().url() === WORDMARK_URL) {
+                await route.fulfill({ body: wordmark, contentType: "image/png", status: 200 });
+                return;
+              }
+              requests.push(route.request().url());
+              await route.abort();
+            });
             try {
               if (part === "html") await prepareHtmlPreview(page, content, mode);
               else await prepareTextPreview(page, content, mode);

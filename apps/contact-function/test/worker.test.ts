@@ -174,7 +174,7 @@ describe("durable outbox worker", () => {
       outboxId: notification.id,
       recipient: "hello@v-b.tech",
       replyTo: "hello@v-b.tech",
-      email: { subject: "New v-b.tech enquiry" },
+      email: { subject: "New v-b.tech enquiry — @thevladbog" },
     });
   });
 
@@ -193,7 +193,7 @@ describe("durable outbox worker", () => {
       {
         recipient: "hello@v-b.tech",
         replyTo: "visitor@example.com",
-        subject: "New v-b.tech enquiry",
+        subject: "New v-b.tech enquiry — visitor@example.com",
       },
       {
         recipient: "visitor@example.com",
