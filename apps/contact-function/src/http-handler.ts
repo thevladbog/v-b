@@ -110,6 +110,16 @@ const header = (event: YandexHttpEvent, wanted: string): string => {
 const validJsonContentType = (value: string): boolean =>
   /^application\/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?$/i.test(value);
 
+const validRoutingHost = (event: YandexHttpEvent): boolean => {
+  const host = optionalHeader(event, "host");
+  const forwardedHost = optionalHeader(event, "x-forwarded-host");
+  if (host === undefined) return forwardedHost === undefined;
+  if (host === "v-b.tech") {
+    return forwardedHost === undefined || forwardedHost === "v-b.tech";
+  }
+  return host === "functions.yandexcloud.net" && forwardedHost === "v-b.tech";
+};
+
 const strictBase64 = (body: string): Buffer => {
   if (!body || body.length % 4 !== 0 || !BASE64_PATTERN.test(body)) {
     throw publicError("invalid_request", 400);
@@ -170,8 +180,7 @@ export const createHttpHandler = (dependencies: HttpHandlerDependencies) =>
         throw publicError("invalid_request", 400);
       }
       validationStage = "host";
-      const host = optionalHeader(event, "host");
-      if (host !== undefined && host !== "v-b.tech") {
+      if (!validRoutingHost(event)) {
         throw publicError("invalid_request", 400);
       }
 

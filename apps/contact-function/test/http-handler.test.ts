@@ -86,6 +86,27 @@ describe("Yandex HTTP contact boundary", () => {
     expect(submit).toHaveBeenCalledWith(request, "192.0.2.1");
   });
 
+  it("accepts the Caddy 2.11 HTTPS upstream authority with the original forwarded host", async () => {
+    const { handler, submit } = enabledHandler();
+    const response = await handler(event({
+      headers: {
+        host: "functions.yandexcloud.net",
+        "x-forwarded-host": "v-b.tech",
+        origin: "https://v-b.tech",
+        "content-type": "application/json; charset=utf-8",
+      },
+      multiValueHeaders: {
+        Host: ["functions.yandexcloud.net"],
+        "X-Forwarded-Host": ["v-b.tech"],
+        Origin: ["https://v-b.tech"],
+        "Content-Type": ["application/json; charset=utf-8"],
+      },
+    }));
+
+    expect(response.statusCode).toBe(202);
+    expect(submit).toHaveBeenCalledWith(request, "192.0.2.1");
+  });
+
   it("accepts Yandex HTTPS events that omit the routing Host header", async () => {
     const { handler, submit } = enabledHandler();
     const response = await handler(event({
@@ -224,6 +245,9 @@ describe("Yandex HTTP contact boundary", () => {
 
   it.each([
     ["wrong host", { headers: { host: "www.v-b.tech", origin: "https://v-b.tech", "content-type": "application/json" } }],
+    ["upstream host without forwarded authority", { headers: { host: "functions.yandexcloud.net", origin: "https://v-b.tech", "content-type": "application/json" } }],
+    ["wrong forwarded authority", { headers: { host: "functions.yandexcloud.net", "x-forwarded-host": "evil.invalid", origin: "https://v-b.tech", "content-type": "application/json" } }],
+    ["forwarded authority with an unexpected routing host", { headers: { host: "evil.invalid", "x-forwarded-host": "v-b.tech", origin: "https://v-b.tech", "content-type": "application/json" } }],
     ["wrong origin", { headers: { host: "v-b.tech", origin: "https://evil.invalid", "content-type": "application/json" } }],
     ["wrong content type", { headers: { host: "v-b.tech", origin: "https://v-b.tech", "content-type": "text/plain" } }],
     ["extra content-type parameter", { headers: { host: "v-b.tech", origin: "https://v-b.tech", "content-type": "application/json; charset=utf-8; profile=x" } }],
