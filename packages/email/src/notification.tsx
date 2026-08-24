@@ -5,7 +5,7 @@ const copy = {
   en: {
     footer: "v-b.tech · Product engineering for systems that need to work.",
     heading: "New enquiry",
-    preview: "A new v-b.tech enquiry is ready to review.",
+    preview: "New enquiry",
     labels: {
       consent: "Consent ID",
       contact: "Contact",
@@ -20,7 +20,7 @@ const copy = {
   ru: {
     footer: "v-b.tech · Продуктовая инженерия для систем, которые должны работать.",
     heading: "Новое обращение",
-    preview: "Новое обращение с v-b.tech готово к просмотру.",
+    preview: "Новое обращение",
     labels: {
       consent: "Идентификатор согласия",
       contact: "Контакт",
@@ -51,11 +51,11 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 export function ContactNotification({ input }: { input: ContactEmailInput }) {
   const localized = copy[input.locale];
+  const preview = `${localized.preview} — ${input.contact}`;
 
   return (
-    <EmailTheme footer={localized.footer} locale={input.locale} preview={localized.preview}>
+    <EmailTheme footer={localized.footer} locale={input.locale} preview={preview}>
       <h1 style={EMAIL_STYLES.heading}>{localized.heading}</h1>
-      <p style={EMAIL_STYLES.copy}>{localized.preview}</p>
       <hr style={{ borderColor: "#d8d1c5", margin: "20px 0" }} />
       <Detail label={localized.labels.name} value={input.name} />
       <Detail label={localized.labels.contact} value={input.contact} />

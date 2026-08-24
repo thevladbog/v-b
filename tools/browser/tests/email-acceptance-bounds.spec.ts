@@ -34,6 +34,11 @@ type EvidenceModule = {
     fileBytes: number;
   };
   assertTotalGeneratedEvidenceBytes(bytes: number): void;
+  classifyContactEmailSubject(subject: string):
+    | "en-confirmation"
+    | "en-notification"
+    | "ru-confirmation"
+    | "ru-notification";
   withCleanEvidenceDirectory<T>(operation: (directory: string) => Promise<T>): Promise<T>;
 };
 
@@ -52,6 +57,18 @@ const syntheticPng = (width: number, height: number, fileBytes = 24): Buffer => 
 test("exports the exact evidence ceilings consumed by acceptance", () => {
   // Break caught: documented/tested maxima drift from the limits actually used by the generator.
   expect(subject.EMAIL_EVIDENCE_LIMITS).toEqual(expectedLimits);
+});
+
+test("classifies notification subjects with their complete contact suffix", () => {
+  // Break caught: visual acceptance rejects newly delivered notifications after the contact becomes part of the subject.
+  expect(subject.classifyContactEmailSubject("New v-b.tech enquiry — visitor@example.com"))
+    .toBe("en-notification");
+  expect(subject.classifyContactEmailSubject("Новое обращение с v-b.tech — @thevladbog"))
+    .toBe("ru-notification");
+  expect(subject.classifyContactEmailSubject("We received your v-b.tech enquiry"))
+    .toBe("en-confirmation");
+  expect(() => subject.classifyContactEmailSubject("New v-b.tech enquiry — "))
+    .toThrow("email_subject_invalid");
 });
 
 test("fails closed before parsing an oversized or malformed Mailpit JSON response", async () => {

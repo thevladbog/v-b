@@ -23,11 +23,19 @@ describe("contact notification rendering", () => {
       message,
     });
 
-    expect(rendered.subject).toBe("New v-b.tech enquiry");
+    expect(rendered.subject).toBe("New v-b.tech enquiry — hello@example.com");
+    expect(rendered.html).toContain('alt="v-b.tech"');
+    expect(rendered.html).toContain('src="https://v-b.tech/assets/vb-wordmark-email.png"');
     expect(rendered.html).toContain("&lt;Vlad &amp; &quot;team&quot;&gt;");
     expect(rendered.html).toContain("Build the product safely.");
     expect(rendered.html).toContain(CURRENT_CONTACT_CONSENT_ID);
-    expect(rendered.html).not.toMatch(/<script|https?:\/\/.*\.(png|gif|woff)/i);
+    expect(rendered.html).not.toContain("<script");
+    expect(
+      [...rendered.html.matchAll(/(?:href|src)="(https?:\/\/[^"]+)"/g)].map(
+        (match) => match[1],
+      ),
+    ).toEqual(["https://v-b.tech/assets/vb-wordmark-email.png"]);
+    expect(rendered.text).not.toContain("ready to review");
     expect(rendered.text).toContain("11111111-1111-4111-8111-111111111111");
     expect(rendered.text).toContain("2026-08-20T12:00:00.000Z");
     expect(rendered.text).toContain("/en/");
@@ -48,8 +56,9 @@ describe("contact notification rendering", () => {
       message,
     });
 
-    expect(rendered.subject).toBe("Новое обращение с v-b.tech");
+    expect(rendered.subject).toBe("Новое обращение с v-b.tech — @thevladbog");
     expect(rendered.text).toContain("Новое обращение");
+    expect(rendered.text).not.toContain("готово к просмотру");
     expect(rendered.text).toContain("@thevladbog");
     expect(rendered.text).toContain(
       "v-b.tech · Продуктовая инженерия для систем, которые должны работать.",
@@ -57,20 +66,19 @@ describe("contact notification rendering", () => {
   });
 
   // Catches a production break that lets visitor values alter mail headers through the render boundary.
-  it("keeps the notification subject static for hostile visitor content", async () => {
-    const rendered = await renderContactNotification({
-      locale: "en",
-      requestId,
-      receivedAt,
-      sourcePath: "/en/",
-      consentId: CURRENT_CONTACT_CONSENT_ID,
-      name: "Vlad\r\nBcc: attacker@example.com",
-      contact: "hello@example.com\r\nBcc: attacker@example.com",
-      message: "Hello\r\nBcc: attacker@example.com",
-    });
-
-    expect(rendered.subject).toBe("New v-b.tech enquiry");
-    expect(rendered.subject).not.toContain("\n");
+  it("rejects control characters before visitor contact reaches the notification subject", async () => {
+    await expect(
+      renderContactNotification({
+        locale: "en",
+        requestId,
+        receivedAt,
+        sourcePath: "/en/",
+        consentId: CURRENT_CONTACT_CONSENT_ID,
+        name: "Vlad",
+        contact: "hello@example.com\r\nBcc: attacker@example.com",
+        message: "Hello",
+      }),
+    ).rejects.toThrow(/contact/i);
   });
 });
 
@@ -89,6 +97,8 @@ describe("visitor confirmation rendering", () => {
     });
 
     expect(rendered.subject).toBe("We received your v-b.tech enquiry");
+    expect(rendered.html).toContain('alt="v-b.tech"');
+    expect(rendered.html).toContain('src="https://v-b.tech/assets/vb-wordmark-email.png"');
     expect(rendered.html).toContain("mailto:hello@v-b.tech");
     expect(rendered.html).toContain("https://t.me/thevladbog");
     expect(rendered.text).toContain("11111111-1111-4111-8111-111111111111");

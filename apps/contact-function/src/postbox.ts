@@ -8,6 +8,7 @@ export const POSTBOX_SENDER = "hello@v-b.tech";
 
 const MAX_IAM_TOKEN_LENGTH = 8_192;
 const MAX_PROVIDER_MESSAGE_ID_LENGTH = 512;
+const MAX_SUBJECT_BYTES = 512;
 const MAX_RENDERED_PART_BYTES = 96_000;
 const MAX_RAW_MIME_BYTES = 200_000;
 const MAX_SUCCESS_BODY_BYTES = 8_192;
@@ -85,7 +86,7 @@ const assertSendInput = (input: PostboxSendInput): void => {
     typeof input.email.subject !== "string" ||
     input.email.subject.length < 1 ||
     hasControls(input.email.subject) ||
-    Buffer.byteLength(input.email.subject, "utf8") > 256 ||
+    Buffer.byteLength(input.email.subject, "utf8") > MAX_SUBJECT_BYTES ||
     typeof input.email.html !== "string" ||
     typeof input.email.text !== "string" ||
     Buffer.byteLength(input.email.html, "utf8") > MAX_RENDERED_PART_BYTES ||
