@@ -52,6 +52,7 @@ export interface TimerRuntimeFactoryInput {
 export interface CreateTimerHandlerOptions {
   createRuntime: (input: TimerRuntimeFactoryInput) => Promise<TimerRuntime>;
   now?: () => Date;
+  reportInvalidEventShape?: (shape: string) => void;
 }
 
 export interface TimerHandlerResult {
@@ -73,6 +74,21 @@ const safeString = (value: unknown, maximum = 256): value is string =>
   value.length >= 1 &&
   value.length <= maximum &&
   !/\p{Cc}/u.test(value);
+
+const timerEventShape = (event: unknown): string => {
+  if (event === null) return "null";
+  if (Array.isArray(event)) return "array";
+  if (typeof event !== "object") return typeof event;
+  const keys = Object.keys(event);
+  if (
+    keys.length === 0 ||
+    keys.length > 8 ||
+    keys.some((key) => !/^[a-z][a-z0-9_]{0,31}$/.test(key))
+  ) {
+    return "object:unbounded";
+  }
+  return `object:${keys.sort().join(",")}`;
+};
 
 const parseTimerEvent = (event: unknown): YandexTimerEvent => {
   if (!isRecord(event) || !hasExactKeys(event, ["messages"])) {
@@ -159,11 +175,21 @@ const createProductionRuntime = async ({
 export const createTimerHandler = ({
   createRuntime,
   now = () => new Date(),
+  reportInvalidEventShape = () => undefined,
 }: CreateTimerHandlerOptions) => async (
   event: unknown,
   context: unknown,
 ): Promise<TimerHandlerResult> => {
-  parseTimerEvent(event);
+  try {
+    parseTimerEvent(event);
+  } catch (error) {
+    try {
+      reportInvalidEventShape(timerEventShape(event));
+    } catch {
+      // Invalid event handling must not depend on optional operational telemetry.
+    }
+    throw error;
+  }
   const workerId = readWorkerId(context);
   const getIamToken = async (): Promise<string> => readIamToken(context);
   const runtime = await createRuntime({ getIamToken });
@@ -180,4 +206,6 @@ export const createTimerHandler = ({
 
 export const timerHandler = createTimerHandler({
   createRuntime: createProductionRuntime,
+  reportInvalidEventShape: (shape) =>
+    console.warn("VBTECH_TIMER_INVALID_EVENT_SHAPE", shape),
 });

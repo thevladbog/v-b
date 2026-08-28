@@ -35,6 +35,18 @@ const functionContext = (): YandexFunctionContext => ({
 });
 
 describe("Yandex timer handler", () => {
+  it("reports only a bounded top-level shape when the provider wrapper is rejected", async () => {
+    const shapes: string[] = [];
+    const handler = createTimerHandler({
+      createRuntime: async () => { throw new Error("must not compose"); },
+      reportInvalidEventShape: (shape) => shapes.push(shape),
+    });
+
+    await expect(handler({ messages: timerEvent().messages, tracing_context: {} }, functionContext()))
+      .rejects.toThrow("invalid_timer_event");
+    expect(shapes).toEqual(["object:messages,tracing_context"]);
+  });
+
   // Catches an externally-triggerable side effect before the exact single TimerMessage is authenticated structurally.
   it.each([
     {},
