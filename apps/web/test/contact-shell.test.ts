@@ -237,7 +237,7 @@ describe("disabled contact shell", () => {
     const artifact = entries.map(({ body }) => body).join("\n");
     const javascript = entries.filter(({ file }) => /\.(?:js|mjs)$/.test(file)).map(({ body }) => body).join("\n");
 
-    expect(entries.filter(({ file }) => file.endsWith(".html"))).toHaveLength(9);
+    expect(entries.filter(({ file }) => file.endsWith(".html"))).toHaveLength(10);
     expect(entries.filter(({ file }) => /\.(?:js|mjs)$/.test(file))).toHaveLength(0);
     expect(artifact).not.toMatch(/\/api\/contact/i);
     expect(artifact).not.toMatch(/smartcaptcha\.cloud\.yandex\.ru|captcha\.js|window\.smartCaptcha|grecaptcha|vbtech-reviewed-active-public-site-key/i);
