@@ -6,6 +6,10 @@ import { buildDocx, DOC_TYPE_LABEL } from "../src/tools/doc-forge/docx-factory.j
 const PX =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
+// docx дедуплицирует одинаковые байты картинок — делаем фикстуры различными,
+// добавляя хвостовые байты после IEND (PNG остаётся валидным)
+const distinct = (b64: string, n: number) => btoa(atob(b64) + " ".repeat(n));
+
 const META = {
   docId: "DOC-2026-042",
   title: "Тестовая спецификация",
@@ -29,9 +33,9 @@ describe("doc-forge docx factory", () => {
   });
 
   it("с печатью и подписью в архиве появляются media-файлы", async () => {
-    const plain = await buildDocx(META, { dashPng: PX, barcodePng: PX });
+    const plain = await buildDocx(META, { dashPng: PX, barcodePng: distinct(PX, 1) });
     const signed = await buildDocx(META, {
-      dashPng: PX, barcodePng: PX, sealPng: PX, signaturePng: PX,
+      dashPng: PX, barcodePng: distinct(PX, 1), sealPng: distinct(PX, 2), signaturePng: distinct(PX, 3),
     });
     const mediaCount = (b: Uint8Array) =>
       Object.keys(unzipSync(b)).filter((n) => n.startsWith("word/media/")).length;
