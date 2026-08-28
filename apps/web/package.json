@@ -17,12 +17,14 @@
     "@vbtech/content": "workspace:*",
     "@vbtech/contracts": "workspace:*",
     "@vbtech/legal-documents": "workspace:*",
-    "astro": "7.1.6"
+    "astro": "7.1.6",
+    "docx": "^9.7.1"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.4",
     "@vbtech/contact-function": "workspace:*",
     "@vbtech/email": "workspace:*",
+    "fflate": "^0.8.3",
     "parse5": "7.3.0",
     "typescript": "5.9.3",
     "vitest": "4.1.10"
