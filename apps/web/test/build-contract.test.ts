@@ -68,7 +68,7 @@ describe("root acceptance gate contract", () => {
     expect(activeConfig).toContain('const activeOrigin = "http://127.0.0.1:43229"');
     expect(activeConfig).toContain('String(config.site).replace(/\\/$/, "") !== activeOrigin');
     expect(JSON.parse(webPackage).scripts).toMatchObject({
-      build: "astro build",
+      build: "node scripts/build-doc-forge.mjs && astro build",
       "build:contact-fixture": "VBTECH_INTERNAL_CONTACT_FIXTURE=1 astro build --config test-fixture/astro.config.mjs",
       "build:contact-active": "VBTECH_PRIVATE_ACTIVE_LEGAL_ARTIFACT=1 astro build --config test-active/astro.config.mjs",
     });
