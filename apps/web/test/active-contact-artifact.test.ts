@@ -170,7 +170,7 @@ describe("private production-shaped ACTIVE contact artifact", () => {
     );
     const artifact = entries.map(({ body }) => body).join("\n");
 
-    expect(files.filter((file) => file.endsWith(".html"))).toHaveLength(9);
+    expect(files.filter((file) => file.endsWith(".html"))).toHaveLength(10);
     expect(clientEntries.map(({ file }) => file)).toHaveLength(1);
     expect(clientEntries[0]?.body).toContain("smartcaptcha.cloud.yandex.ru");
     expect(clientEntries[0]?.body).toContain("/api/contact");

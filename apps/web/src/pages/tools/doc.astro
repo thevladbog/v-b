@@ -1,0 +1,76 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  locale="ru"
+  title="Doc Forge — v-b.tech"
+  description="Внутренний генератор фирменных документов"
+  noindex={true}
+>
+  <main class="df-page">
+    <section id="df-lock" class="df-lock">
+      <p class="df-lock-label">DOC FORGE · ВНУТРЕННИЙ ИНСТРУМЕНТ</p>
+      <h1>Генератор документов</h1>
+      <form id="df-unlock">
+        <input type="password" name="pw" placeholder="Пароль" required autofocus />
+        <button type="submit">Открыть</button>
+        <p id="df-err" hidden>Не расшифровалось — проверь пароль.</p>
+      </form>
+    </section>
+    <section id="df-tool" hidden></section>
+  </main>
+</BaseLayout>
+
+<script>
+  import { savedPassword, tryUnlock } from "../../tools/doc-forge/unlock.js";
+
+  const lock = document.getElementById("df-lock")!;
+  const tool = document.getElementById("df-tool")!;
+  const err = document.getElementById("df-err")!;
+  const form = document.getElementById("df-unlock") as HTMLFormElement;
+
+  async function attempt(pw: string) {
+    const ok = await tryUnlock(pw, tool);
+    if (ok) {
+      lock.hidden = true;
+      tool.hidden = false;
+    } else {
+      err.hidden = false;
+      (form.elements.namedItem("pw") as HTMLInputElement).value = "";
+    }
+  }
+
+  const saved = savedPassword();
+  if (saved) attempt(saved);
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    attempt((form.elements.namedItem("pw") as HTMLInputElement).value);
+  });
+</script>
+
+<style>
+  .df-page { max-width: 1080px; margin: 0 auto; padding: 96px 32px; font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  .df-lock-label { font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.22em; color: #d98e04; }
+  .df-lock h1 { font-size: 34px; letter-spacing: -0.02em; margin: 8px 0 24px; }
+  #df-unlock { display: flex; gap: 12px; flex-wrap: wrap; }
+  #df-unlock input { font: 14px "IBM Plex Mono", monospace; padding: 12px 16px; border-radius: 8px; border: 1px solid #2a2f35; background: #101214; color: #e8eaec; min-width: 260px; }
+  #df-unlock button { font: 500 14px "IBM Plex Mono", monospace; padding: 12px 24px; border-radius: 8px; border: none; background: #f5a623; color: #0c0e10; cursor: pointer; }
+  #df-err { color: #e5533c; font-size: 13px; width: 100%; }
+  /* инструмент */
+  :global(.df-grid) { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  :global(.df-form) { display: grid; gap: 14px; }
+  :global(.df-form label) { display: grid; gap: 6px; font-size: 13px; color: #a6adb5; }
+  :global(.df-form input), :global(.df-form select) { font: 14px "IBM Plex Mono", monospace; padding: 10px 14px; border-radius: 8px; border: 1px solid #2a2f35; background: #101214; color: #e8eaec; }
+  :global(.df-check) { grid-auto-flow: column; justify-content: start; align-items: center; }
+  :global(.df-actions) { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+  :global(.df-actions button) { font: 500 13px "IBM Plex Mono", monospace; padding: 11px 18px; border-radius: 8px; border: 1px solid #2a2f35; background: transparent; color: #a6adb5; cursor: pointer; }
+  :global(.df-actions .df-primary) { background: #f5a623; border: none; color: #0c0e10; }
+  :global(.df-doc) { background: #f5f5f2; color: #1b1f23; border-radius: 12px; padding: 28px; display: grid; gap: 10px; }
+  :global(.df-eyebrow) { font: 600 11px "IBM Plex Mono", monospace; letter-spacing: 0.2em; text-transform: uppercase; color: #d98e04; }
+  :global(.df-title) { font: 700 26px "IBM Plex Sans", sans-serif; letter-spacing: -0.02em; }
+  :global(.df-meta) { font: 12px "IBM Plex Mono", monospace; color: #5a626b; }
+  :global(canvas.df-bc) { margin-top: 12px; height: 40px; max-width: 100%; }
+  @media (max-width: 800px) { :global(.df-grid) { grid-template-columns: 1fr; } }
+</style>
