@@ -8,7 +8,7 @@
 ## Сборка
 - Пароль: env `VBTECH_DOC_TOOL_PASSWORD` (задать в CI-секретах и локально).
   Без него сборка payload пропускается: страница выложится, но открыть её
-  будет нельно («no-payload»).
+  будет нельзя («no-payload»).
 - Приватные ассеты (не в git): `apps/web/private-assets/doc-forge/`
   - `seal.png` — печать (брать из облачной папки бренда: seal/vb-seal-legal-logo-duo-mci-alt.png)
   - `signature.png` — факсимиле (signature/vb-signature-vector-ink@2400.png)
