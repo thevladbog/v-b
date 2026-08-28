@@ -21,7 +21,11 @@ export async function tryUnlock(password: string, root: HTMLElement): Promise<bo
   const payload: Payload = JSON.parse(new TextDecoder().decode(plain));
   sessionStorage.setItem(SS_KEY, password);
   const url = URL.createObjectURL(new Blob([payload.js], { type: "text/javascript" }));
-  await import(/* @vite-ignore */ url);
+  try {
+    await import(/* @vite-ignore */ url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
   const init = (globalThis as Record<string, unknown>).vbDocForgeInit as (
     r: HTMLElement,
     p: { sealPng?: string; signaturePng?: string },

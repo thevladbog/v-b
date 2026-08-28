@@ -30,14 +30,32 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
   const err = document.getElementById("df-err")!;
   const form = document.getElementById("df-unlock") as HTMLFormElement;
 
+  let busy = false;
+
   async function attempt(pw: string) {
-    const ok = await tryUnlock(pw, tool);
-    if (ok) {
-      lock.hidden = true;
-      tool.hidden = false;
-    } else {
+    if (busy) return;
+    busy = true;
+    const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      const ok = await tryUnlock(pw, tool);
+      if (ok) {
+        lock.hidden = true;
+        tool.hidden = false;
+      } else {
+        err.textContent = "Не расшифровалось — проверь пароль.";
+        err.hidden = false;
+        (form.elements.namedItem("pw") as HTMLInputElement).value = "";
+      }
+    } catch (e) {
+      err.textContent =
+        (e as Error).message === "no-payload"
+          ? "Инструмент недоступен: payload не собран или сеть недоступна."
+          : "Что-то пошло не так — обнови страницу.";
       err.hidden = false;
-      (form.elements.namedItem("pw") as HTMLInputElement).value = "";
+    } finally {
+      busy = false;
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 
