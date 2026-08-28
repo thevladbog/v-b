@@ -24,3 +24,7 @@ test-results/
 .env
 .env.*
 !.env.example
+
+# Doc Forge: локальные приватные ассеты и зашифрованный payload
+apps/web/private-assets/
+apps/web/public/tools/doc-payload.bin
