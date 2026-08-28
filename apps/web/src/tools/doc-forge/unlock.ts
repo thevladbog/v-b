@@ -20,22 +20,22 @@ export async function tryUnlock(password: string, root: HTMLElement): Promise<bo
   }
   const payload: Payload = JSON.parse(new TextDecoder().decode(plain));
   sessionStorage.setItem(SS_KEY, password);
-  const url = URL.createObjectURL(new Blob([payload.js], { type: "text/javascript" }));
+  // Инлайновый script, а не blob:-URL: CSP сайта разрешает 'unsafe-inline',
+  // но не blob: в script-src — загрузка по blob-ссылке блокируется браузером.
+  // Инлайн выполняется синхронно при вставке в DOM, промис не нужен.
+  const script = document.createElement("script");
+  script.textContent = payload.js;
   try {
-    await new Promise<void>((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = url;
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error("payload-exec"));
-      document.head.append(s);
-    });
+    document.head.append(script);
   } finally {
-    URL.revokeObjectURL(url);
+    script.remove();
   }
   const init = (globalThis as Record<string, unknown>).vbDocForgeInit as (
     r: HTMLElement,
     p: { sealPng?: string; signaturePng?: string },
   ) => void;
+  // CSP блокирует выполнение молча (без исключения) — ловим по отсутствию контракта
+  if (typeof init !== "function") throw new Error("payload-exec");
   init(root, { sealPng: payload.sealPng, signaturePng: payload.signaturePng });
   return true;
 }
