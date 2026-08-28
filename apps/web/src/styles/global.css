@@ -24,6 +24,16 @@ body {
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   overflow-wrap: anywhere;
+  /* Прижимаем футер к низу экрана на коротких страницах: main забирает
+     свободное место. 100dvh, а не 100vh — иначе на iOS Safari страница
+     «прыгает» при сворачивании адресной строки. */
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+body > main {
+  flex: 1 0 auto;
 }
 
 a {
