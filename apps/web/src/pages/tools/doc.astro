@@ -37,6 +37,13 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     busy = true;
     const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
     if (submitBtn) submitBtn.disabled = true;
+    if (!window.isSecureContext) {
+      err.textContent = "Нужен https или localhost — Web Crypto недоступен.";
+      err.hidden = false;
+      busy = false;
+      if (submitBtn) submitBtn.disabled = false;
+      return;
+    }
     try {
       const ok = await tryUnlock(pw, tool);
       if (ok) {
@@ -48,10 +55,13 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         (form.elements.namedItem("pw") as HTMLInputElement).value = "";
       }
     } catch (e) {
+      const message = (e as Error).message;
       err.textContent =
-        (e as Error).message === "no-payload"
+        message === "no-payload"
           ? "Инструмент недоступен: payload не собран или сеть недоступна."
-          : "Что-то пошло не так — обнови страницу.";
+          : message === "bad-payload"
+            ? "Файл инструмента повреждён — пересобери сайт."
+            : "Что-то пошло не так — обнови страницу.";
       err.hidden = false;
     } finally {
       busy = false;

@@ -22,7 +22,12 @@ function download(name: string, data: Uint8Array | string, mime: string) {
 }
 
 function readIssued(): string[] {
-  try { return JSON.parse(localStorage.getItem(LS_IDS) ?? "[]"); } catch { return []; }
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(LS_IDS) ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 (globalThis as Record<string, unknown>).vbDocForgeInit = (root: HTMLElement, priv: PrivateAssets) => {
@@ -67,7 +72,7 @@ function readIssued(): string[] {
   f("author").value = localStorage.getItem(LS_AUTHOR) ?? "Влад Богатырев";
   f("date").value = today;
 
-  const seed = () => `${f("docId").value} ${f("title").value}`.trim();
+  const seed = () => `${f("docId").value.trim()} ${f("title").value.trim()}`.trim();
   const meta = (): DocMeta => ({
     docId: f("docId").value.trim(),
     title: f("title").value.trim(),

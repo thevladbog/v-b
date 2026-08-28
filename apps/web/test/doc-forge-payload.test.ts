@@ -1,15 +1,21 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { decryptPayload } from "../src/tools/doc-forge/payload-crypto.js";
 
-const OUT = "public/tools/doc-payload.bin";
+const OUT = join(tmpdir(), "doc-payload-test.bin");
+
+afterEach(() => {
+  rmSync(OUT, { force: true });
+});
 
 describe("doc-forge payload build", () => {
   it("собирает шифроблоб, который расшифровывается паролем и содержит бандл", async () => {
     rmSync(OUT, { force: true });
     execFileSync("node", ["scripts/build-doc-forge.mjs"], {
-      env: { ...process.env, VBTECH_DOC_TOOL_PASSWORD: "test-password-123" },
+      env: { ...process.env, VBTECH_DOC_TOOL_PASSWORD: "test-password-123", VBTECH_DOC_TOOL_OUT: OUT },
     });
     expect(existsSync(OUT)).toBe(true);
     const blob = new Uint8Array(readFileSync(OUT));
@@ -18,7 +24,7 @@ describe("doc-forge payload build", () => {
   }, 120_000);
 
   it("без пароля пропускает сборку и не падает", () => {
-    const env = { ...process.env };
+    const env = { ...process.env, VBTECH_DOC_TOOL_OUT: OUT };
     delete env.VBTECH_DOC_TOOL_PASSWORD;
     const out = execFileSync("node", ["scripts/build-doc-forge.mjs"], { env }).toString();
     expect(out).toContain("skip");

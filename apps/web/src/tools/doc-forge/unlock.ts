@@ -22,7 +22,13 @@ export async function tryUnlock(password: string, root: HTMLElement): Promise<bo
   sessionStorage.setItem(SS_KEY, password);
   const url = URL.createObjectURL(new Blob([payload.js], { type: "text/javascript" }));
   try {
-    await import(/* @vite-ignore */ url);
+    await new Promise<void>((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = url;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("payload-exec"));
+      document.head.append(s);
+    });
   } finally {
     URL.revokeObjectURL(url);
   }

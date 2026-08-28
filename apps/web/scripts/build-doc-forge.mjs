@@ -1,15 +1,25 @@
 import { build } from "esbuild";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, "..");
-const OUT = join(appRoot, "public/tools/doc-payload.bin");
+const DEFAULT_OUT = join(appRoot, "public/tools/doc-payload.bin");
+const outOverride = process.env.VBTECH_DOC_TOOL_OUT;
+const OUT = outOverride
+  ? isAbsolute(outOverride)
+    ? outOverride
+    : join(appRoot, outOverride)
+  : DEFAULT_OUT;
 
 const password = process.env.VBTECH_DOC_TOOL_PASSWORD;
 if (!password) {
   console.log("[doc-forge] VBTECH_DOC_TOOL_PASSWORD не задан — skip (страница будет без payload)");
+  if (existsSync(DEFAULT_OUT)) {
+    rmSync(DEFAULT_OUT, { force: true });
+    console.log("[doc-forge] удалён устаревший payload — сборка без пароля не должна поставлять старый блоб");
+  }
   process.exit(0);
 }
 
