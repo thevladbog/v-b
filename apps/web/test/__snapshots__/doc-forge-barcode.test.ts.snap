@@ -1,0 +1,221 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`doc-forge barcode > модель соответствует фирменному алгоритму (снапшот эталонного сида) 1`] = `
+[
+  {
+    "amber": false,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 3,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": true,
+    "w": 3,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": true,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 8,
+  },
+  {
+    "amber": false,
+    "short": true,
+    "w": 8,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": true,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 2,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 8,
+  },
+  {
+    "amber": false,
+    "short": true,
+    "w": 2,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 8,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 8,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 3,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 8,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": true,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 2,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 2,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 8,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": true,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 3,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 12,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 5,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 2,
+  },
+  {
+    "amber": false,
+    "short": true,
+    "w": 8,
+  },
+  {
+    "amber": false,
+    "short": true,
+    "w": 3,
+  },
+  {
+    "amber": false,
+    "short": false,
+    "w": 8,
+  },
+]
+`;
