@@ -6,13 +6,45 @@
 шифроблоб `public/tools/doc-payload.bin`.
 
 ## Сборка
-- Пароль: env `VBTECH_DOC_TOOL_PASSWORD` (задать в CI-секретах и локально).
-  Без него сборка payload пропускается: страница выложится, но открыть её
-  будет нельзя («no-payload»).
-- Приватные ассеты (не в git): `apps/web/private-assets/doc-forge/`
-  - `seal.png` — печать (брать из облачной папки бренда: seal/vb-seal-legal-logo-duo-mci-alt.png)
-  - `signature.png` — факсимиле (signature/vb-signature-vector-ink@2400.png)
-  Без них инструмент работает, но без опции «печать + подпись».
+
+### Локально
+Пароль передаётся обычной переменной окружения (Astro-овские `.env` prebuild-скрипт
+не читает — храни пароль в менеджере паролей):
+
+```
+VBTECH_DOC_TOOL_PASSWORD='пароль' pnpm --filter @vbtech/web build
+```
+
+Приватные ассеты (не в git): `apps/web/private-assets/doc-forge/`
+- `seal.png` — печать (облачная папка бренда: seal/vb-seal-legal-logo-duo-mci-alt.png)
+- `signature.png` — факсимиле (signature/vb-signature-vector-ink@2400.png)
+
+Без пароля сборка payload пропускается (страница выложится, но не откроется:
+«no-payload») и удаляет устаревший payload. Без ассетов инструмент работает,
+но без опции «печать + подпись».
+
+### CI (публикация релиза)
+Образ собирается в `.github/workflows/publish.yml`, окружение **`release-publish`** —
+секреты добавляются именно туда (Settings → Environments → release-publish):
+
+| Секрет | Содержимое |
+|---|---|
+| `VBTECH_DOC_TOOL_PASSWORD` | пароль страницы |
+| `VBTECH_DOC_TOOL_SEAL_B64` | `base64 -i seal.png` (одной строкой) |
+| `VBTECH_DOC_TOOL_SIGNATURE_B64` | `base64 -i signature.png` |
+
+Все три необязательны и передаются в сборку BuildKit-секретами (`--secret`, не
+`--build-arg`: арги оседают в истории слоёв). Внутри образа приватные PNG
+существуют только в момент сборки — они запекаются в шифроблоб и удаляются в том
+же слое. После сборки workflow проверяет: если пароль задан, payload обязан быть
+в образе.
+
+`docker build` в publish.yml идёт с `--no-cache`: BuildKit не включает секреты в
+ключ кэша, иначе слой, собранный без пароля, мог бы переиспользоваться и дать
+образ без payload.
+
+`ci.yml` собирает образ без этих секретов — это нормально: страница выкладывается
+без payload, тесты используют собственный временный пароль.
 
 ## Смена пароля
 Поменять секрет и пересобрать сайт. Старые ссылки/сессии умирают сами

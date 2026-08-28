@@ -16,14 +16,34 @@ ENV VBTECH_RELEASE_SHA=$VBTECH_RELEASE_SHA
 
 ARG VBTECH_SUBMISSION_STATE=disabled
 ARG PUBLIC_SMARTCAPTCHA_SITE_KEY
-RUN case "$VBTECH_SUBMISSION_STATE" in \
+# Doc Forge: пароль и приватные ассеты приходят BuildKit-секретами (не build-arg —
+# арги оседают в истории слоёв). Каждый необязателен: без пароля payload не собирается,
+# без ассетов инструмент выходит без опции «печать + подпись».
+RUN --mount=type=secret,id=vbtech_doc_tool_password \
+    --mount=type=secret,id=vbtech_doc_tool_seal \
+    --mount=type=secret,id=vbtech_doc_tool_signature \
+    set -eu; \
+    if [ -s /run/secrets/vbtech_doc_tool_seal ] && [ -s /run/secrets/vbtech_doc_tool_signature ]; then \
+      mkdir -p apps/web/private-assets/doc-forge; \
+      base64 -d < /run/secrets/vbtech_doc_tool_seal > apps/web/private-assets/doc-forge/seal.png; \
+      base64 -d < /run/secrets/vbtech_doc_tool_signature > apps/web/private-assets/doc-forge/signature.png; \
+    fi; \
+    if [ -s /run/secrets/vbtech_doc_tool_password ]; then \
+      VBTECH_DOC_TOOL_PASSWORD="$(cat /run/secrets/vbtech_doc_tool_password)"; \
+      export VBTECH_DOC_TOOL_PASSWORD; \
+    fi; \
+    case "$VBTECH_SUBMISSION_STATE" in \
       disabled) PUBLIC_CONTACT_SUBMISSION_ENABLED=false corepack pnpm --filter @vbtech/web build ;; \
       enabled) test -n "$PUBLIC_SMARTCAPTCHA_SITE_KEY" && \
         PUBLIC_CONTACT_SUBMISSION_ENABLED=true \
         PUBLIC_SMARTCAPTCHA_SITE_KEY="$PUBLIC_SMARTCAPTCHA_SITE_KEY" \
         corepack pnpm --filter @vbtech/web build ;; \
       *) exit 64 ;; \
-    esac
+    esac; \
+    rm -rf apps/web/private-assets; \
+    if [ -s /run/secrets/vbtech_doc_tool_password ] && [ ! -s apps/web/dist/tools/doc-payload.bin ]; then \
+      echo "doc-forge: пароль передан, но payload не собран" >&2; exit 65; \
+    fi
 
 FROM caddy:2.11.4-alpine AS runtime
 

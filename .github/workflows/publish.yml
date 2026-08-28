@@ -52,6 +52,9 @@ jobs:
       VBTECH_SUBMISSION_STATE: ${{ github.event.inputs.submission_state }}
       VBTECH_CONFIRM_ENABLE: ${{ github.event.inputs.confirm_enable }}
       PUBLIC_SMARTCAPTCHA_SITE_KEY: ${{ vars.VBTECH_SMARTCAPTCHA_SITE_KEY }}
+      VBTECH_DOC_TOOL_PASSWORD: ${{ secrets.VBTECH_DOC_TOOL_PASSWORD }}
+      VBTECH_DOC_TOOL_SEAL_B64: ${{ secrets.VBTECH_DOC_TOOL_SEAL_B64 }}
+      VBTECH_DOC_TOOL_SIGNATURE_B64: ${{ secrets.VBTECH_DOC_TOOL_SIGNATURE_B64 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -85,11 +88,22 @@ jobs:
           corepack pnpm install --frozen-lockfile
           corepack pnpm run test:contracts
           corepack pnpm run build:function-artifact
-          docker build --load --file deploy/container/web.Dockerfile \
+          # --no-cache: BuildKit не включает секреты в ключ кэша, поэтому слой,
+          # собранный без пароля, иначе может переиспользоваться и дать образ без payload.
+          DOCKER_BUILDKIT=1 docker build --no-cache --load --file deploy/container/web.Dockerfile \
             --build-arg VBTECH_RELEASE_SHA="$RELEASE_SHA" \
             --build-arg VBTECH_SUBMISSION_STATE="$VBTECH_SUBMISSION_STATE" \
             --build-arg PUBLIC_SMARTCAPTCHA_SITE_KEY="$PUBLIC_SMARTCAPTCHA_SITE_KEY" \
+            --secret id=vbtech_doc_tool_password,env=VBTECH_DOC_TOOL_PASSWORD \
+            --secret id=vbtech_doc_tool_seal,env=VBTECH_DOC_TOOL_SEAL_B64 \
+            --secret id=vbtech_doc_tool_signature,env=VBTECH_DOC_TOOL_SIGNATURE_B64 \
             --tag "$IMAGE_REPOSITORY:$RELEASE_SHA-$VBTECH_SUBMISSION_STATE" .
+          if [ -n "$VBTECH_DOC_TOOL_PASSWORD" ]
+          then
+            docker run --rm --entrypoint sh \
+              "$IMAGE_REPOSITORY:$RELEASE_SHA-$VBTECH_SUBMISSION_STATE" \
+              -c 'test -s /srv/vbtech/tools/doc-payload.bin'
+          fi
       - uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
         with:
           registry: ghcr.io
